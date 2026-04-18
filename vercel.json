@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/release-holds",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/complete-past-bookings",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-availability-email",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}
