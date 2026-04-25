@@ -18,6 +18,7 @@ const teacherNav: NavItem[] = [
   { href: "/professor/agenda", label: "Agenda" },
   { href: "/professor/alunos", label: "Alunos" },
   { href: "/professor/videos", label: "Vídeos" },
+  { href: "/professor/recursos", label: "Recursos" },
   { href: "/professor/perfil", label: "Perfil" },
 ];
 

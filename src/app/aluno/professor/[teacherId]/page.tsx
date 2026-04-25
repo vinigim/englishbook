@@ -1,17 +1,46 @@
 import { notFound } from "next/navigation";
+import {
+  BookOpen,
+  Play,
+  FileText,
+  Newspaper,
+  Gamepad2,
+  Mic,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Container } from "@/components/ui/Container";
 import { Alert } from "@/components/ui/Badge";
 import { formatBRL } from "@/lib/utils";
+import { RESOURCE_TYPE_LABELS } from "@/lib/types";
+import type { ResourceType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const RESOURCE_ICONS: Record<ResourceType, React.ElementType> = {
+  blog: BookOpen,
+  youtube: Play,
+  artigo: FileText,
+  noticia: Newspaper,
+  game: Gamepad2,
+  podcast: Mic,
+};
 
 type VideoRow = {
   id: string;
   title: string;
   description: string | null;
   storage_path: string;
+  topic_id: string | null;
+  topic: { name: string } | null;
+};
+
+type ResourceRow = {
+  id: string;
+  type: ResourceType;
+  title: string;
+  url: string;
+  description: string | null;
   topic_id: string | null;
   topic: { name: string } | null;
 };
@@ -52,7 +81,6 @@ export default async function TeacherVipPage({
 
   const isVip = !!vipRow;
 
-  // Se não é VIP, mostra a página mas sem conteúdo restrito
   if (!isVip) {
     return (
       <Container size="md">
@@ -68,18 +96,27 @@ export default async function TeacherVipPage({
     );
   }
 
-  // Busca vídeos via admin (RLS de teacher_videos só permite o professor ler)
+  // Busca vídeos e indicações em paralelo via admin client
   const admin = createAdminClient();
-  const { data: videos } = await admin
-    .from("teacher_videos")
-    .select("id, title, description, storage_path, topic_id, topic:topic_id(name)")
-    .eq("teacher_id", teacherId)
-    .order("created_at", { ascending: false })
-    .returns<VideoRow[]>();
+  const [videosResult, resourcesResult] = await Promise.all([
+    admin
+      .from("teacher_videos")
+      .select("id, title, description, storage_path, topic_id, topic:topic_id(name)")
+      .eq("teacher_id", teacherId)
+      .order("created_at", { ascending: false })
+      .returns<VideoRow[]>(),
 
-  // Gera signed URLs (1 hora de validade)
+    admin
+      .from("teacher_resources")
+      .select("id, type, title, url, description, topic_id, topic:topic_id(name)")
+      .eq("teacher_id", teacherId)
+      .order("created_at", { ascending: false })
+      .returns<ResourceRow[]>(),
+  ]);
+
+  // Signed URLs para vídeos (1 h de validade)
   const videosWithUrls = await Promise.all(
-    (videos ?? []).map(async (v) => {
+    (videosResult.data ?? []).map(async (v) => {
       const { data } = await admin.storage
         .from("teacher-videos")
         .createSignedUrl(v.storage_path, 3600);
@@ -87,62 +124,166 @@ export default async function TeacherVipPage({
     })
   );
 
-  // Agrupa por tópico
-  const grouped = new Map<string, { label: string; items: typeof videosWithUrls }>();
+  const resources = resourcesResult.data ?? [];
+
+  // Coleta todos os topic_id presentes em vídeos ou indicações
+  const topicKeys = new Map<string, string>(); // key → label
   for (const v of videosWithUrls) {
     const key = v.topic_id ?? "__geral__";
-    const label = v.topic?.name ?? "Geral";
-    if (!grouped.has(key)) grouped.set(key, { label, items: [] });
-    grouped.get(key)!.items.push(v);
+    if (!topicKeys.has(key)) topicKeys.set(key, v.topic?.name ?? "Geral");
   }
+  for (const r of resources) {
+    const key = r.topic_id ?? "__geral__";
+    if (!topicKeys.has(key)) topicKeys.set(key, r.topic?.name ?? "Geral");
+  }
+
+  const hasContent = videosWithUrls.length > 0 || resources.length > 0;
 
   return (
     <Container size="md">
       <div className="py-10 md:py-16 space-y-12">
         <TeacherHeader teacher={teacher} teacherName={teacherName} isVip />
 
-        {videosWithUrls.length === 0 ? (
-          <Alert variant="info" title="Nenhum vídeo disponível">
-            {teacherName} ainda não adicionou vídeos. Volte em breve!
+        {!hasContent ? (
+          <Alert variant="info" title="Nenhum conteúdo ainda">
+            {teacherName} ainda não adicionou vídeos ou indicações. Volte em
+            breve!
           </Alert>
-        ) : (
-          <div className="space-y-12">
-            {Array.from(grouped.entries()).map(([key, group]) => (
-              <section key={key}>
-                <h2 className="font-display text-2xl tracking-tight border-b border-ink pb-2 mb-6">
-                  {group.label}
-                </h2>
-                <div className="space-y-8">
-                  {group.items.map((video) => (
-                    <div key={video.id} className="space-y-3">
-                      <h3 className="font-medium">{video.title}</h3>
-                      {video.description ? (
-                        <p className="text-sm text-muted">{video.description}</p>
-                      ) : null}
-                      {video.signedUrl ? (
-                        <video
-                          controls
-                          preload="metadata"
-                          className="w-full border border-line"
-                          style={{ maxHeight: "480px" }}
-                        >
-                          <source src={video.signedUrl} />
-                          Seu navegador não suporta reprodução de vídeo.
-                        </video>
-                      ) : (
-                        <p className="text-sm text-accent">
-                          Vídeo temporariamente indisponível.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+        ) : null}
+
+        {/* Seção de vídeos */}
+        {videosWithUrls.length > 0 ? (
+          <div className="space-y-2">
+            <h2 className="font-display text-3xl tracking-tight">Vídeos</h2>
+            <ContentByTopic
+              topicKeys={topicKeys}
+              renderItems={(key) => {
+                const items = videosWithUrls.filter(
+                  (v) => (v.topic_id ?? "__geral__") === key
+                );
+                if (items.length === 0) return null;
+                return (
+                  <div className="space-y-8">
+                    {items.map((video) => (
+                      <div key={video.id} className="space-y-3">
+                        <h4 className="font-medium">{video.title}</h4>
+                        {video.description ? (
+                          <p className="text-sm text-muted">
+                            {video.description}
+                          </p>
+                        ) : null}
+                        {video.signedUrl ? (
+                          <video
+                            controls
+                            preload="metadata"
+                            className="w-full border border-line"
+                            style={{ maxHeight: "480px" }}
+                          >
+                            <source src={video.signedUrl} />
+                            Seu navegador não suporta reprodução de vídeo.
+                          </video>
+                        ) : (
+                          <p className="text-sm text-accent">
+                            Vídeo temporariamente indisponível.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }}
+            />
           </div>
-        )}
+        ) : null}
+
+        {/* Seção de indicações */}
+        {resources.length > 0 ? (
+          <div className="space-y-2">
+            <h2 className="font-display text-3xl tracking-tight">Indicações</h2>
+            <ContentByTopic
+              topicKeys={topicKeys}
+              renderItems={(key) => {
+                const items = resources.filter(
+                  (r) => (r.topic_id ?? "__geral__") === key
+                );
+                if (items.length === 0) return null;
+                return (
+                  <ul className="space-y-4">
+                    {items.map((r) => {
+                      const Icon = RESOURCE_ICONS[r.type];
+                      return (
+                        <li
+                          key={r.id}
+                          className="border border-line p-4 space-y-2"
+                        >
+                          <div className="flex items-start gap-3">
+                            <Icon className="w-4 h-4 mt-0.5 text-muted shrink-0" />
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs border border-line px-2 py-0.5 text-muted">
+                                  {RESOURCE_TYPE_LABELS[r.type]}
+                                </span>
+                                <a
+                                  href={r.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium hover:text-accent transition-colors link-underline"
+                                >
+                                  {r.title}
+                                </a>
+                              </div>
+                              {r.description ? (
+                                <p className="text-sm text-muted">
+                                  {r.description}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </Container>
+  );
+}
+
+/**
+ * Renderiza conteúdo agrupado por tópico.
+ * Só mostra um grupo se renderItems retornar algo não-nulo.
+ */
+function ContentByTopic({
+  topicKeys,
+  renderItems,
+}: {
+  topicKeys: Map<string, string>;
+  renderItems: (key: string) => React.ReactNode;
+}) {
+  const entries = Array.from(topicKeys.entries());
+  const multiTopic = entries.filter(([k]) => k !== "__geral__").length > 0;
+
+  return (
+    <div className="space-y-8 mt-4">
+      {entries.map(([key, label]) => {
+        const content = renderItems(key);
+        if (!content) return null;
+        return (
+          <section key={key}>
+            {multiTopic && (
+              <h3 className="text-xs tracking-[0.2em] uppercase text-muted mb-4 border-b border-line pb-2">
+                {key === "__geral__" ? "Geral" : label}
+              </h3>
+            )}
+            {content}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 

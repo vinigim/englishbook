@@ -47,6 +47,34 @@ export type AvailabilitySlot = {
   held_until: string | null;
 };
 
+export type ResourceType =
+  | "blog"
+  | "youtube"
+  | "artigo"
+  | "noticia"
+  | "game"
+  | "podcast";
+
+export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
+  blog: "Blog",
+  youtube: "YouTube",
+  artigo: "Artigo",
+  noticia: "Notícia",
+  game: "Game",
+  podcast: "Podcast",
+};
+
+export type TeacherResource = {
+  id: string;
+  teacher_id: string;
+  topic_id: string | null;
+  type: ResourceType;
+  title: string;
+  url: string;
+  description: string | null;
+  created_at: string;
+};
+
 export type TeacherVideo = {
   id: string;
   teacher_id: string;
