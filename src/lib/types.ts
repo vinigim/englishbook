@@ -47,6 +47,16 @@ export type AvailabilitySlot = {
   held_until: string | null;
 };
 
+export type TeacherVideo = {
+  id: string;
+  teacher_id: string;
+  topic_id: string | null;
+  title: string;
+  description: string | null;
+  storage_path: string;
+  created_at: string;
+};
+
 export type Booking = {
   id: string;
   student_id: string;

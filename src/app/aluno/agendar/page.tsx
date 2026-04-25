@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { Container } from "@/components/ui/Container";
 import { Alert } from "@/components/ui/Badge";
@@ -183,6 +184,12 @@ export default async function AgendarPage() {
                         ))}
                       </div>
                     ) : null}
+                    <Link
+                      href={`/aluno/professor/${teacher.id}`}
+                      className="mt-5 inline-block text-xs text-muted hover:text-ink transition-colors link-underline"
+                    >
+                      Conteúdo VIP →
+                    </Link>
                   </div>
 
                   {/* Coluna dos slots */}
