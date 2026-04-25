@@ -1,4 +1,10 @@
 export type UserRole = "aluno" | "professor";
+
+export type LessonTopic = {
+  id: string;
+  name: string;
+  slug: string;
+};
 export type SlotStatus = "available" | "pending" | "booked" | "cancelled";
 export type BookingStatus =
   | "pending_payment"
@@ -51,4 +57,5 @@ export type Booking = {
   currency: string;
   scheduled_start_at: string;
   scheduled_end_at: string;
+  topic_id: string | null;
 };

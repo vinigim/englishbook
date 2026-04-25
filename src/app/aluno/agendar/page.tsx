@@ -4,7 +4,7 @@ import { Alert } from "@/components/ui/Badge";
 import { BookSlotButton } from "./BookSlotButton";
 import { groupSlotsByDay } from "@/lib/slots";
 import { formatBRL } from "@/lib/utils";
-import type { AvailabilitySlot } from "@/lib/types";
+import type { AvailabilitySlot, LessonTopic } from "@/lib/types";
 
 // Evita cache — disponibilidade muda em tempo real
 export const dynamic = "force-dynamic";
@@ -55,24 +55,57 @@ export default async function AgendarPage() {
     );
   }
 
-  // 2) Slots disponíveis futuros de todos os teachers ativos
   const teacherIds = (teachers ?? []).map((t) => t.id);
-  let slots: AvailabilitySlot[] = [];
-  if (teacherIds.length > 0) {
-    const { data: slotRows } = await supabase
-      .from("availability_slots")
-      .select(
-        "id, teacher_id, start_at, end_at, status, held_by_student_id, held_until"
-      )
-      .in("teacher_id", teacherIds)
-      .eq("status", "available")
-      .gte("start_at", now.toISOString())
-      .lte("start_at", in30Days.toISOString())
-      .order("start_at", { ascending: true });
-    slots = (slotRows ?? []) as AvailabilitySlot[];
+
+  // 2) Slots disponíveis futuros + tópicos por professor (em paralelo)
+  const [slotsResult, allTopicsResult, teacherTopicLinksResult] =
+    await Promise.all([
+      teacherIds.length > 0
+        ? supabase
+            .from("availability_slots")
+            .select(
+              "id, teacher_id, start_at, end_at, status, held_by_student_id, held_until"
+            )
+            .in("teacher_id", teacherIds)
+            .eq("status", "available")
+            .gte("start_at", now.toISOString())
+            .lte("start_at", in30Days.toISOString())
+            .order("start_at", { ascending: true })
+        : Promise.resolve({ data: [] as AvailabilitySlot[] }),
+
+      supabase
+        .from("lesson_topics")
+        .select("id, name, slug")
+        .order("display_order")
+        .returns<LessonTopic[]>(),
+
+      teacherIds.length > 0
+        ? supabase
+            .from("teacher_topics")
+            .select("teacher_id, topic_id")
+            .in("teacher_id", teacherIds)
+            .returns<{ teacher_id: string; topic_id: string }[]>()
+        : Promise.resolve({ data: [] as { teacher_id: string; topic_id: string }[] }),
+    ]);
+
+  const slots = (slotsResult.data ?? []) as AvailabilitySlot[];
+  const allTopics = allTopicsResult.data ?? [];
+  const teacherTopicLinks = teacherTopicLinksResult.data ?? [];
+
+  // Mapa topic_id → LessonTopic (preserva a ordem de display_order)
+  const topicById = new Map(allTopics.map((t) => [t.id, t]));
+
+  // Mapa teacher_id → LessonTopic[]
+  const topicsByTeacher = new Map<string, LessonTopic[]>();
+  for (const link of teacherTopicLinks) {
+    const topic = topicById.get(link.topic_id);
+    if (!topic) continue;
+    const arr = topicsByTeacher.get(link.teacher_id) ?? [];
+    arr.push(topic);
+    topicsByTeacher.set(link.teacher_id, arr);
   }
 
-  // 3) Agrupa por teacher
+  // 3) Agrupa slots por teacher
   const slotsByTeacher = new Map<string, AvailabilitySlot[]>();
   for (const slot of slots) {
     const arr = slotsByTeacher.get(slot.teacher_id) ?? [];
@@ -114,6 +147,7 @@ export default async function AgendarPage() {
             const teacherSlots = slotsByTeacher.get(teacher.id) ?? [];
             const grouped = groupSlotsByDay(teacherSlots);
             const teacherName = teacher.profiles.full_name;
+            const teacherTopics = topicsByTeacher.get(teacher.id) ?? [];
 
             return (
               <section
@@ -136,6 +170,18 @@ export default async function AgendarPage() {
                       <p className="text-muted mt-4 leading-relaxed text-sm">
                         {teacher.bio}
                       </p>
+                    ) : null}
+                    {teacherTopics.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {teacherTopics.map((topic) => (
+                          <span
+                            key={topic.id}
+                            className="text-xs border border-line px-2 py-0.5 text-muted"
+                          >
+                            {topic.name}
+                          </span>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
 
@@ -160,6 +206,7 @@ export default async function AgendarPage() {
                                   startAt={slot.start_at}
                                   endAt={slot.end_at}
                                   teacherName={teacherName}
+                                  teacherTopics={teacherTopics}
                                 />
                               ))}
                             </div>

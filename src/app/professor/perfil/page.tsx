@@ -2,29 +2,48 @@ import { requireUser } from "@/lib/auth";
 import { Container } from "@/components/ui/Container";
 import { Alert } from "@/components/ui/Badge";
 import { TeacherProfileForm } from "./TeacherProfileForm";
+import type { LessonTopic } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function PerfilPage() {
   const { profile, supabase } = await requireUser("professor");
 
-  const { data: teacher, error } = await supabase
-    .from("teachers")
-    .select("bio, hourly_price_cents, active")
-    .eq("id", profile.id)
-    .single<{ bio: string | null; hourly_price_cents: number; active: boolean }>();
+  const [teacherResult, topicsResult, myTopicsResult] = await Promise.all([
+    supabase
+      .from("teachers")
+      .select("bio, hourly_price_cents, active")
+      .eq("id", profile.id)
+      .single<{ bio: string | null; hourly_price_cents: number; active: boolean }>(),
 
-  if (error || !teacher) {
+    supabase
+      .from("lesson_topics")
+      .select("id, name, slug")
+      .order("display_order")
+      .returns<LessonTopic[]>(),
+
+    supabase
+      .from("teacher_topics")
+      .select("topic_id")
+      .eq("teacher_id", profile.id)
+      .returns<{ topic_id: string }[]>(),
+  ]);
+
+  if (teacherResult.error || !teacherResult.data) {
     return (
       <Container>
         <div className="py-10">
           <Alert variant="danger" title="Erro">
-            {error?.message ?? "Perfil não encontrado."}
+            {teacherResult.error?.message ?? "Perfil não encontrado."}
           </Alert>
         </div>
       </Container>
     );
   }
+
+  const teacher = teacherResult.data;
+  const allTopics = topicsResult.data ?? [];
+  const myTopicIds = (myTopicsResult.data ?? []).map((r) => r.topic_id);
 
   return (
     <Container size="md">
@@ -43,6 +62,8 @@ export default async function PerfilPage() {
           initialBio={teacher.bio ?? ""}
           initialPriceCents={teacher.hourly_price_cents}
           initialActive={teacher.active}
+          allTopics={allTopics}
+          initialTopicIds={myTopicIds}
         />
       </div>
     </Container>

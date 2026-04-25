@@ -6,12 +6,15 @@ import { saveTeacherProfileAction, type ProfileState } from "./actions";
 import { Input, Label } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import type { LessonTopic } from "@/lib/types";
 
 type Props = {
   initialFullName: string;
   initialBio: string;
   initialPriceCents: number;
   initialActive: boolean;
+  allTopics: LessonTopic[];
+  initialTopicIds: string[];
 };
 
 function SubmitButton() {
@@ -39,12 +42,29 @@ export function TeacherProfileForm({
   initialBio,
   initialPriceCents,
   initialActive,
+  allTopics,
+  initialTopicIds,
 }: Props) {
   const [active, setActive] = useState(initialActive);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(
+    new Set(initialTopicIds)
+  );
   const [state, formAction] = useActionState<ProfileState, FormData>(
     saveTeacherProfileAction,
     {}
   );
+
+  function toggleTopic(id: string) {
+    setSelectedTopicIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   return (
     <form action={formAction} className="space-y-10 max-w-2xl">
@@ -116,6 +136,43 @@ export function TeacherProfileForm({
           Valor cobrado por aula de 60 minutos.
         </p>
       </div>
+
+      {/* Tópicos */}
+      {allTopics.length > 0 ? (
+        <div>
+          <Label>Tópicos que você oferece</Label>
+          <p className="text-xs text-muted mb-4">
+            Alunos poderão escolher um tópico ao agendar. Deixe vazio para
+            oferecer apenas aulas generalistas.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {allTopics.map((topic) => {
+              const checked = selectedTopicIds.has(topic.id);
+              return (
+                <label
+                  key={topic.id}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 border cursor-pointer select-none transition-colors",
+                    checked
+                      ? "border-ink bg-ink text-paper"
+                      : "border-line hover:border-ink"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    name="topic_ids"
+                    value={topic.id}
+                    checked={checked}
+                    onChange={() => toggleTopic(topic.id)}
+                    className="sr-only"
+                  />
+                  {topic.name}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {/* Active */}
       <div>

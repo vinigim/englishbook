@@ -16,6 +16,7 @@ type AgendaBooking = {
   scheduled_end_at: string;
   cancelled_reason: string | null;
   profiles: { full_name: string; email: string } | null;
+  topic: { name: string } | null;
 };
 
 function isFilter(v: string | undefined): v is AgendaFilter {
@@ -38,7 +39,8 @@ export default async function AgendaPage({
       `
       id, status, price_cents, scheduled_start_at, scheduled_end_at,
       cancelled_reason,
-      profiles:student_id ( full_name, email )
+      profiles:student_id ( full_name, email ),
+      topic:topic_id ( name )
     `
     )
     .eq("teacher_id", user.id);
@@ -147,11 +149,14 @@ function AgendaRow({ booking }: { booking: AgendaBooking }) {
           <p className="text-xs text-muted">{studentEmail}</p>
         ) : null}
       </div>
-      <div className="sm:col-span-4 text-sm text-muted">
+      <div className="sm:col-span-3 text-sm text-muted">
         {formatDateTime(booking.scheduled_start_at)}
+        {booking.topic?.name ? (
+          <p className="text-xs mt-0.5">{booking.topic.name}</p>
+        ) : null}
       </div>
       <div className="sm:col-span-2">{badge}</div>
-      <div className="sm:col-span-1 sm:text-right font-display text-muted">
+      <div className="sm:col-span-2 sm:text-right font-display text-muted">
         {formatBRL(booking.price_cents)}
       </div>
     </li>

@@ -21,6 +21,7 @@ type HistoryBooking = {
   cancelled_at: string | null;
   cancelled_reason: string | null;
   profiles: { full_name: string } | null;
+  topic: { name: string } | null;
 };
 
 function isHistoryFilter(v: string | undefined): v is HistoryFilter {
@@ -51,7 +52,8 @@ export default async function HistoricoPage({
       `
       id, status, price_cents, currency, scheduled_start_at, scheduled_end_at,
       cancelled_at, cancelled_reason,
-      profiles:teacher_id (full_name)
+      profiles:teacher_id (full_name),
+      topic:topic_id (name)
     `,
       { count: "exact" }
     )
@@ -214,6 +216,9 @@ function HistoryRow({ booking }: { booking: HistoryBooking }) {
         <p className="text-sm text-muted">
           {formatDateTime(booking.scheduled_start_at)}
         </p>
+        {booking.topic?.name ? (
+          <p className="text-xs text-muted mt-0.5">{booking.topic.name}</p>
+        ) : null}
       </div>
       <div className="sm:col-span-3">{badge}</div>
       <div className="sm:col-span-2 text-sm text-muted">

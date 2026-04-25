@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   slot_id: z.string().uuid(),
+  topic_id: z.string().uuid().optional(),
 });
 
 // Duração do hold deve bater com o PT do Stripe (cliente tem que pagar antes disso).
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
       p_slot_id: parsed.data.slot_id,
       p_student_id: user.id,
       p_hold_minutes: HOLD_MINUTES,
+      p_topic_id: parsed.data.topic_id ?? null,
     }
   );
 

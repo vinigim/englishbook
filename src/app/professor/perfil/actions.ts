@@ -12,6 +12,7 @@ const schema = z.object({
     .min(10, "Preço mínimo R$ 10")
     .max(2000, "Preço máximo R$ 2.000"),
   active: z.boolean(),
+  topic_ids: z.array(z.string().uuid()).optional(),
 });
 
 export type ProfileState = {
@@ -31,13 +32,13 @@ export async function saveTeacherProfileAction(
 
   if (!user) return { error: "Sessão expirada." };
 
-  // hourly_price vem como string "80" (reais); converter p/ número
   const priceRaw = formData.get("hourly_price_brl");
   const parsed = schema.safeParse({
     full_name: formData.get("full_name"),
     bio: formData.get("bio") || "",
     hourly_price_brl: priceRaw ? Number(priceRaw) : 0,
     active: formData.get("active") === "on",
+    topic_ids: formData.getAll("topic_ids"),
   });
 
   if (!parsed.success) {
@@ -48,7 +49,6 @@ export async function saveTeacherProfileAction(
     return { fieldErrors };
   }
 
-  // Atualiza os dois: profiles.full_name e teachers.*
   const { error: profileError } = await supabase
     .from("profiles")
     .update({ full_name: parsed.data.full_name })
@@ -67,7 +67,25 @@ export async function saveTeacherProfileAction(
 
   if (teacherError) return { error: teacherError.message };
 
+  // Substitui todos os tópicos do professor
+  const { error: deleteError } = await supabase
+    .from("teacher_topics")
+    .delete()
+    .eq("teacher_id", user.id);
+
+  if (deleteError) return { error: deleteError.message };
+
+  const topicIds = parsed.data.topic_ids ?? [];
+  if (topicIds.length > 0) {
+    const { error: insertError } = await supabase
+      .from("teacher_topics")
+      .insert(topicIds.map((id) => ({ teacher_id: user.id, topic_id: id })));
+
+    if (insertError) return { error: insertError.message };
+  }
+
   revalidatePath("/professor/perfil");
   revalidatePath("/professor/dashboard");
+  revalidatePath("/aluno/agendar");
   return { ok: true };
 }
