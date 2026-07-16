@@ -5,6 +5,7 @@ import { normalizePhone } from "@/lib/phone";
 import { firstName, renderTemplateBody, countTemplateVariables } from "@/lib/message";
 import type {
   DetectedColumn,
+  MetaTemplate,
   ParseResult,
   PreparedContact,
   SendResultLine,
@@ -39,6 +40,47 @@ export default function Home() {
   const [languageCode, setLanguageCode] = useState("pt_BR");
   const [templateBody, setTemplateBody] = useState(DEFAULT_TEMPLATE);
   const [slots, setSlots] = useState<VarSlot[]>([]);
+
+  // templates aprovados (buscados da Meta)
+  const [templates, setTemplates] = useState<MetaTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  async function loadTemplates() {
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+    try {
+      const res = await fetch("/api/templates");
+      const data = await res.json();
+      if (!data.ok) {
+        setTemplatesError(data.error || "Não foi possível carregar os templates.");
+        setTemplates([]);
+      } else {
+        setTemplates(data.templates ?? []);
+      }
+    } catch (err) {
+      setTemplatesError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTemplatesLoading(false);
+      setTemplatesLoaded(true);
+    }
+  }
+
+  // Busca os templates automaticamente ao entrar no passo de composição.
+  useEffect(() => {
+    if (step === "compose" && !templatesLoaded && !templatesLoading) {
+      loadTemplates();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Preenche os campos a partir de um template escolhido.
+  function applyTemplate(t: MetaTemplate) {
+    setTemplateName(t.name);
+    setLanguageCode(t.language);
+    if (t.bodyText) setTemplateBody(t.bodyText);
+  }
 
   // envio
   const [delayMs, setDelayMs] = useState(4000);
@@ -283,6 +325,11 @@ export default function Home() {
           slots={slots}
           setSlots={setSlots}
           sampleContact={validContacts[0]}
+          templates={templates}
+          templatesLoading={templatesLoading}
+          templatesError={templatesError}
+          onReloadTemplates={loadTemplates}
+          onApplyTemplate={applyTemplate}
           onBack={() => setStep("map")}
           onNext={() => setStep("review")}
         />
@@ -533,6 +580,119 @@ function MapStep({
   );
 }
 
+function TemplateStatusBadge({ status }: { status: string }) {
+  const s = status.toUpperCase();
+  const map: Record<string, string> = {
+    APPROVED: "bg-green-100 text-green-700",
+    PENDING: "bg-yellow-100 text-yellow-700",
+    REJECTED: "bg-red-100 text-red-700",
+  };
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+        map[s] ?? "bg-gray-100 text-gray-500"
+      }`}
+    >
+      {s}
+    </span>
+  );
+}
+
+function TemplatePicker({
+  templates,
+  loading,
+  error,
+  selectedKey,
+  onReload,
+  onSelect,
+  keyOf,
+}: {
+  templates: MetaTemplate[];
+  loading: boolean;
+  error: string | null;
+  selectedKey: string;
+  onReload: () => void;
+  onSelect: (t: MetaTemplate) => void;
+  keyOf: (t: MetaTemplate) => string;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700">
+          Templates aprovados na sua conta
+        </span>
+        <button
+          onClick={onReload}
+          disabled={loading}
+          className="text-xs font-medium text-wa-teal hover:underline disabled:opacity-50"
+        >
+          {loading ? "carregando…" : "↻ recarregar"}
+        </button>
+      </div>
+
+      {loading && (
+        <p className="text-sm text-gray-400">Buscando templates na Meta…</p>
+      )}
+
+      {!loading && error && (
+        <p className="text-xs text-amber-700">
+          {error} — você ainda pode preencher o template manualmente abaixo.
+        </p>
+      )}
+
+      {!loading && !error && templates.length === 0 && (
+        <p className="text-xs text-gray-400">
+          Nenhum template encontrado. Preencha manualmente abaixo.
+        </p>
+      )}
+
+      {!loading && templates.length > 0 && (
+        <div className="max-h-56 space-y-1.5 overflow-y-auto">
+          {templates.map((t) => {
+            const isSelected = keyOf(t) === selectedKey;
+            const selectable = t.status.toUpperCase() === "APPROVED";
+            return (
+              <button
+                key={keyOf(t)}
+                onClick={() => selectable && onSelect(t)}
+                disabled={!selectable}
+                className={`w-full rounded-md border px-3 py-2 text-left transition ${
+                  isSelected
+                    ? "border-wa-green bg-wa-green/10"
+                    : "border-gray-200 bg-white hover:border-wa-teal"
+                } ${!selectable ? "cursor-not-allowed opacity-60" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm text-gray-800">
+                    {t.name}
+                  </span>
+                  <span className="text-xs text-gray-400">{t.language}</span>
+                  <TemplateStatusBadge status={t.status} />
+                  {t.variableCount > 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      {t.variableCount} var.
+                    </span>
+                  )}
+                  {isSelected && (
+                    <span className="ml-auto text-xs font-semibold text-wa-green">
+                      selecionado
+                    </span>
+                  )}
+                </div>
+                {t.bodyText && (
+                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                    {t.bodyText}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComposeStep({
   columns,
   templateName,
@@ -544,6 +704,11 @@ function ComposeStep({
   slots,
   setSlots,
   sampleContact,
+  templates,
+  templatesLoading,
+  templatesError,
+  onReloadTemplates,
+  onApplyTemplate,
   onBack,
   onNext,
 }: {
@@ -557,6 +722,11 @@ function ComposeStep({
   slots: VarSlot[];
   setSlots: React.Dispatch<React.SetStateAction<VarSlot[]>>;
   sampleContact?: PreparedContact;
+  templates: MetaTemplate[];
+  templatesLoading: boolean;
+  templatesError: string | null;
+  onReloadTemplates: () => void;
+  onApplyTemplate: (t: MetaTemplate) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -566,8 +736,23 @@ function ComposeStep({
     setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   }
 
+  // Chave única name+language, já que o mesmo template pode ter vários idiomas.
+  function keyOf(t: MetaTemplate) {
+    return `${t.name}::${t.language}`;
+  }
+
   return (
     <Card>
+      <TemplatePicker
+        templates={templates}
+        loading={templatesLoading}
+        error={templatesError}
+        selectedKey={`${templateName}::${languageCode}`}
+        onReload={onReloadTemplates}
+        onSelect={(t) => onApplyTemplate(t)}
+        keyOf={keyOf}
+      />
+
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">

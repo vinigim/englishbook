@@ -1,6 +1,8 @@
 // Cliente mínimo da WhatsApp Cloud API (Meta Graph API).
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
 
+import type { MetaTemplate } from "./types";
+
 export interface WhatsAppConfig {
   accessToken: string;
   phoneNumberId: string;
@@ -92,13 +94,29 @@ export async function sendTemplateMessage(
   }
 }
 
-export interface MetaTemplate {
-  name: string;
-  language: string;
-  status: string;
-  category: string;
-  bodyText: string | null;
-  variableCount: number;
+/**
+ * Converte a resposta bruta do endpoint message_templates da Graph API na
+ * nossa forma enxuta. Extraído como função pura para ser testável sem rede.
+ */
+export function parseTemplatesResponse(data: any): MetaTemplate[] {
+  return (data?.data ?? []).map((t: any): MetaTemplate => {
+    const bodyComponent = (t.components ?? []).find(
+      (c: any) => c.type === "BODY",
+    );
+    const bodyText: string | null = bodyComponent?.text ?? null;
+    const variableCount = bodyText
+      ? new Set([...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => m[1]))
+          .size
+      : 0;
+    return {
+      name: t.name,
+      language: t.language,
+      status: t.status,
+      category: t.category,
+      bodyText,
+      variableCount,
+    };
+  });
 }
 
 /**
@@ -124,27 +142,7 @@ export async function listTemplates(
       return { ok: false, error: data?.error?.message || `HTTP ${res.status}` };
     }
 
-    const templates: MetaTemplate[] = (data?.data ?? []).map((t: any) => {
-      const bodyComponent = (t.components ?? []).find(
-        (c: any) => c.type === "BODY",
-      );
-      const bodyText: string | null = bodyComponent?.text ?? null;
-      const variableCount = bodyText
-        ? new Set(
-            [...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => m[1]),
-          ).size
-        : 0;
-      return {
-        name: t.name,
-        language: t.language,
-        status: t.status,
-        category: t.category,
-        bodyText,
-        variableCount,
-      };
-    });
-
-    return { ok: true, templates };
+    return { ok: true, templates: parseTemplatesResponse(data) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

@@ -1,12 +1,31 @@
+// Títulos/pronomes de tratamento que devem ser ignorados ao pegar o 1º nome.
+const TITLES = new Set([
+  "dr",
+  "dra",
+  "sr",
+  "sra",
+  "srta",
+  "prof",
+  "profa",
+  "dro",
+  "exmo",
+  "exma",
+]);
+
 /**
- * Extrai o primeiro nome, capitalizado. Útil porque planilhas costumam trazer
- * o nome completo ("MARIA DA SILVA") e a mensagem fica mais natural com "Maria".
+ * Extrai o primeiro nome, capitalizado, pulando títulos de tratamento.
+ * Ex.: "MARIA DA SILVA" -> "Maria"; "Dra. Nayara Scardovelli" -> "Nayara".
+ * Se sobrar só o título (nome vazio), devolve o título capitalizado.
  */
 export function firstName(fullName: string): string {
   const cleaned = String(fullName ?? "").trim();
   if (!cleaned) return "";
-  const first = cleaned.split(/\s+/)[0];
-  return capitalize(first);
+  const tokens = cleaned.split(/\s+/);
+  for (const token of tokens) {
+    const bare = token.replace(/\.$/, "").toLowerCase();
+    if (!TITLES.has(bare)) return capitalize(token);
+  }
+  return capitalize(tokens[0]);
 }
 
 export function capitalize(word: string): string {

@@ -9,9 +9,11 @@ export function normalizeHeader(header: string): string {
     .trim();
 }
 
-// Aliases conhecidos por papel. A ordem importa: telefone é checado antes de
-// nome para evitar que "nome do contato" roube uma coluna de telefone.
-const ALIASES: Record<Exclude<ColumnRole, "custom">, string[]> = {
+type Role = Exclude<ColumnRole, "custom">;
+
+// Aliases que casam por SUBSTRING — inequívocos o bastante para aparecer dentro
+// de cabeçalhos compostos (ex: "telefone comercial", "nome completo").
+const SUBSTRING_ALIASES: Record<Role, string[]> = {
   phone: [
     "telefone",
     "celular",
@@ -19,26 +21,11 @@ const ALIASES: Record<Exclude<ColumnRole, "custom">, string[]> = {
     "whats",
     "zap",
     "fone",
-    "phone",
     "mobile",
-    "numero",
-    "num",
-    "tel",
     "contato telefonico",
   ],
-  name: [
-    "nome",
-    "name",
-    "cliente",
-    "contato",
-    "responsavel",
-    "primeiro nome",
-    "nome completo",
-    "full name",
-    "first name",
-    "lead",
-  ],
-  email: ["email", "e-mail", "mail", "correio"],
+  name: ["nome", "name", "primeiro nome", "nome completo", "full name", "first name"],
+  email: ["email", "e-mail", "correio"],
   company: [
     "empresa",
     "company",
@@ -49,6 +36,18 @@ const ALIASES: Record<Exclude<ColumnRole, "custom">, string[]> = {
   ],
 };
 
+// Aliases ambíguos/curtos — só casam se o cabeçalho for EXATAMENTE isso.
+// Evita que "Status do Contato" ou "Data do Contato" virem "nome" só por
+// conterem a palavra "contato".
+const EXACT_ALIASES: Record<Role, string[]> = {
+  phone: ["numero", "num", "tel", "phone"],
+  name: ["cliente", "contato", "responsavel", "lead"],
+  email: ["mail"],
+  company: [],
+};
+
+const ROLE_ORDER: Role[] = ["phone", "email", "company", "name"];
+
 /**
  * Tenta inferir o papel de uma coluna a partir do cabeçalho.
  * Retorna "custom" quando nada casa.
@@ -57,18 +56,19 @@ export function detectRole(header: string): ColumnRole {
   const h = normalizeHeader(header);
   if (!h) return "custom";
 
-  const order: Array<Exclude<ColumnRole, "custom">> = [
-    "phone",
-    "email",
-    "company",
-    "name",
-  ];
+  // 1) Correspondência exata primeiro (mais confiável).
+  for (const role of ROLE_ORDER) {
+    if (SUBSTRING_ALIASES[role].includes(h)) return role;
+    if (EXACT_ALIASES[role].includes(h)) return role;
+  }
 
-  for (const role of order) {
-    for (const alias of ALIASES[role]) {
-      if (h === alias || h.includes(alias)) return role;
+  // 2) Correspondência por substring, só para aliases inequívocos.
+  for (const role of ROLE_ORDER) {
+    for (const alias of SUBSTRING_ALIASES[role]) {
+      if (h.includes(alias)) return role;
     }
   }
+
   return "custom";
 }
 

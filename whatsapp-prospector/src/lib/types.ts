@@ -43,6 +43,16 @@ export interface PreparedContact {
   error?: string;
 }
 
+/** Um template de mensagem cadastrado na conta WhatsApp Business (Meta). */
+export interface MetaTemplate {
+  name: string;
+  language: string;
+  status: string; // APPROVED, PENDING, REJECTED...
+  category: string;
+  bodyText: string | null;
+  variableCount: number;
+}
+
 export interface SendResultLine {
   index: number;
   phoneE164: string | null;
