@@ -41,6 +41,8 @@ export interface PreparedContact {
   preview: string;
   /** Motivo de o contato ser inválido, se for o caso. */
   error?: string;
+  /** O "1º nome" foi extraído de algo que parece nome de empresa. */
+  nameWarning?: boolean;
 }
 
 /** Um template de mensagem cadastrado na conta WhatsApp Business (Meta). */

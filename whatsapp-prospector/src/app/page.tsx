@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizePhone } from "@/lib/phone";
-import { firstName, renderTemplateBody, countTemplateVariables } from "@/lib/message";
+import {
+  firstName,
+  renderTemplateBody,
+  countTemplateVariables,
+  looksLikeCompanyName,
+} from "@/lib/message";
 import type {
   DetectedColumn,
   MetaTemplate,
@@ -145,9 +150,15 @@ export default function Home() {
       const rawPhone = row[phoneCol] ?? "";
       const phoneE164 = normalizePhone(rawPhone);
 
+      let nameWarning = false;
       const variables = slots.map((slot) => {
         if (!slot.column) return slot.literal;
         const value = row[slot.column] ?? "";
+        // Só alertamos quando estamos reduzindo para o 1º nome de algo que
+        // parece nome de empresa — aí "Olá Clínica!" pode soar estranho.
+        if (slot.firstNameOnly && looksLikeCompanyName(value)) {
+          nameWarning = true;
+        }
         return slot.firstNameOnly ? firstName(value) : value;
       });
 
@@ -159,6 +170,7 @@ export default function Home() {
         variables,
         preview: renderTemplateBody(templateBody, variables),
         error: phoneE164 ? undefined : "telefone inválido",
+        nameWarning,
       };
     });
   }, [parse, nameCol, phoneCol, slots, templateBody]);
@@ -325,6 +337,7 @@ export default function Home() {
           slots={slots}
           setSlots={setSlots}
           sampleContact={validContacts[0]}
+          companyWarningCount={validContacts.filter((c) => c.nameWarning).length}
           templates={templates}
           templatesLoading={templatesLoading}
           templatesError={templatesError}
@@ -704,6 +717,7 @@ function ComposeStep({
   slots,
   setSlots,
   sampleContact,
+  companyWarningCount,
   templates,
   templatesLoading,
   templatesError,
@@ -722,6 +736,7 @@ function ComposeStep({
   slots: VarSlot[];
   setSlots: React.Dispatch<React.SetStateAction<VarSlot[]>>;
   sampleContact?: PreparedContact;
+  companyWarningCount: number;
   templates: MetaTemplate[];
   templatesLoading: boolean;
   templatesError: string | null;
@@ -850,6 +865,25 @@ function ComposeStep({
           <div className="rounded-lg bg-[#dcf8c6] px-4 py-3 text-sm text-gray-800 shadow-sm">
             {sampleContact.preview}
           </div>
+          {sampleContact.nameWarning && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
+              <span>⚠️</span>
+              <span>
+                Este nome parece ser de <strong>empresa</strong>. Com “só 1º
+                nome” a saudação pode ficar estranha — considere desmarcar a
+                opção para usar o nome completo.
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {companyWarningCount > 0 && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          ⚠️ <strong>{companyWarningCount}</strong>{" "}
+          {companyWarningCount === 1 ? "contato parece" : "contatos parecem"}{" "}
+          ter nome de empresa na variável de 1º nome. Revise na próxima etapa
+          (ficam marcados com ⚠️).
         </div>
       )}
 
@@ -889,6 +923,9 @@ function ReviewStep({
 }) {
   const done = Object.keys(results).length;
   const progress = validCount > 0 ? Math.round((done / validCount) * 100) : 0;
+  const warnCount = prepared.filter(
+    (c) => c.phoneE164 && c.nameWarning,
+  ).length;
 
   return (
     <Card>
@@ -899,6 +936,11 @@ function ReviewStep({
         {invalidCount > 0 && (
           <span className="rounded bg-red-100 px-2 py-1 text-red-700">
             {invalidCount} inválidos (pulados)
+          </span>
+        )}
+        {warnCount > 0 && (
+          <span className="rounded bg-amber-100 px-2 py-1 text-amber-700">
+            ⚠️ {warnCount} com possível nome de empresa
           </span>
         )}
         <label className="ml-auto flex items-center gap-2 text-gray-600">
@@ -955,7 +997,16 @@ function ReviewStep({
               const r = results[c.index];
               return (
                 <tr key={c.index} className="border-t border-gray-100 align-top">
-                  <td className="px-3 py-2">{c.name || "—"}</td>
+                  <td className="px-3 py-2">
+                    <span className="flex items-center gap-1">
+                      {c.name || "—"}
+                      {c.nameWarning && (
+                        <span title="Parece nome de empresa — revise a personalização com '1º nome'.">
+                          ⚠️
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {c.phoneE164 ?? (
                       <span className="text-red-500">{c.rawPhone} (inválido)</span>
