@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Derma Lux — Agenda de Aluguéis</title>
+<style>
+  :root {
+    --bg: #0e1220;
+    --bg-soft: #161b2e;
+    --panel: #1b2138;
+    --panel-2: #222a45;
+    --border: #2c3557;
+    --text: #eef1fb;
+    --muted: #97a0c4;
+    --brand: #8b7bff;
+    --brand-2: #34d3c6;
+    --brand-soft: rgba(139,123,255,0.15);
+    --danger: #ff6b81;
+    --success: #3ddc97;
+    --warning: #ffb443;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(0,0,0,0.35);
+    --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6fc;
+      --bg-soft: #ffffff;
+      --panel: #ffffff;
+      --panel-2: #f0f2fb;
+      --border: #e2e6f5;
+      --text: #1c2138;
+      --muted: #6a7398;
+      --brand-soft: rgba(139,123,255,0.12);
+      --shadow: 0 10px 30px rgba(60,70,120,0.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand); }
+
+  /* ---------- Layout ---------- */
+  header.topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: linear-gradient(180deg, var(--bg-soft), var(--bg-soft) 70%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 1200px; margin: 0 auto; padding: 14px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
+    box-shadow: 0 6px 16px rgba(139,123,255,0.4);
+  }
+  .logo-text b { font-size: 18px; letter-spacing: .3px; }
+  .logo-text span { display: block; font-size: 12px; color: var(--muted); margin-top: -2px; }
+  .topbar-spacer { flex: 1; }
+
+  nav.tabs { display: flex; gap: 4px; background: var(--panel-2); padding: 5px; border-radius: 12px; flex-wrap: wrap; }
+  nav.tabs button {
+    border: none; background: transparent; color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+    font-family: inherit; transition: .15s;
+  }
+  nav.tabs button:hover { color: var(--text); }
+  nav.tabs button.active { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(139,123,255,0.35); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 80px; }
+  .view { display: none; animation: fade .25s ease; }
+  .view.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  h1.page-title { font-size: 22px; margin: 4px 0 2px; }
+  .page-sub { color: var(--muted); font-size: 14px; margin: 0 0 20px; }
+
+  /* ---------- Cards / panels ---------- */
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  }
+  .grid { display: grid; gap: 16px; }
+  .stats { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 22px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px;
+  }
+  .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+  .stat .v { font-size: 28px; font-weight: 800; margin-top: 4px; }
+  .stat .v small { font-size: 14px; color: var(--muted); font-weight: 600; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    padding: 9px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: .15s; text-decoration: none;
+  }
+  .btn:hover { border-color: var(--brand); transform: translateY(-1px); }
+  .btn-primary { background: linear-gradient(135deg, var(--brand), #6f5cff); color: #fff; border: none; box-shadow: 0 6px 16px rgba(139,123,255,0.35); }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-ghost { background: transparent; }
+  .btn-danger { color: var(--danger); border-color: transparent; background: transparent; padding: 6px 8px; }
+  .btn-danger:hover { background: rgba(255,107,129,0.12); border-color: transparent; transform: none; }
+  .btn-sm { padding: 6px 11px; font-size: 13px; }
+
+  /* ---------- Forms ---------- */
+  label.field { display: block; margin-bottom: 14px; }
+  label.field .lab { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--muted); }
+  input, select, textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .toolbar .grow { flex: 1; }
+
+  /* ---------- Rental list ---------- */
+  .day-group { margin-bottom: 22px; }
+  .day-head {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+    padding-bottom: 8px; border-bottom: 1px dashed var(--border);
+  }
+  .day-head .d { font-size: 16px; font-weight: 800; }
+  .day-head .dow { color: var(--muted); font-size: 13px; text-transform: capitalize; }
+  .day-head .cnt { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+  .rental {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px;
+    transition: .15s;
+  }
+  .rental:hover { border-color: var(--brand); }
+  .rental.past { opacity: .6; }
+  .rental .time {
+    min-width: 118px; text-align: center; padding: 8px 6px; border-radius: 10px;
+    background: var(--panel-2); font-weight: 700; font-size: 14px; line-height: 1.25;
+  }
+  .rental .time small { display: block; color: var(--muted); font-weight: 600; font-size: 12px; }
+  .rental .info { flex: 1; min-width: 0; }
+  .rental .info .client { font-weight: 700; font-size: 15px; }
+  .rental .info .meta { color: var(--muted); font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
+  .rental .info .meta span { display: inline-flex; align-items: center; gap: 5px; }
+  .equip-pill {
+    padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap;
+  }
+  .rental .actions { display: flex; gap: 4px; }
+
+  .icon-btn {
+    border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 7px;
+    border-radius: 8px; display: grid; place-items: center; transition: .15s;
+  }
+  .icon-btn:hover { background: var(--panel-2); color: var(--text); }
+  .icon-btn.del:hover { color: var(--danger); }
+
+  /* ---------- Availability ---------- */
+  .avail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .slot {
+    padding: 12px 8px; text-align: center; border-radius: 10px; font-weight: 700; font-size: 14px;
+    border: 1px solid var(--border); cursor: pointer; transition: .15s; position: relative;
+  }
+  .slot.free { background: rgba(61,220,151,0.10); border-color: rgba(61,220,151,0.4); color: var(--success); }
+  .slot.free:hover { background: rgba(61,220,151,0.22); transform: translateY(-2px); }
+  .slot.busy { background: rgba(255,107,129,0.10); border-color: rgba(255,107,129,0.35); color: var(--danger); cursor: not-allowed; }
+  .slot .who { display: block; font-size: 11px; font-weight: 600; margin-top: 3px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend { display: flex; gap: 18px; margin: 14px 0 20px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .legend .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+
+  /* ---------- Equipment ---------- */
+  .equip-card {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px;
+  }
+  .swatch { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; }
+  .equip-card .name { font-weight: 700; flex: 1; }
+  .equip-card .use { color: var(--muted); font-size: 13px; }
+
+  /* ---------- Empty state ---------- */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .big { font-size: 46px; margin-bottom: 8px; }
+  .empty h3 { color: var(--text); margin: 0 0 6px; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(6,9,20,0.62); backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center; z-index: 50; padding: 32px 16px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+    width: 100%; max-width: 560px; padding: 24px; box-shadow: var(--shadow); animation: pop .2s ease;
+  }
+  @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(10px); } to { opacity: 1; transform: none; } }
+  .modal h2 { margin: 0 0 4px; font-size: 20px; }
+  .modal .modal-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 12px; font-weight: 600;
+    font-size: 14px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: .25s; z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; background: var(--brand-soft); color: var(--brand); }
+  .muted { color: var(--muted); }
+  .badge-today { background: var(--warning); color: #3a2600; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 800; }
+
+  @media (max-width: 640px) {
+    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    .rental { flex-wrap: wrap; }
+    .rental .time { min-width: 90px; }
+    .topbar-inner { gap: 10px; }
+    nav.tabs { width: 100%; justify-content: space-between; }
+    nav.tabs button { flex: 1; padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <div class="logo-mark">DL</div>
+      <div class="logo-text">
+        <b>Derma Lux</b>
+        <span>Agenda de aluguel de lasers</span>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <nav class="tabs" id="tabs">
+      <button data-view="agenda" class="active">📋 Agenda</button>
+      <button data-view="disponibilidade">🕑 Disponibilidade</button>
+      <button data-view="equipamentos">🔬 Equipamentos</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ AGENDA / PRÓXIMAS OBRIGAÇÕES ============ -->
+  <section id="view-agenda" class="view active">
+    <div class="toolbar">
+      <div>
+        <h1 class="page-title">Próximas obrigações de aluguel</h1>
+        <p class="page-sub">Todos os aluguéis agendados, organizados por data.</p>
+      </div>
+      <div class="grow"></div>
+      <button class="btn btn-primary" onclick="openRentalModal()">＋ Novo aluguel</button>
+    </div>
+
+    <div class="grid stats" id="stats"></div>
+
+    <div class="toolbar">
+      <input id="searchInput" placeholder="🔍 Buscar por cliente, endereço ou equipamento..." oninput="renderAgenda()" style="max-width:340px" />
+      <select id="filterEquip" onchange="renderAgenda()" style="max-width:220px"></select>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none">
+        <input type="checkbox" id="showPast" onchange="renderAgenda()" style="width:auto" /> Mostrar passados
+      </label>
+    </div>
+
+    <div id="agendaList"></div>
+  </section>
+
+  <!-- ============ DISPONIBILIDADE ============ -->
+  <section id="view-disponibilidade" class="view">
+    <h1 class="page-title">Horários disponíveis</h1>
+    <p class="page-sub">Escolha o equipamento e a data para ver, num relance, os horários livres e ocupados.</p>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="form-row-3">
+        <label class="field">
+          <span class="lab">Equipamento (laser)</span>
+          <select id="availEquip" onchange="renderAvailability()"></select>
+        </label>
+        <label class="field">
+          <span class="lab">Data</span>
+          <input type="date" id="availDate" onchange="renderAvailability()" />
+        </label>
+        <label class="field">
+          <span class="lab">Duração do bloco</span>
+          <select id="availStep" onchange="renderAvailability()">
+            <option value="60">1 hora</option>
+            <option value="30">30 minutos</option>
+            <option value="120">2 horas</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr">
+        <label class="field" style="margin-bottom:0">
+          <span class="lab">Abertura</span>
+          <input type="time" id="availOpen" value="08:00" onchange="renderAvailability()" />
+        </label>
+        <label class="field" style="margin-bottom:0">
+          <span class="lab">Fechamento</span>
+          <input type="time" id="availClose" value="20:00" onchange="renderAvailability()" />
+        </label>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot" style="background:rgba(61,220,151,0.7)"></span>Livre — clique para agendar</span>
+      <span><span class="dot" style="background:rgba(255,107,129,0.7)"></span>Ocupado</span>
+    </div>
+    <div id="availGrid" class="avail-grid"></div>
+  </section>
+
+  <!-- ============ EQUIPAMENTOS ============ -->
+  <section id="view-equipamentos" class="view">
+    <div class="toolbar">
+      <div>
+        <h1 class="page-title">Meus equipamentos</h1>
+        <p class="page-sub">Cadastre os lasers que você aluga.</p>
+      </div>
+      <div class="grow"></div>
+      <button class="btn btn-primary" onclick="openEquipModal()">＋ Novo equipamento</button>
+    </div>
+    <div id="equipList"></div>
+  </section>
+</main>
+
+<!-- ============ MODAL: ALUGUEL ============ -->
+<div class="overlay" id="rentalOverlay">
+  <div class="modal">
+    <h2 id="rentalModalTitle">Novo aluguel</h2>
+    <p class="modal-sub">Preencha os dados do aluguel do laser.</p>
+    <form id="rentalForm" onsubmit="saveRental(event)">
+      <input type="hidden" id="rentalId" />
+      <label class="field">
+        <span class="lab">Nome do cliente *</span>
+        <input id="rClient" required placeholder="Dr. João Silva / Clínica Estética..." />
+      </label>
+      <label class="field">
+        <span class="lab">Endereço *</span>
+        <input id="rAddress" required placeholder="Rua, número, bairro, cidade" />
+      </label>
+      <div class="form-row">
+        <label class="field">
+          <span class="lab">Telefone / contato</span>
+          <input id="rPhone" placeholder="(11) 99999-9999" />
+        </label>
+        <label class="field">
+          <span class="lab">Equipamento (laser) *</span>
+          <select id="rEquip" required></select>
+        </label>
+      </div>
+      <div class="form-row-3">
+        <label class="field">
+          <span class="lab">Data *</span>
+          <input type="date" id="rDate" required />
+        </label>
+        <label class="field">
+          <span class="lab">Início *</span>
+          <input type="time" id="rStart" required />
+        </label>
+        <label class="field">
+          <span class="lab">Término *</span>
+          <input type="time" id="rEnd" required />
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="field">
+          <span class="lab">Valor do aluguel (R$)</span>
+          <input id="rPrice" inputmode="decimal" placeholder="Ex.: 850,00" />
+        </label>
+        <label class="field">
+          <span class="lab">Observações</span>
+          <input id="rNotes" placeholder="Opcional" />
+        </label>
+      </div>
+      <div id="conflictWarn" style="display:none;color:var(--danger);font-size:13px;font-weight:600;margin-top:-4px">
+        ⚠️ Atenção: este horário conflita com outro aluguel deste equipamento.
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('rentalOverlay')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar aluguel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MODAL: EQUIPAMENTO ============ -->
+<div class="overlay" id="equipOverlay">
+  <div class="modal">
+    <h2 id="equipModalTitle">Novo equipamento</h2>
+    <p class="modal-sub">Dê um nome ao laser e escolha uma cor para identificá-lo na agenda.</p>
+    <form id="equipForm" onsubmit="saveEquip(event)">
+      <input type="hidden" id="equipId" />
+      <label class="field">
+        <span class="lab">Nome do equipamento *</span>
+        <input id="eName" required placeholder="Ex.: Laser CO2 Fracionado" />
+      </label>
+      <label class="field">
+        <span class="lab">Tipo / indicação (opcional)</span>
+        <input id="eUse" placeholder="Ex.: Rejuvenescimento, depilação..." />
+      </label>
+      <label class="field">
+        <span class="lab">Cor de identificação</span>
+        <input type="color" id="eColor" value="#8b7bff" style="height:44px;padding:4px" />
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('equipOverlay')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Derma Lux — Agenda de aluguéis de laser
+   Armazenamento local (localStorage), sem servidor.
+   ============================================================ */
+
+const STORE_KEY = "dermalux_v1";
+const DOW = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+const MONTHS = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const PALETTE = ["#8b7bff","#34d3c6","#ff8fb1","#ffb443","#6fb1ff","#3ddc97","#c78bff","#ff7a7a"];
+
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  // seed inicial com equipamentos de exemplo
+  return {
+    equipment: [
+      { id: uid(), name: "Laser CO2 Fracionado", use: "Rejuvenescimento", color: "#8b7bff" },
+      { id: uid(), name: "Laser Depilação Diodo", use: "Depilação", color: "#34d3c6" },
+    ],
+    rentals: [],
+  };
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+/* ---------- Helpers de data ---------- */
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function fmtDateLong(iso) {
+  const [y,m,d] = iso.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  return { day: `${d} de ${MONTHS[m-1]}`, full: `${d} de ${fullMonth(m-1)} de ${y}`, dow: DOW[dt.getDay()], obj: dt };
+}
+function fullMonth(i){ return ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][i]; }
+function minutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function toBRL(v){
+  const n = parseFloat(String(v).replace(/\./g,"").replace(",","."));
+  if (isNaN(n)) return null;
+  return n;
+}
+function fmtBRL(n){ return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+
+function equipById(id){ return state.equipment.find(e => e.id === id); }
+function overlaps(aS,aE,bS,bE){ return aS < bE && bS < aE; }
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2400);
+}
+
+/* ---------- Navegação ---------- */
+document.getElementById("tabs").addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const view = btn.dataset.view;
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b === btn));
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById("view-" + view).classList.add("active");
+  if (view === "disponibilidade") renderAvailability();
+  if (view === "equipamentos") renderEquip();
+  if (view === "agenda") renderAgenda();
+});
+
+/* ---------- Modais ---------- */
+function closeModal(id){ document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".overlay").forEach(o => {
+  o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); });
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
+});
+
+/* ============ ALUGUEL ============ */
+function fillEquipSelect(sel, includeAll){
+  sel.innerHTML = "";
+  if (includeAll){ const o = document.createElement("option"); o.value=""; o.textContent="Todos os equipamentos"; sel.appendChild(o); }
+  state.equipment.forEach(e => {
+    const o = document.createElement("option"); o.value = e.id; o.textContent = e.name; sel.appendChild(o);
+  });
+}
+
+function openRentalModal(prefill){
+  if (state.equipment.length === 0){
+    toast("Cadastre um equipamento primeiro.");
+    document.querySelector('[data-view="equipamentos"]').click();
+    return;
+  }
+  document.getElementById("rentalForm").reset();
+  document.getElementById("rentalId").value = "";
+  document.getElementById("conflictWarn").style.display = "none";
+  document.getElementById("rentalModalTitle").textContent = "Novo aluguel";
+  fillEquipSelect(document.getElementById("rEquip"), false);
+  document.getElementById("rDate").value = (prefill && prefill.date) || todayStr();
+  if (prefill){
+    if (prefill.equipId) document.getElementById("rEquip").value = prefill.equipId;
+    if (prefill.start) document.getElementById("rStart").value = prefill.start;
+    if (prefill.end) document.getElementById("rEnd").value = prefill.end;
+  }
+  document.getElementById("rentalOverlay").classList.add("open");
+  setTimeout(()=>document.getElementById("rClient").focus(), 50);
+}
+
+function editRental(id){
+  const r = state.rentals.find(x => x.id === id);
+  if (!r) return;
+  fillEquipSelect(document.getElementById("rEquip"), false);
+  document.getElementById("rentalId").value = r.id;
+  document.getElementById("rClient").value = r.client;
+  document.getElementById("rAddress").value = r.address;
+  document.getElementById("rPhone").value = r.phone || "";
+  document.getElementById("rEquip").value = r.equipId;
+  document.getElementById("rDate").value = r.date;
+  document.getElementById("rStart").value = r.start;
+  document.getElementById("rEnd").value = r.end;
+  document.getElementById("rPrice").value = r.price != null ? String(r.price).replace(".",",") : "";
+  document.getElementById("rNotes").value = r.notes || "";
+  document.getElementById("conflictWarn").style.display = "none";
+  document.getElementById("rentalModalTitle").textContent = "Editar aluguel";
+  document.getElementById("rentalOverlay").classList.add("open");
+}
+
+function checkConflict(equipId, date, start, end, ignoreId){
+  const s = minutes(start), e = minutes(end);
+  return state.rentals.some(r => r.id !== ignoreId && r.equipId === equipId && r.date === date &&
+    overlaps(s, e, minutes(r.start), minutes(r.end)));
+}
+
+// aviso ao vivo de conflito
+["rEquip","rDate","rStart","rEnd"].forEach(id => {
+  document.addEventListener("input", ev => {
+    if (ev.target.id !== id) return;
+    const eq = rEquip.value, d = rDate.value, s = rStart.value, e = rEnd.value;
+    if (eq && d && s && e && minutes(e) > minutes(s)){
+      document.getElementById("conflictWarn").style.display =
+        checkConflict(eq, d, s, e, document.getElementById("rentalId").value) ? "block" : "none";
+    }
+  });
+});
+
+function saveRental(ev){
+  ev.preventDefault();
+  const id = document.getElementById("rentalId").value;
+  const start = document.getElementById("rStart").value;
+  const end = document.getElementById("rEnd").value;
+  if (minutes(end) <= minutes(start)){ toast("O horário de término deve ser depois do início."); return; }
+
+  const data = {
+    client: document.getElementById("rClient").value.trim(),
+    address: document.getElementById("rAddress").value.trim(),
+    phone: document.getElementById("rPhone").value.trim(),
+    equipId: document.getElementById("rEquip").value,
+    date: document.getElementById("rDate").value,
+    start, end,
+    price: toBRL(document.getElementById("rPrice").value),
+    notes: document.getElementById("rNotes").value.trim(),
+  };
+
+  if (checkConflict(data.equipId, data.date, start, end, id)){
+    if (!confirm("Este horário conflita com outro aluguel do mesmo equipamento. Deseja salvar mesmo assim?")) return;
+  }
+
+  if (id){
+    const r = state.rentals.find(x => x.id === id);
+    Object.assign(r, data);
+    toast("Aluguel atualizado.");
+  } else {
+    state.rentals.push({ id: uid(), ...data });
+    toast("Aluguel agendado!");
+  }
+  save();
+  closeModal("rentalOverlay");
+  renderAgenda();
+}
+
+function deleteRental(id){
+  const r = state.rentals.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm(`Remover o aluguel de "${r.client}"?`)) return;
+  state.rentals = state.rentals.filter(x => x.id !== id);
+  save(); renderAgenda();
+  toast("Aluguel removido.");
+}
+
+/* ============ RENDER: AGENDA ============ */
+function renderStats(){
+  const el = document.getElementById("stats");
+  const today = todayStr();
+  const upcoming = state.rentals.filter(r => r.date >= today);
+  const todays = state.rentals.filter(r => r.date === today);
+  const revenue = upcoming.reduce((s,r) => s + (r.price || 0), 0);
+  el.innerHTML = `
+    <div class="stat"><div class="k">Aluguéis hoje</div><div class="v">${todays.length}</div></div>
+    <div class="stat"><div class="k">Próximos aluguéis</div><div class="v">${upcoming.length}</div></div>
+    <div class="stat"><div class="k">Equipamentos</div><div class="v">${state.equipment.length}</div></div>
+    <div class="stat"><div class="k">A receber (futuro)</div><div class="v"><small>${revenue ? fmtBRL(revenue) : "—"}</small></div></div>
+  `;
+}
+
+function renderAgenda(){
+  renderStats();
+  fillEquipSelect(document.getElementById("filterEquip"), true);
+  // restaura seleção do filtro se possível
+  const list = document.getElementById("agendaList");
+  const q = (document.getElementById("searchInput").value || "").toLowerCase().trim();
+  const fEquip = document.getElementById("filterEquip").value;
+  const showPast = document.getElementById("showPast").checked;
+  const today = todayStr();
+
+  let items = state.rentals.slice();
+  if (!showPast) items = items.filter(r => r.date >= today);
+  if (fEquip) items = items.filter(r => r.equipId === fEquip);
+  if (q) items = items.filter(r => {
+    const eq = equipById(r.equipId);
+    return [r.client, r.address, r.notes, r.phone, eq && eq.name].join(" ").toLowerCase().includes(q);
+  });
+
+  items.sort((a,b) => a.date === b.date ? minutes(a.start) - minutes(b.start) : a.date.localeCompare(b.date));
+
+  if (items.length === 0){
+    list.innerHTML = `<div class="empty"><div class="big">📅</div><h3>Nenhum aluguel ${showPast ? "" : "futuro "}encontrado</h3>
+      <p>Clique em <b>Novo aluguel</b> para agendar o uso de um laser.</p></div>`;
+    return;
+  }
+
+  // agrupa por data
+  const groups = {};
+  items.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
+
+  let html = "";
+  Object.keys(groups).sort().forEach(date => {
+    const info = fmtDateLong(date);
+    const isToday = date === today;
+    const isPastDay = date < today;
+    html += `<div class="day-group"><div class="day-head">
+      <span class="d">${info.day}</span>
+      <span class="dow">${info.dow}</span>
+      ${isToday ? '<span class="badge-today">HOJE</span>' : ""}
+      <span class="cnt">${groups[date].length} aluguel(éis)</span>
+    </div>`;
+    groups[date].forEach(r => {
+      const eq = equipById(r.equipId) || { name: "—", color: "#888" };
+      html += `<div class="rental ${isPastDay ? "past" : ""}">
+        <div class="time">${r.start}<small>até ${r.end}</small></div>
+        <div class="info">
+          <div class="client">${esc(r.client)}</div>
+          <div class="meta">
+            <span>📍 ${esc(r.address)}</span>
+            ${r.phone ? `<span>📞 ${esc(r.phone)}</span>` : ""}
+            ${r.price != null ? `<span>💰 ${fmtBRL(r.price)}</span>` : ""}
+            ${r.notes ? `<span>📝 ${esc(r.notes)}</span>` : ""}
+          </div>
+        </div>
+        <span class="equip-pill" style="background:${eq.color}">${esc(eq.name)}</span>
+        <div class="actions">
+          <button class="icon-btn" title="Editar" onclick="editRental('${r.id}')">✏️</button>
+          <button class="icon-btn del" title="Remover" onclick="deleteRental('${r.id}')">🗑️</button>
+        </div>
+      </div>`;
+    });
+    html += "</div>";
+  });
+  list.innerHTML = html;
+}
+
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ============ RENDER: DISPONIBILIDADE ============ */
+function renderAvailability(){
+  const equipSel = document.getElementById("availEquip");
+  if (!equipSel.options.length || equipSel.dataset.count != state.equipment.length){
+    fillEquipSelect(equipSel, false);
+    equipSel.dataset.count = state.equipment.length;
+  }
+  if (!document.getElementById("availDate").value) document.getElementById("availDate").value = todayStr();
+
+  const grid = document.getElementById("availGrid");
+  if (state.equipment.length === 0){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔬</div><h3>Nenhum equipamento cadastrado</h3><p>Cadastre um laser na aba Equipamentos.</p></div>`;
+    return;
+  }
+
+  const equipId = equipSel.value;
+  const date = document.getElementById("availDate").value;
+  const step = parseInt(document.getElementById("availStep").value, 10);
+  const open = minutes(document.getElementById("availOpen").value || "08:00");
+  const close = minutes(document.getElementById("availClose").value || "20:00");
+
+  const dayRentals = state.rentals.filter(r => r.equipId === equipId && r.date === date);
+
+  let html = "";
+  let anyFree = false;
+  for (let t = open; t + step <= close; t += step){
+    const slotEnd = t + step;
+    const conflict = dayRentals.find(r => overlaps(t, slotEnd, minutes(r.start), minutes(r.end)));
+    const label = fmtMin(t) + "–" + fmtMin(slotEnd);
+    if (conflict){
+      html += `<div class="slot busy" title="Ocupado: ${esc(conflict.client)}">${fmtMin(t)}<span class="who">${esc(conflict.client)}</span></div>`;
+    } else {
+      anyFree = true;
+      html += `<div class="slot free" title="Livre — clique para agendar ${label}"
+        onclick='openRentalModal(${JSON.stringify({date, equipId, start: fmtMin(t), end: fmtMin(slotEnd)})})'>${fmtMin(t)}<span class="who">livre</span></div>`;
+    }
+  }
+  if (!anyFree && dayRentals.length === 0) {
+    // faixa horária inválida
+  }
+  grid.innerHTML = html || `<div class="empty" style="grid-column:1/-1"><p>Ajuste os horários de abertura/fechamento.</p></div>`;
+}
+function fmtMin(m){ return String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0"); }
+
+/* ============ RENDER: EQUIPAMENTOS ============ */
+function openEquipModal(){
+  document.getElementById("equipForm").reset();
+  document.getElementById("equipId").value = "";
+  document.getElementById("eColor").value = PALETTE[state.equipment.length % PALETTE.length];
+  document.getElementById("equipModalTitle").textContent = "Novo equipamento";
+  document.getElementById("equipOverlay").classList.add("open");
+  setTimeout(()=>document.getElementById("eName").focus(), 50);
+}
+function editEquip(id){
+  const e = equipById(id); if (!e) return;
+  document.getElementById("equipId").value = e.id;
+  document.getElementById("eName").value = e.name;
+  document.getElementById("eUse").value = e.use || "";
+  document.getElementById("eColor").value = e.color;
+  document.getElementById("equipModalTitle").textContent = "Editar equipamento";
+  document.getElementById("equipOverlay").classList.add("open");
+}
+function saveEquip(ev){
+  ev.preventDefault();
+  const id = document.getElementById("equipId").value;
+  const data = {
+    name: document.getElementById("eName").value.trim(),
+    use: document.getElementById("eUse").value.trim(),
+    color: document.getElementById("eColor").value,
+  };
+  if (id){ Object.assign(equipById(id), data); toast("Equipamento atualizado."); }
+  else { state.equipment.push({ id: uid(), ...data }); toast("Equipamento cadastrado."); }
+  save();
+  closeModal("equipOverlay");
+  renderEquip();
+}
+function deleteEquip(id){
+  const e = equipById(id); if (!e) return;
+  const count = state.rentals.filter(r => r.equipId === id).length;
+  const msg = count > 0
+    ? `O laser "${e.name}" tem ${count} aluguel(éis) agendado(s). Remover o equipamento também removerá esses aluguéis. Continuar?`
+    : `Remover o equipamento "${e.name}"?`;
+  if (!confirm(msg)) return;
+  state.equipment = state.equipment.filter(x => x.id !== id);
+  state.rentals = state.rentals.filter(r => r.equipId !== id);
+  save(); renderEquip();
+  toast("Equipamento removido.");
+}
+function renderEquip(){
+  const el = document.getElementById("equipList");
+  if (state.equipment.length === 0){
+    el.innerHTML = `<div class="empty"><div class="big">🔬</div><h3>Nenhum equipamento cadastrado</h3><p>Clique em <b>Novo equipamento</b> para começar.</p></div>`;
+    return;
+  }
+  el.innerHTML = state.equipment.map(e => {
+    const count = state.rentals.filter(r => r.equipId === e.id && r.date >= todayStr()).length;
+    return `<div class="equip-card">
+      <div class="swatch" style="background:${e.color}"></div>
+      <div>
+        <div class="name">${esc(e.name)}</div>
+        ${e.use ? `<div class="use">${esc(e.use)}</div>` : ""}
+      </div>
+      <div style="flex:1"></div>
+      <span class="tag">${count} próximos</span>
+      <button class="icon-btn" title="Editar" onclick="editEquip('${e.id}')">✏️</button>
+      <button class="icon-btn del" title="Remover" onclick="deleteEquip('${e.id}')">🗑️</button>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- Init ---------- */
+renderAgenda();
+</script>
+</body>
+</html>
