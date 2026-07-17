@@ -78,6 +78,18 @@
   nav.tabs button:hover { color: var(--text); }
   nav.tabs button.active { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(139,123,255,0.35); }
 
+  .user-area { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .user-area .email { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Mode banner ---------- */
+  .mode-banner {
+    max-width: 1200px; margin: 10px auto -6px; padding: 0 20px;
+    display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted);
+  }
+  .mode-banner .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-weight: 700; }
+  .mode-banner .chip.cloud { background: rgba(52,211,198,0.14); color: var(--brand-2); }
+  .mode-banner .chip.local { background: rgba(255,180,67,0.16); color: var(--warning); }
+
   main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 80px; }
   .view { display: none; animation: fade .25s ease; }
   .view.active { display: block; }
@@ -210,6 +222,18 @@
   .modal .modal-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
 
+  /* ---------- Auth screen ---------- */
+  .auth-screen {
+    position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
+    padding: 24px; background: radial-gradient(1200px 600px at 50% -10%, rgba(139,123,255,0.18), transparent), var(--bg);
+  }
+  .auth-screen.show { display: flex; }
+  .auth-card { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 30px; box-shadow: var(--shadow); }
+  .auth-card .logo { justify-content: center; margin-bottom: 18px; }
+  .auth-card h2 { text-align: center; margin: 0 0 4px; }
+  .auth-card p.sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+  .auth-error { color: var(--danger); font-size: 13px; font-weight: 600; min-height: 18px; margin-top: 6px; text-align: center; }
+
   /* ---------- Toast ---------- */
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -229,10 +253,35 @@
     .topbar-inner { gap: 10px; }
     nav.tabs { width: 100%; justify-content: space-between; }
     nav.tabs button { flex: 1; padding: 8px 8px; }
+    .user-area .email { max-width: 120px; }
   }
 </style>
 </head>
 <body>
+
+<!-- ============ TELA DE LOGIN (modo nuvem) ============ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="logo">
+      <div class="logo-mark">DL</div>
+      <div class="logo-text"><b>Derma Lux</b><span>Agenda de aluguel de lasers</span></div>
+    </div>
+    <h2>Entrar</h2>
+    <p class="sub">Acesse a agenda da sua empresa.</p>
+    <form id="authForm" onsubmit="doLogin(event)">
+      <label class="field">
+        <span class="lab">E-mail</span>
+        <input type="email" id="authEmail" required autocomplete="username" placeholder="voce@empresa.com" />
+      </label>
+      <label class="field">
+        <span class="lab">Senha</span>
+        <input type="password" id="authPassword" required autocomplete="current-password" placeholder="••••••••" />
+      </label>
+      <button type="submit" class="btn btn-primary" style="width:100%" id="authBtn">Entrar</button>
+      <div class="auth-error" id="authError"></div>
+    </form>
+  </div>
+</div>
 
 <header class="topbar">
   <div class="topbar-inner">
@@ -249,8 +298,14 @@
       <button data-view="disponibilidade">🕑 Disponibilidade</button>
       <button data-view="equipamentos">🔬 Equipamentos</button>
     </nav>
+    <div class="user-area" id="userArea" style="display:none">
+      <span class="email" id="userEmail"></span>
+      <button class="btn btn-sm btn-ghost" onclick="doLogout()">Sair</button>
+    </div>
   </div>
 </header>
+
+<div class="mode-banner" id="modeBanner"></div>
 
 <main>
   <!-- ============ AGENDA / PRÓXIMAS OBRIGAÇÕES ============ -->
@@ -423,395 +478,9 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
-/* ============================================================
-   Derma Lux — Agenda de aluguéis de laser
-   Armazenamento local (localStorage), sem servidor.
-   ============================================================ */
-
-const STORE_KEY = "dermalux_v1";
-const DOW = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
-const MONTHS = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
-const PALETTE = ["#8b7bff","#34d3c6","#ff8fb1","#ffb443","#6fb1ff","#3ddc97","#c78bff","#ff7a7a"];
-
-let state = load();
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  // seed inicial com equipamentos de exemplo
-  return {
-    equipment: [
-      { id: uid(), name: "Laser CO2 Fracionado", use: "Rejuvenescimento", color: "#8b7bff" },
-      { id: uid(), name: "Laser Depilação Diodo", use: "Depilação", color: "#34d3c6" },
-    ],
-    rentals: [],
-  };
-}
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
-/* ---------- Helpers de data ---------- */
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-function fmtDateLong(iso) {
-  const [y,m,d] = iso.split("-").map(Number);
-  const dt = new Date(y, m-1, d);
-  return { day: `${d} de ${MONTHS[m-1]}`, full: `${d} de ${fullMonth(m-1)} de ${y}`, dow: DOW[dt.getDay()], obj: dt };
-}
-function fullMonth(i){ return ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][i]; }
-function minutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
-function toBRL(v){
-  const n = parseFloat(String(v).replace(/\./g,"").replace(",","."));
-  if (isNaN(n)) return null;
-  return n;
-}
-function fmtBRL(n){ return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
-
-function equipById(id){ return state.equipment.find(e => e.id === id); }
-function overlaps(aS,aE,bS,bE){ return aS < bE && bS < aE; }
-
-/* ---------- Toast ---------- */
-let toastTimer;
-function toast(msg){
-  const t = document.getElementById("toast");
-  t.textContent = msg; t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove("show"), 2400);
-}
-
-/* ---------- Navegação ---------- */
-document.getElementById("tabs").addEventListener("click", e => {
-  const btn = e.target.closest("button");
-  if (!btn) return;
-  const view = btn.dataset.view;
-  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b === btn));
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  document.getElementById("view-" + view).classList.add("active");
-  if (view === "disponibilidade") renderAvailability();
-  if (view === "equipamentos") renderEquip();
-  if (view === "agenda") renderAgenda();
-});
-
-/* ---------- Modais ---------- */
-function closeModal(id){ document.getElementById(id).classList.remove("open"); }
-document.querySelectorAll(".overlay").forEach(o => {
-  o.addEventListener("click", e => { if (e.target === o) o.classList.remove("open"); });
-});
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") document.querySelectorAll(".overlay.open").forEach(o => o.classList.remove("open"));
-});
-
-/* ============ ALUGUEL ============ */
-function fillEquipSelect(sel, includeAll){
-  sel.innerHTML = "";
-  if (includeAll){ const o = document.createElement("option"); o.value=""; o.textContent="Todos os equipamentos"; sel.appendChild(o); }
-  state.equipment.forEach(e => {
-    const o = document.createElement("option"); o.value = e.id; o.textContent = e.name; sel.appendChild(o);
-  });
-}
-
-function openRentalModal(prefill){
-  if (state.equipment.length === 0){
-    toast("Cadastre um equipamento primeiro.");
-    document.querySelector('[data-view="equipamentos"]').click();
-    return;
-  }
-  document.getElementById("rentalForm").reset();
-  document.getElementById("rentalId").value = "";
-  document.getElementById("conflictWarn").style.display = "none";
-  document.getElementById("rentalModalTitle").textContent = "Novo aluguel";
-  fillEquipSelect(document.getElementById("rEquip"), false);
-  document.getElementById("rDate").value = (prefill && prefill.date) || todayStr();
-  if (prefill){
-    if (prefill.equipId) document.getElementById("rEquip").value = prefill.equipId;
-    if (prefill.start) document.getElementById("rStart").value = prefill.start;
-    if (prefill.end) document.getElementById("rEnd").value = prefill.end;
-  }
-  document.getElementById("rentalOverlay").classList.add("open");
-  setTimeout(()=>document.getElementById("rClient").focus(), 50);
-}
-
-function editRental(id){
-  const r = state.rentals.find(x => x.id === id);
-  if (!r) return;
-  fillEquipSelect(document.getElementById("rEquip"), false);
-  document.getElementById("rentalId").value = r.id;
-  document.getElementById("rClient").value = r.client;
-  document.getElementById("rAddress").value = r.address;
-  document.getElementById("rPhone").value = r.phone || "";
-  document.getElementById("rEquip").value = r.equipId;
-  document.getElementById("rDate").value = r.date;
-  document.getElementById("rStart").value = r.start;
-  document.getElementById("rEnd").value = r.end;
-  document.getElementById("rPrice").value = r.price != null ? String(r.price).replace(".",",") : "";
-  document.getElementById("rNotes").value = r.notes || "";
-  document.getElementById("conflictWarn").style.display = "none";
-  document.getElementById("rentalModalTitle").textContent = "Editar aluguel";
-  document.getElementById("rentalOverlay").classList.add("open");
-}
-
-function checkConflict(equipId, date, start, end, ignoreId){
-  const s = minutes(start), e = minutes(end);
-  return state.rentals.some(r => r.id !== ignoreId && r.equipId === equipId && r.date === date &&
-    overlaps(s, e, minutes(r.start), minutes(r.end)));
-}
-
-// aviso ao vivo de conflito
-["rEquip","rDate","rStart","rEnd"].forEach(id => {
-  document.addEventListener("input", ev => {
-    if (ev.target.id !== id) return;
-    const eq = rEquip.value, d = rDate.value, s = rStart.value, e = rEnd.value;
-    if (eq && d && s && e && minutes(e) > minutes(s)){
-      document.getElementById("conflictWarn").style.display =
-        checkConflict(eq, d, s, e, document.getElementById("rentalId").value) ? "block" : "none";
-    }
-  });
-});
-
-function saveRental(ev){
-  ev.preventDefault();
-  const id = document.getElementById("rentalId").value;
-  const start = document.getElementById("rStart").value;
-  const end = document.getElementById("rEnd").value;
-  if (minutes(end) <= minutes(start)){ toast("O horário de término deve ser depois do início."); return; }
-
-  const data = {
-    client: document.getElementById("rClient").value.trim(),
-    address: document.getElementById("rAddress").value.trim(),
-    phone: document.getElementById("rPhone").value.trim(),
-    equipId: document.getElementById("rEquip").value,
-    date: document.getElementById("rDate").value,
-    start, end,
-    price: toBRL(document.getElementById("rPrice").value),
-    notes: document.getElementById("rNotes").value.trim(),
-  };
-
-  if (checkConflict(data.equipId, data.date, start, end, id)){
-    if (!confirm("Este horário conflita com outro aluguel do mesmo equipamento. Deseja salvar mesmo assim?")) return;
-  }
-
-  if (id){
-    const r = state.rentals.find(x => x.id === id);
-    Object.assign(r, data);
-    toast("Aluguel atualizado.");
-  } else {
-    state.rentals.push({ id: uid(), ...data });
-    toast("Aluguel agendado!");
-  }
-  save();
-  closeModal("rentalOverlay");
-  renderAgenda();
-}
-
-function deleteRental(id){
-  const r = state.rentals.find(x => x.id === id);
-  if (!r) return;
-  if (!confirm(`Remover o aluguel de "${r.client}"?`)) return;
-  state.rentals = state.rentals.filter(x => x.id !== id);
-  save(); renderAgenda();
-  toast("Aluguel removido.");
-}
-
-/* ============ RENDER: AGENDA ============ */
-function renderStats(){
-  const el = document.getElementById("stats");
-  const today = todayStr();
-  const upcoming = state.rentals.filter(r => r.date >= today);
-  const todays = state.rentals.filter(r => r.date === today);
-  const revenue = upcoming.reduce((s,r) => s + (r.price || 0), 0);
-  el.innerHTML = `
-    <div class="stat"><div class="k">Aluguéis hoje</div><div class="v">${todays.length}</div></div>
-    <div class="stat"><div class="k">Próximos aluguéis</div><div class="v">${upcoming.length}</div></div>
-    <div class="stat"><div class="k">Equipamentos</div><div class="v">${state.equipment.length}</div></div>
-    <div class="stat"><div class="k">A receber (futuro)</div><div class="v"><small>${revenue ? fmtBRL(revenue) : "—"}</small></div></div>
-  `;
-}
-
-function renderAgenda(){
-  renderStats();
-  fillEquipSelect(document.getElementById("filterEquip"), true);
-  // restaura seleção do filtro se possível
-  const list = document.getElementById("agendaList");
-  const q = (document.getElementById("searchInput").value || "").toLowerCase().trim();
-  const fEquip = document.getElementById("filterEquip").value;
-  const showPast = document.getElementById("showPast").checked;
-  const today = todayStr();
-
-  let items = state.rentals.slice();
-  if (!showPast) items = items.filter(r => r.date >= today);
-  if (fEquip) items = items.filter(r => r.equipId === fEquip);
-  if (q) items = items.filter(r => {
-    const eq = equipById(r.equipId);
-    return [r.client, r.address, r.notes, r.phone, eq && eq.name].join(" ").toLowerCase().includes(q);
-  });
-
-  items.sort((a,b) => a.date === b.date ? minutes(a.start) - minutes(b.start) : a.date.localeCompare(b.date));
-
-  if (items.length === 0){
-    list.innerHTML = `<div class="empty"><div class="big">📅</div><h3>Nenhum aluguel ${showPast ? "" : "futuro "}encontrado</h3>
-      <p>Clique em <b>Novo aluguel</b> para agendar o uso de um laser.</p></div>`;
-    return;
-  }
-
-  // agrupa por data
-  const groups = {};
-  items.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
-
-  let html = "";
-  Object.keys(groups).sort().forEach(date => {
-    const info = fmtDateLong(date);
-    const isToday = date === today;
-    const isPastDay = date < today;
-    html += `<div class="day-group"><div class="day-head">
-      <span class="d">${info.day}</span>
-      <span class="dow">${info.dow}</span>
-      ${isToday ? '<span class="badge-today">HOJE</span>' : ""}
-      <span class="cnt">${groups[date].length} aluguel(éis)</span>
-    </div>`;
-    groups[date].forEach(r => {
-      const eq = equipById(r.equipId) || { name: "—", color: "#888" };
-      html += `<div class="rental ${isPastDay ? "past" : ""}">
-        <div class="time">${r.start}<small>até ${r.end}</small></div>
-        <div class="info">
-          <div class="client">${esc(r.client)}</div>
-          <div class="meta">
-            <span>📍 ${esc(r.address)}</span>
-            ${r.phone ? `<span>📞 ${esc(r.phone)}</span>` : ""}
-            ${r.price != null ? `<span>💰 ${fmtBRL(r.price)}</span>` : ""}
-            ${r.notes ? `<span>📝 ${esc(r.notes)}</span>` : ""}
-          </div>
-        </div>
-        <span class="equip-pill" style="background:${eq.color}">${esc(eq.name)}</span>
-        <div class="actions">
-          <button class="icon-btn" title="Editar" onclick="editRental('${r.id}')">✏️</button>
-          <button class="icon-btn del" title="Remover" onclick="deleteRental('${r.id}')">🗑️</button>
-        </div>
-      </div>`;
-    });
-    html += "</div>";
-  });
-  list.innerHTML = html;
-}
-
-function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-
-/* ============ RENDER: DISPONIBILIDADE ============ */
-function renderAvailability(){
-  const equipSel = document.getElementById("availEquip");
-  if (!equipSel.options.length || equipSel.dataset.count != state.equipment.length){
-    fillEquipSelect(equipSel, false);
-    equipSel.dataset.count = state.equipment.length;
-  }
-  if (!document.getElementById("availDate").value) document.getElementById("availDate").value = todayStr();
-
-  const grid = document.getElementById("availGrid");
-  if (state.equipment.length === 0){
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔬</div><h3>Nenhum equipamento cadastrado</h3><p>Cadastre um laser na aba Equipamentos.</p></div>`;
-    return;
-  }
-
-  const equipId = equipSel.value;
-  const date = document.getElementById("availDate").value;
-  const step = parseInt(document.getElementById("availStep").value, 10);
-  const open = minutes(document.getElementById("availOpen").value || "08:00");
-  const close = minutes(document.getElementById("availClose").value || "20:00");
-
-  const dayRentals = state.rentals.filter(r => r.equipId === equipId && r.date === date);
-
-  let html = "";
-  let anyFree = false;
-  for (let t = open; t + step <= close; t += step){
-    const slotEnd = t + step;
-    const conflict = dayRentals.find(r => overlaps(t, slotEnd, minutes(r.start), minutes(r.end)));
-    const label = fmtMin(t) + "–" + fmtMin(slotEnd);
-    if (conflict){
-      html += `<div class="slot busy" title="Ocupado: ${esc(conflict.client)}">${fmtMin(t)}<span class="who">${esc(conflict.client)}</span></div>`;
-    } else {
-      anyFree = true;
-      html += `<div class="slot free" title="Livre — clique para agendar ${label}"
-        onclick='openRentalModal(${JSON.stringify({date, equipId, start: fmtMin(t), end: fmtMin(slotEnd)})})'>${fmtMin(t)}<span class="who">livre</span></div>`;
-    }
-  }
-  if (!anyFree && dayRentals.length === 0) {
-    // faixa horária inválida
-  }
-  grid.innerHTML = html || `<div class="empty" style="grid-column:1/-1"><p>Ajuste os horários de abertura/fechamento.</p></div>`;
-}
-function fmtMin(m){ return String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0"); }
-
-/* ============ RENDER: EQUIPAMENTOS ============ */
-function openEquipModal(){
-  document.getElementById("equipForm").reset();
-  document.getElementById("equipId").value = "";
-  document.getElementById("eColor").value = PALETTE[state.equipment.length % PALETTE.length];
-  document.getElementById("equipModalTitle").textContent = "Novo equipamento";
-  document.getElementById("equipOverlay").classList.add("open");
-  setTimeout(()=>document.getElementById("eName").focus(), 50);
-}
-function editEquip(id){
-  const e = equipById(id); if (!e) return;
-  document.getElementById("equipId").value = e.id;
-  document.getElementById("eName").value = e.name;
-  document.getElementById("eUse").value = e.use || "";
-  document.getElementById("eColor").value = e.color;
-  document.getElementById("equipModalTitle").textContent = "Editar equipamento";
-  document.getElementById("equipOverlay").classList.add("open");
-}
-function saveEquip(ev){
-  ev.preventDefault();
-  const id = document.getElementById("equipId").value;
-  const data = {
-    name: document.getElementById("eName").value.trim(),
-    use: document.getElementById("eUse").value.trim(),
-    color: document.getElementById("eColor").value,
-  };
-  if (id){ Object.assign(equipById(id), data); toast("Equipamento atualizado."); }
-  else { state.equipment.push({ id: uid(), ...data }); toast("Equipamento cadastrado."); }
-  save();
-  closeModal("equipOverlay");
-  renderEquip();
-}
-function deleteEquip(id){
-  const e = equipById(id); if (!e) return;
-  const count = state.rentals.filter(r => r.equipId === id).length;
-  const msg = count > 0
-    ? `O laser "${e.name}" tem ${count} aluguel(éis) agendado(s). Remover o equipamento também removerá esses aluguéis. Continuar?`
-    : `Remover o equipamento "${e.name}"?`;
-  if (!confirm(msg)) return;
-  state.equipment = state.equipment.filter(x => x.id !== id);
-  state.rentals = state.rentals.filter(r => r.equipId !== id);
-  save(); renderEquip();
-  toast("Equipamento removido.");
-}
-function renderEquip(){
-  const el = document.getElementById("equipList");
-  if (state.equipment.length === 0){
-    el.innerHTML = `<div class="empty"><div class="big">🔬</div><h3>Nenhum equipamento cadastrado</h3><p>Clique em <b>Novo equipamento</b> para começar.</p></div>`;
-    return;
-  }
-  el.innerHTML = state.equipment.map(e => {
-    const count = state.rentals.filter(r => r.equipId === e.id && r.date >= todayStr()).length;
-    return `<div class="equip-card">
-      <div class="swatch" style="background:${e.color}"></div>
-      <div>
-        <div class="name">${esc(e.name)}</div>
-        ${e.use ? `<div class="use">${esc(e.use)}</div>` : ""}
-      </div>
-      <div style="flex:1"></div>
-      <span class="tag">${count} próximos</span>
-      <button class="icon-btn" title="Editar" onclick="editEquip('${e.id}')">✏️</button>
-      <button class="icon-btn del" title="Remover" onclick="deleteEquip('${e.id}')">🗑️</button>
-    </div>`;
-  }).join("");
-}
-
-/* ---------- Init ---------- */
-renderAgenda();
-</script>
+<!-- Supabase JS (nuvem). Se o app estiver em modo local, este script apenas não é usado. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
