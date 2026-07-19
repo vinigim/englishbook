@@ -1,4 +1,4 @@
-# Derma Lux — Agenda de Aluguéis de Laser
+# Lux Derma — Agenda de Aluguéis de Laser
 
 Aplicação para controlar a agenda de aluguel dos seus lasers para médicos e clínicas.
 

@@ -1,5 +1,5 @@
 /* ============================================================
-   Configuração do Derma Lux
+   Configuração do Lux Derma
    ------------------------------------------------------------
    Para usar em VÁRIOS DISPOSITIVOS (celular, computador, tablet),
    preencha as duas chaves abaixo com os dados do seu projeto Supabase.

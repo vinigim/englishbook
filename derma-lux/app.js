@@ -1,5 +1,5 @@
 /* ============================================================
-   Derma Lux — Agenda de aluguéis de laser
+   Lux Derma — Agenda de aluguéis de laser
    ------------------------------------------------------------
    Dois modos de funcionamento, escolhidos automaticamente:
 
