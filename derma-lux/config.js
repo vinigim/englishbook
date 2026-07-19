@@ -15,6 +15,6 @@
    O passo a passo completo está no README.md.
    ============================================================ */
 window.DERMALUX_CONFIG = {
-  supabaseUrl: "",       // ex.: "https://abcdxyz.supabase.co"
-  supabaseAnonKey: "",   // ex.: "eyJhbGciOi..."
+  supabaseUrl: "https://hvhxvrodhkivjfhttayp.supabase.co",
+  supabaseAnonKey: "sb_publishable_GnNENyE4t9Pc8GWAqTjsWw_dSvkUASg",
 };
