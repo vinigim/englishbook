@@ -22,7 +22,7 @@ export function DermaLuxNav({ email }: { email: string }) {
             DL
           </div>
           <span className="font-display text-lg tracking-tight hidden sm:block">
-            Derma Lux
+            Lux Derma
           </span>
         </Link>
 

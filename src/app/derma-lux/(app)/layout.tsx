@@ -6,6 +6,11 @@ import { RealtimeRefresher } from "./RealtimeRefresher";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Lux Derma — Agenda de aluguéis",
+  description: "Agenda de aluguel de lasers para médicos e clínicas.",
+};
+
 export default async function DermaLuxAppLayout({
   children,
 }: {

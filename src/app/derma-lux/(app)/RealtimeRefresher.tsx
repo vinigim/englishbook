@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Assina as mudanças nas tabelas do Derma Lux e atualiza a tela em tempo real,
+ * Assina as mudanças nas tabelas do Lux Derma e atualiza a tela em tempo real,
  * para que aluguéis criados/editados em outro aparelho apareçam aqui na hora.
  */
 export function RealtimeRefresher() {

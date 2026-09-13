@@ -4,6 +4,10 @@ import { DlLoginForm } from "./LoginForm";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Entrar — Lux Derma",
+};
+
 export default async function DermaLuxLoginPage() {
   const supabase = await createClient();
   const {
@@ -20,7 +24,7 @@ export default async function DermaLuxLoginPage() {
           </div>
           <div>
             <p className="font-display text-2xl tracking-tight leading-none">
-              Derma Lux
+              Lux Derma
             </p>
             <p className="text-sm text-muted">Agenda de aluguel de lasers</p>
           </div>

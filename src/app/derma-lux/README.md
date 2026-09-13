@@ -1,6 +1,6 @@
-# Derma Lux — versão Next.js (deploy a partir deste repositório)
+# Lux Derma — versão Next.js (deploy a partir deste repositório)
 
-Esta é a versão do Derma Lux integrada ao app Next.js, para você **publicar direto
+Esta é a versão do Lux Derma integrada ao app Next.js, para você **publicar direto
 na Vercel** a partir deste repositório. Ela roda em `/derma-lux`, com:
 
 - **Login** (e-mail/senha) via Supabase Auth — rota `/derma-lux/login`
