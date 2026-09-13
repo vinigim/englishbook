@@ -17,7 +17,12 @@ const C_FULL = "#374151"; // cinza-escuro
 const C_MORNING = "#b0851f"; // âmbar
 const C_AFTERNOON = "#3b5b8c"; // azul
 
-type Status = "available" | "rented" | "full" | "morning" | "afternoon";
+type Status =
+  | "available"
+  | "rented"
+  | "full"
+  | "avail_morning"
+  | "avail_afternoon";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -99,13 +104,19 @@ export function AvailabilityClient({
           (periods.has("full") ||
             (periods.has("morning") && periods.has("afternoon")));
         if (closedFull) status = "full";
-        else if (periods?.has("morning")) status = "morning";
-        else if (periods?.has("afternoon")) status = "afternoon";
         else if (occupied.has(str)) status = "rented";
-        else {
-          status = "available";
+        else if (periods?.has("morning"))
+          status = "avail_afternoon"; // manhã fechada → tarde livre
+        else if (periods?.has("afternoon"))
+          status = "avail_morning"; // tarde fechada → manhã livre
+        else status = "available";
+
+        if (
+          status === "available" ||
+          status === "avail_morning" ||
+          status === "avail_afternoon"
+        )
           available++;
-        }
       }
 
       cells.push({ date: d, str, inWindow, status, isToday: str === startStr });
@@ -206,35 +217,6 @@ export function AvailabilityClient({
 
                     const base =
                       "aspect-square rounded-md flex flex-col items-center justify-center leading-none select-none";
-                    const dayLabel = (
-                      <>
-                        <span className="text-base font-bold">
-                          {c.date.getDate()}
-                        </span>
-                        <span className="text-[9px] mt-0.5 opacity-90">
-                          {MONTHS_ABBR[c.date.getMonth()]}
-                        </span>
-                      </>
-                    );
-
-                    if (c.status === "available") {
-                      return (
-                        <button
-                          key={c.str}
-                          type="button"
-                          onClick={() => bookDay(c.str)}
-                          title="Disponível — toque para agendar"
-                          className={`${base} text-white hover:brightness-110 transition ${
-                            c.isToday
-                              ? "ring-2 ring-accent ring-offset-1 ring-offset-paper"
-                              : ""
-                          }`}
-                          style={{ backgroundColor: C_AVAILABLE }}
-                        >
-                          {dayLabel}
-                        </button>
-                      );
-                    }
 
                     if (c.status === "rented") {
                       return (
@@ -253,27 +235,63 @@ export function AvailabilityClient({
                       );
                     }
 
+                    if (c.status === "full") {
+                      return (
+                        <div
+                          key={c.str}
+                          className={`${base} text-white`}
+                          style={{ backgroundColor: C_FULL }}
+                          title="Agenda fechada (dia todo)"
+                        >
+                          <span className="text-base font-bold">
+                            {c.date.getDate()}
+                          </span>
+                          <span className="text-[9px] mt-0.5 opacity-90">
+                            {MONTHS_ABBR[c.date.getMonth()]}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    // available, avail_morning, avail_afternoon → clicável
                     const color =
-                      c.status === "full"
-                        ? C_FULL
-                        : c.status === "morning"
+                      c.status === "avail_morning"
                         ? C_MORNING
-                        : C_AFTERNOON;
-                    const label =
-                      c.status === "full"
-                        ? "Agenda fechada (dia todo)"
-                        : c.status === "morning"
-                        ? "Agenda fechada (manhã)"
-                        : "Agenda fechada (tarde)";
+                        : c.status === "avail_afternoon"
+                        ? C_AFTERNOON
+                        : C_AVAILABLE;
+                    const small =
+                      c.status === "avail_morning"
+                        ? "manhã"
+                        : c.status === "avail_afternoon"
+                        ? "tarde"
+                        : MONTHS_ABBR[c.date.getMonth()];
+                    const title =
+                      c.status === "avail_morning"
+                        ? "Disponível de manhã — toque para agendar"
+                        : c.status === "avail_afternoon"
+                        ? "Disponível à tarde — toque para agendar"
+                        : "Disponível — toque para agendar";
                     return (
-                      <div
+                      <button
                         key={c.str}
-                        className={`${base} text-white`}
+                        type="button"
+                        onClick={() => bookDay(c.str)}
+                        title={title}
+                        className={`${base} text-white hover:brightness-110 transition ${
+                          c.isToday
+                            ? "ring-2 ring-accent ring-offset-1 ring-offset-paper"
+                            : ""
+                        }`}
                         style={{ backgroundColor: color }}
-                        title={label}
                       >
-                        {dayLabel}
-                      </div>
+                        <span className="text-base font-bold">
+                          {c.date.getDate()}
+                        </span>
+                        <span className="text-[9px] mt-0.5 opacity-90">
+                          {small}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -282,11 +300,11 @@ export function AvailabilityClient({
 
             {/* Legenda */}
             <div className="flex gap-x-4 gap-y-1.5 text-xs text-muted mt-4 flex-wrap">
-              <Legend color={C_AVAILABLE} label="Disponível" />
+              <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
+              <Legend color={C_MORNING} label="Disponível de manhã" />
+              <Legend color={C_AFTERNOON} label="Disponível à tarde" />
               <Legend color="#d9d4c9" label="Alugado" />
               <Legend color={C_FULL} label="Fechada (dia todo)" />
-              <Legend color={C_MORNING} label="Fechada (manhã)" />
-              <Legend color={C_AFTERNOON} label="Fechada (tarde)" />
             </div>
           </div>
 
