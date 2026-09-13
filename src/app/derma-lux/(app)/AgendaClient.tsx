@@ -214,6 +214,12 @@ export function AgendaClient({
                               🧼 Esterilização: {r.sterilized ? "Sim" : "Não"}
                             </span>
                           ) : null}
+                          {r.specialized_technique != null ? (
+                            <span>
+                              🎯 Técnica especializada:{" "}
+                              {r.specialized_technique ? "Sim" : "Não"}
+                            </span>
+                          ) : null}
                           {r.notes ? <span>📝 {r.notes}</span> : null}
                         </div>
                       </div>

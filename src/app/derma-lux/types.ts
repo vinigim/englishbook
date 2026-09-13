@@ -19,4 +19,5 @@ export type Rental = {
   specialty: string | null;
   tips_used: string | null;
   sterilized: boolean | null;
+  specialized_technique: boolean | null;
 };

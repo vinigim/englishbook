@@ -35,6 +35,7 @@ type FormState = {
   specialty: string;
   tips_used: string;
   sterilized: "" | "sim" | "nao";
+  specialized_technique: "" | "sim" | "nao";
 };
 
 function todayStr() {
@@ -68,6 +69,12 @@ function buildInitial(
           : initial.sterilized === false
           ? "nao"
           : "",
+      specialized_technique:
+        initial.specialized_technique === true
+          ? "sim"
+          : initial.specialized_technique === false
+          ? "nao"
+          : "",
     };
   }
   return {
@@ -83,6 +90,7 @@ function buildInitial(
     specialty: "",
     tips_used: "",
     sterilized: "",
+    specialized_technique: "",
   };
 }
 
@@ -164,6 +172,12 @@ export function RentalModal({
         form.sterilized === "sim"
           ? true
           : form.sterilized === "nao"
+          ? false
+          : null,
+      specialized_technique:
+        form.specialized_technique === "sim"
+          ? true
+          : form.specialized_technique === "nao"
           ? false
           : null,
     });
@@ -302,20 +316,32 @@ export function RentalModal({
             </Field>
           </div>
 
+          <Field label="Ponteiras utilizadas">
+            <input
+              className={inputCls}
+              value={form.tips_used}
+              onChange={(e) => set("tips_used", e.target.value)}
+              placeholder="Ex.: Ponteira 15mm, 7mm…"
+            />
+          </Field>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Ponteiras utilizadas">
-              <input
-                className={inputCls}
-                value={form.tips_used}
-                onChange={(e) => set("tips_used", e.target.value)}
-                placeholder="Ex.: Ponteira 15mm, 7mm…"
-              />
-            </Field>
             <Field label="Esterilização">
               <select
                 className={inputCls}
                 value={form.sterilized}
                 onChange={(e) => set("sterilized", e.target.value)}
+              >
+                <option value="">— selecione —</option>
+                <option value="sim">Sim</option>
+                <option value="nao">Não</option>
+              </select>
+            </Field>
+            <Field label="Técnica especializada">
+              <select
+                className={inputCls}
+                value={form.specialized_technique}
+                onChange={(e) => set("specialized_technique", e.target.value)}
               >
                 <option value="">— selecione —</option>
                 <option value="sim">Sim</option>
