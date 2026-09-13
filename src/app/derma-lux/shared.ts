@@ -130,7 +130,9 @@ export function buildConfirmationMessage(
     lines.push(`🧼 Esterilização: ${r.sterilized ? "Sim" : "Não"}`);
   if (r.specialized_technique != null)
     lines.push(
-      `🎯 Técnica especializada: ${r.specialized_technique ? "Sim" : "Não"}`
+      `🎯 Acompanha técnica especializada? ${
+        r.specialized_technique ? "Sim" : "Não"
+      }`
     );
   lines.push("");
   lines.push("Podemos confirmar? 🙏");
