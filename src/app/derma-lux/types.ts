@@ -15,6 +15,8 @@ export type Rental = {
   start_time: string; // HH:MM
   end_time: string; // HH:MM
   price: number | null;
+  freight_price: number | null;
+  technique_price: number | null;
   notes: string | null;
   specialty: string | null;
   tips_used: string | null;

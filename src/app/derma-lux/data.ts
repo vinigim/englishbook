@@ -11,6 +11,8 @@ type RawRental = {
   start_time: string;
   end_time: string;
   price: number | string | null;
+  freight_price: number | string | null;
+  technique_price: number | string | null;
   notes: string | null;
   specialty: string | null;
   tips_used: string | null;
@@ -29,6 +31,8 @@ function toRental(r: RawRental): Rental {
     start_time: String(r.start_time).slice(0, 5),
     end_time: String(r.end_time).slice(0, 5),
     price: r.price != null ? Number(r.price) : null,
+    freight_price: r.freight_price != null ? Number(r.freight_price) : null,
+    technique_price: r.technique_price != null ? Number(r.technique_price) : null,
     notes: r.notes ?? null,
     specialty: r.specialty ?? null,
     tips_used: r.tips_used ?? null,

@@ -31,6 +31,8 @@ type FormState = {
   start_time: string;
   end_time: string;
   price: string;
+  freight_price: string;
+  technique_price: string;
   notes: string;
   specialty: string;
   tips_used: string;
@@ -60,6 +62,14 @@ function buildInitial(
       start_time: initial.start_time,
       end_time: initial.end_time,
       price: initial.price != null ? String(initial.price).replace(".", ",") : "",
+      freight_price:
+        initial.freight_price != null
+          ? String(initial.freight_price).replace(".", ",")
+          : "",
+      technique_price:
+        initial.technique_price != null
+          ? String(initial.technique_price).replace(".", ",")
+          : "",
       notes: initial.notes ?? "",
       specialty: initial.specialty ?? "",
       tips_used: initial.tips_used ?? "",
@@ -86,6 +96,8 @@ function buildInitial(
     start_time: prefill?.start_time ?? "",
     end_time: prefill?.end_time ?? "",
     price: "",
+    freight_price: "",
+    technique_price: "",
     notes: "",
     specialty: "",
     tips_used: "",
@@ -243,6 +255,11 @@ export function RentalModal({
       start_time: form.start_time,
       end_time: form.end_time,
       price: parseBRL(form.price),
+      freight_price: parseBRL(form.freight_price),
+      technique_price:
+        form.specialized_technique === "sim"
+          ? parseBRL(form.technique_price)
+          : null,
       notes: form.notes,
       specialty: form.specialty,
       tips_used: form.tips_used,
@@ -414,12 +431,13 @@ export function RentalModal({
                 <p className="text-xs text-muted mt-1">{fmtBRL(priceNumber)}</p>
               ) : null}
             </Field>
-            <Field label="Observações">
+            <Field label="Valor do frete (R$)">
               <input
                 className={inputCls}
-                value={form.notes}
-                onChange={(e) => set("notes", e.target.value)}
-                placeholder="Opcional"
+                inputMode="decimal"
+                value={form.freight_price}
+                onChange={(e) => set("freight_price", e.target.value)}
+                placeholder="Ex.: 120,00 · 0 = isento"
               />
             </Field>
           </div>
@@ -457,6 +475,27 @@ export function RentalModal({
               </select>
             </Field>
           </div>
+
+          {form.specialized_technique === "sim" ? (
+            <Field label="Valor da técnica especializada (R$)">
+              <input
+                className={inputCls}
+                inputMode="decimal"
+                value={form.technique_price}
+                onChange={(e) => set("technique_price", e.target.value)}
+                placeholder="Ex.: 300,00"
+              />
+            </Field>
+          ) : null}
+
+          <Field label="Observações">
+            <input
+              className={inputCls}
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Opcional"
+            />
+          </Field>
 
           {conflict ? (
             <p className="text-sm text-accent font-medium">
