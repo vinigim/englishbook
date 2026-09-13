@@ -171,15 +171,15 @@ export function AvailabilityClient({
 
           {/* Cartão para print */}
           <div className="border border-line bg-paper shadow-[4px_4px_0_0_rgba(26,26,26,0.06)] p-5 max-w-2xl">
-            <div className="flex items-start gap-3 mb-1">
+            <div className="flex items-start gap-3 -mx-5 -mt-5 mb-4 px-5 py-4 bg-brand text-paper">
               <div className="w-9 h-9 bg-accent text-paper grid place-items-center font-display text-base font-semibold shrink-0">
                 DL
               </div>
               <div className="min-w-0">
-                <p className="font-display text-xl tracking-tight leading-tight break-words">
+                <p className="font-display text-xl tracking-tight leading-tight break-words text-paper">
                   {equip?.name ?? "—"}
                 </p>
-                <p className="text-sm text-muted">
+                <p className="text-sm text-paper/70">
                   Disponibilidade · {periodLabel}
                 </p>
               </div>
