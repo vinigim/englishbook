@@ -26,10 +26,10 @@ src/app/derma-lux/
     page.tsx          Agenda
     disponibilidade/  Disponibilidade
     equipamentos/     Equipamentos
-supabase/migrations/0004_derma_lux.sql   Tabelas dl_equipment e dl_rentals + RLS + realtime
+supabase/migrations/0004_derma_lux.sql   Tabelas equipment e rentals + RLS + realtime
 ```
 
-Os dados ficam em tabelas próprias com prefixo `dl_` — independentes do schema do EnglishBook.
+Os dados ficam nas tabelas `equipment` e `rentals` (as mesmas da versão estática original).
 
 ## Configuração (uma vez)
 

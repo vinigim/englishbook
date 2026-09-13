@@ -65,8 +65,8 @@ export async function saveRental(input: unknown): Promise<ActionResult> {
   };
 
   const { error } = id
-    ? await supabase.from("dl_rentals").update(row).eq("id", id)
-    : await supabase.from("dl_rentals").insert(row);
+    ? await supabase.from("rentals").update(row).eq("id", id)
+    : await supabase.from("rentals").insert(row);
 
   if (error) return { ok: false, error: error.message };
   revalidateAll();
@@ -79,7 +79,7 @@ export async function deleteRental(id: string): Promise<ActionResult> {
   if (!z.string().uuid().safeParse(id).success) {
     return { ok: false, error: "ID inválido." };
   }
-  const { error } = await supabase.from("dl_rentals").delete().eq("id", id);
+  const { error } = await supabase.from("rentals").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidateAll();
   return { ok: true };
@@ -108,8 +108,8 @@ export async function saveEquipment(input: unknown): Promise<ActionResult> {
   const row = { name: rest.name, use: rest.use || null, color: rest.color };
 
   const { error } = id
-    ? await supabase.from("dl_equipment").update(row).eq("id", id)
-    : await supabase.from("dl_equipment").insert(row);
+    ? await supabase.from("equipment").update(row).eq("id", id)
+    : await supabase.from("equipment").insert(row);
 
   if (error) return { ok: false, error: error.message };
   revalidateAll();
@@ -122,8 +122,8 @@ export async function deleteEquipment(id: string): Promise<ActionResult> {
   if (!z.string().uuid().safeParse(id).success) {
     return { ok: false, error: "ID inválido." };
   }
-  // dl_rentals.equip_id tem ON DELETE CASCADE — os aluguéis do laser saem junto.
-  const { error } = await supabase.from("dl_equipment").delete().eq("id", id);
+  // rentals.equip_id tem ON DELETE CASCADE — os aluguéis do laser saem junto.
+  const { error } = await supabase.from("equipment").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidateAll();
   return { ok: true };

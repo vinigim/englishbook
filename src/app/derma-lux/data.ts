@@ -35,8 +35,8 @@ export async function getDermaLuxData(): Promise<{
 }> {
   const supabase = await createClient();
   const [eqRes, rtRes] = await Promise.all([
-    supabase.from("dl_equipment").select("*").order("created_at", { ascending: true }),
-    supabase.from("dl_rentals").select("*"),
+    supabase.from("equipment").select("*").order("created_at", { ascending: true }),
+    supabase.from("rentals").select("*"),
   ]);
 
   const equipment = (eqRes.data ?? []) as Equipment[];

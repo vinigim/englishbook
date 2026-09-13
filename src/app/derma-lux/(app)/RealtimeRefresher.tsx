@@ -23,12 +23,12 @@ export function RealtimeRefresher() {
       .channel("derma-lux-changes")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "dl_rentals" },
+        { event: "*", schema: "public", table: "rentals" },
         refresh
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "dl_equipment" },
+        { event: "*", schema: "public", table: "equipment" },
         refresh
       )
       .subscribe();
