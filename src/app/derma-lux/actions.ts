@@ -36,6 +36,9 @@ const rentalSchema = z
     end_time: z.string().regex(/^\d{2}:\d{2}$/, "Término inválido"),
     price: z.number().nullish(),
     notes: z.string().trim().nullish(),
+    specialty: z.string().trim().nullish(),
+    tips_used: z.string().trim().nullish(),
+    sterilized: z.boolean().nullish(),
   })
   .refine((d) => d.end_time > d.start_time, {
     message: "O término deve ser depois do início",
@@ -62,6 +65,9 @@ export async function saveRental(input: unknown): Promise<ActionResult> {
     end_time: rest.end_time,
     price: rest.price ?? null,
     notes: rest.notes || null,
+    specialty: rest.specialty || null,
+    tips_used: rest.tips_used || null,
+    sterilized: rest.sterilized ?? null,
   };
 
   const { error } = id

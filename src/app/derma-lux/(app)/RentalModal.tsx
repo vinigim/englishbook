@@ -32,6 +32,9 @@ type FormState = {
   end_time: string;
   price: string;
   notes: string;
+  specialty: string;
+  tips_used: string;
+  sterilized: "" | "sim" | "nao";
 };
 
 function todayStr() {
@@ -57,6 +60,14 @@ function buildInitial(
       end_time: initial.end_time,
       price: initial.price != null ? String(initial.price).replace(".", ",") : "",
       notes: initial.notes ?? "",
+      specialty: initial.specialty ?? "",
+      tips_used: initial.tips_used ?? "",
+      sterilized:
+        initial.sterilized === true
+          ? "sim"
+          : initial.sterilized === false
+          ? "nao"
+          : "",
     };
   }
   return {
@@ -69,6 +80,9 @@ function buildInitial(
     end_time: prefill?.end_time ?? "",
     price: "",
     notes: "",
+    specialty: "",
+    tips_used: "",
+    sterilized: "",
   };
 }
 
@@ -144,6 +158,14 @@ export function RentalModal({
       end_time: form.end_time,
       price: parseBRL(form.price),
       notes: form.notes,
+      specialty: form.specialty,
+      tips_used: form.tips_used,
+      sterilized:
+        form.sterilized === "sim"
+          ? true
+          : form.sterilized === "nao"
+          ? false
+          : null,
     });
     setSaving(false);
 
@@ -180,6 +202,15 @@ export function RentalModal({
               value={form.client}
               onChange={(e) => set("client", e.target.value)}
               placeholder="Dr. João Silva / Clínica Estética…"
+            />
+          </Field>
+
+          <Field label="Especialidade">
+            <input
+              className={inputCls}
+              value={form.specialty}
+              onChange={(e) => set("specialty", e.target.value)}
+              placeholder="Ex.: Dermatologia, Oftalmologia…"
             />
           </Field>
 
@@ -268,6 +299,28 @@ export function RentalModal({
                 onChange={(e) => set("notes", e.target.value)}
                 placeholder="Opcional"
               />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Ponteiras utilizadas">
+              <input
+                className={inputCls}
+                value={form.tips_used}
+                onChange={(e) => set("tips_used", e.target.value)}
+                placeholder="Ex.: Ponteira 15mm, 7mm…"
+              />
+            </Field>
+            <Field label="Esterilização">
+              <select
+                className={inputCls}
+                value={form.sterilized}
+                onChange={(e) => set("sterilized", e.target.value)}
+              >
+                <option value="">— selecione —</option>
+                <option value="sim">Sim</option>
+                <option value="nao">Não</option>
+              </select>
             </Field>
           </div>
 

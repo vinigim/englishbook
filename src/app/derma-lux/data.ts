@@ -12,6 +12,9 @@ type RawRental = {
   end_time: string;
   price: number | string | null;
   notes: string | null;
+  specialty: string | null;
+  tips_used: string | null;
+  sterilized: boolean | null;
 };
 
 function toRental(r: RawRental): Rental {
@@ -26,6 +29,9 @@ function toRental(r: RawRental): Rental {
     end_time: String(r.end_time).slice(0, 5),
     price: r.price != null ? Number(r.price) : null,
     notes: r.notes ?? null,
+    specialty: r.specialty ?? null,
+    tips_used: r.tips_used ?? null,
+    sterilized: r.sterilized ?? null,
   };
 }
 

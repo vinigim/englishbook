@@ -16,4 +16,7 @@ export type Rental = {
   end_time: string; // HH:MM
   price: number | null;
   notes: string | null;
+  specialty: string | null;
+  tips_used: string | null;
+  sterilized: boolean | null;
 };

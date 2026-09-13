@@ -200,10 +200,19 @@ export function AgendaClient({
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold">{r.client}</p>
                         <div className="text-sm text-muted flex gap-x-4 gap-y-0.5 flex-wrap mt-0.5">
+                          {r.specialty ? <span>🩺 {r.specialty}</span> : null}
                           <span>📍 {r.address}</span>
                           {r.phone ? <span>📞 {r.phone}</span> : null}
                           {r.price != null ? (
                             <span>💰 {fmtBRL(r.price)}</span>
+                          ) : null}
+                          {r.tips_used ? (
+                            <span>🔧 Ponteiras: {r.tips_used}</span>
+                          ) : null}
+                          {r.sterilized != null ? (
+                            <span>
+                              🧼 Esterilização: {r.sterilized ? "Sim" : "Não"}
+                            </span>
                           ) : null}
                           {r.notes ? <span>📝 {r.notes}</span> : null}
                         </div>
