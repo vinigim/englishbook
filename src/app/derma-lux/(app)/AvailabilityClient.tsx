@@ -13,7 +13,7 @@ const DAYS = 30;
 
 // Cores por status
 const C_AVAILABLE = "#2f6f4f"; // verde
-const C_FULL = "#374151"; // cinza-escuro
+const C_UNAVAILABLE = "#cfc9bd"; // cinza — alugado OU fechado o dia todo
 const C_MORNING = "#b0851f"; // âmbar
 const C_AFTERNOON = "#3b5b8c"; // azul
 
@@ -218,35 +218,18 @@ export function AvailabilityClient({
                     const base =
                       "aspect-square rounded-md flex flex-col items-center justify-center leading-none select-none";
 
-                    if (c.status === "rented") {
+                    if (c.status === "rented" || c.status === "full") {
                       return (
                         <div
                           key={c.str}
-                          className={`${base} bg-line/60 text-muted`}
-                          title="Alugado"
+                          className={`${base} text-muted`}
+                          style={{ backgroundColor: C_UNAVAILABLE }}
+                          title="Indisponível"
                         >
                           <span className="text-base font-semibold line-through decoration-1">
                             {c.date.getDate()}
                           </span>
                           <span className="text-[9px] mt-0.5">
-                            {MONTHS_ABBR[c.date.getMonth()]}
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    if (c.status === "full") {
-                      return (
-                        <div
-                          key={c.str}
-                          className={`${base} text-white`}
-                          style={{ backgroundColor: C_FULL }}
-                          title="Agenda fechada (dia todo)"
-                        >
-                          <span className="text-base font-bold">
-                            {c.date.getDate()}
-                          </span>
-                          <span className="text-[9px] mt-0.5 opacity-90">
                             {MONTHS_ABBR[c.date.getMonth()]}
                           </span>
                         </div>
@@ -303,8 +286,7 @@ export function AvailabilityClient({
               <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
               <Legend color={C_MORNING} label="Disponível de manhã" />
               <Legend color={C_AFTERNOON} label="Disponível à tarde" />
-              <Legend color="#d9d4c9" label="Alugado" />
-              <Legend color={C_FULL} label="Fechada (dia todo)" />
+              <Legend color={C_UNAVAILABLE} label="Indisponível" />
             </div>
           </div>
 
