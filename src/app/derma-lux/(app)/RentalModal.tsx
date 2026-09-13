@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Equipment, Rental } from "../types";
 import { checkConflict, minutes, parseBRL, fmtBRL } from "../shared";
@@ -127,6 +127,47 @@ export function RentalModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, prefill]);
 
+  // Lista de clientes que já alugaram (dados do aluguel mais recente de cada um)
+  const pastClients = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        client: string;
+        specialty: string;
+        address: string;
+        phone: string;
+      }
+    >();
+    const sorted = [...rentals].sort((a, b) => a.date.localeCompare(b.date));
+    for (const r of sorted) {
+      const name = r.client?.trim();
+      if (!name) continue;
+      map.set(name.toLowerCase(), {
+        key: name.toLowerCase(),
+        client: name,
+        specialty: r.specialty ?? "",
+        address: r.address ?? "",
+        phone: r.phone ?? "",
+      });
+    }
+    return [...map.values()].sort((a, b) =>
+      a.client.localeCompare(b.client, "pt-BR")
+    );
+  }, [rentals]);
+
+  function applyPastClient(key: string) {
+    const c = pastClients.find((p) => p.key === key);
+    if (!c) return;
+    setForm((f) => ({
+      ...f,
+      client: c.client,
+      specialty: c.specialty,
+      address: c.address,
+      phone: c.phone,
+    }));
+  }
+
   async function pickContact() {
     try {
       const nav = navigator as Navigator & {
@@ -246,6 +287,23 @@ export function RentalModal({
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {pastClients.length > 0 ? (
+            <Field label="Cliente que já alugou (reutilizar dados)">
+              <select
+                className={inputCls}
+                value=""
+                onChange={(e) => applyPastClient(e.target.value)}
+              >
+                <option value="">— selecionar cliente anterior —</option>
+                {pastClients.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.client}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+
           <Field label="Nome do cliente *">
             <input
               className={inputCls}
