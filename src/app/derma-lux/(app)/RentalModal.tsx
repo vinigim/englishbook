@@ -108,6 +108,15 @@ export function RentalModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [canPickContact, setCanPickContact] = useState(false);
+
+  useEffect(() => {
+    setCanPickContact(
+      typeof navigator !== "undefined" &&
+        "contacts" in navigator &&
+        "ContactsManager" in window
+    );
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -117,6 +126,34 @@ export function RentalModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, prefill]);
+
+  async function pickContact() {
+    try {
+      const nav = navigator as Navigator & {
+        contacts?: {
+          select: (
+            props: string[],
+            opts?: { multiple?: boolean }
+          ) => Promise<Array<{ tel?: string[]; name?: string[] }>>;
+        };
+      };
+      if (!nav.contacts) return;
+      const result = await nav.contacts.select(["tel", "name"], {
+        multiple: false,
+      });
+      const c = result?.[0];
+      if (!c) return;
+      const tel = c.tel?.[0] ?? "";
+      const name = c.name?.[0] ?? "";
+      setForm((f) => ({
+        ...f,
+        phone: tel || f.phone,
+        client: f.client || name,
+      }));
+    } catch {
+      // usuário cancelou ou navegador não suporta — ignora
+    }
+  }
 
   if (!open) return null;
 
@@ -213,6 +250,7 @@ export function RentalModal({
             <input
               className={inputCls}
               required
+              autoComplete="name"
               value={form.client}
               onChange={(e) => set("client", e.target.value)}
               placeholder="Dr. João Silva / Clínica Estética…"
@@ -232,6 +270,7 @@ export function RentalModal({
             <input
               className={inputCls}
               required
+              autoComplete="street-address"
               value={form.address}
               onChange={(e) => set("address", e.target.value)}
               placeholder="Rua, número, bairro, cidade"
@@ -242,10 +281,21 @@ export function RentalModal({
             <Field label="Telefone / contato">
               <input
                 className={inputCls}
+                type="tel"
+                autoComplete="tel"
                 value={form.phone}
                 onChange={(e) => set("phone", e.target.value)}
                 placeholder="(11) 99999-9999"
               />
+              {canPickContact ? (
+                <button
+                  type="button"
+                  onClick={pickContact}
+                  className="mt-1.5 text-sm text-accent underline"
+                >
+                  📇 Importar do contato
+                </button>
+              ) : null}
             </Field>
             <Field label="Equipamento (laser) *">
               <select
