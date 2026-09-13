@@ -22,6 +22,49 @@ function revalidateAll() {
 }
 
 // ============================================================================
+// FECHAMENTO / BLOQUEIO DE AGENDA
+// ============================================================================
+const blockSchema = z.object({
+  equip_id: z.string().uuid("Selecione um equipamento"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
+  period: z.enum(["full", "morning", "afternoon"]),
+  note: z.string().trim().nullish(),
+});
+
+export async function createBlock(input: unknown): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  const parsed = blockSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const { error } = await supabase.from("blocks").insert({
+    equip_id: parsed.data.equip_id,
+    date: parsed.data.date,
+    period: parsed.data.period,
+    note: parsed.data.note || null,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function deleteBlock(id: string): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+  if (!z.string().uuid().safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+  const { error } = await supabase.from("blocks").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true };
+}
+
+// ============================================================================
 // ALUGUÉIS
 // ============================================================================
 const rentalSchema = z

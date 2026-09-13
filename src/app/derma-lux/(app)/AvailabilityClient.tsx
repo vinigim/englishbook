@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Equipment, Rental } from "../types";
+import type { Block, BlockPeriod, Equipment, Rental } from "../types";
 import { RentalModal, type RentalPrefill } from "./RentalModal";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -10,6 +10,14 @@ const MONTHS_ABBR = [
   "jul", "ago", "set", "out", "nov", "dez",
 ];
 const DAYS = 30;
+
+// Cores por status
+const C_AVAILABLE = "#2f6f4f"; // verde
+const C_FULL = "#374151"; // cinza-escuro
+const C_MORNING = "#b0851f"; // âmbar
+const C_AFTERNOON = "#3b5b8c"; // azul
+
+type Status = "available" | "rented" | "full" | "morning" | "afternoon";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -29,16 +37,18 @@ type Cell = {
   date: Date;
   str: string;
   inWindow: boolean;
-  occupied: boolean;
+  status: Status;
   isToday: boolean;
 };
 
 export function AvailabilityClient({
   equipment,
   rentals,
+  blocks,
 }: {
   equipment: Equipment[];
   rentals: Rental[];
+  blocks: Block[];
 }) {
   const [equipId, setEquipId] = useState(equipment[0]?.id ?? "");
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,12 +62,25 @@ export function AvailabilityClient({
     return s;
   }, [rentals, equipId]);
 
+  const blocksByDate = useMemo(() => {
+    const m = new Map<string, Set<BlockPeriod>>();
+    for (const b of blocks) {
+      if (b.equip_id !== equipId) continue;
+      let set = m.get(b.date);
+      if (!set) {
+        set = new Set();
+        m.set(b.date, set);
+      }
+      set.add(b.period);
+    }
+    return m;
+  }, [blocks, equipId]);
+
   const { weeks, availableCount, periodLabel } = useMemo(() => {
     const start = startOfToday();
     const end = addDays(start, DAYS - 1);
     const startStr = toStr(start);
     const endStr = toStr(end);
-    const todayStr = startStr;
 
     const gridStart = addDays(start, -start.getDay());
     const gridEnd = addDays(end, 6 - end.getDay());
@@ -67,24 +90,33 @@ export function AvailabilityClient({
     for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
       const str = toStr(d);
       const inWindow = str >= startStr && str <= endStr;
-      const isOcc = occupied.has(str);
-      if (inWindow && !isOcc) available++;
-      cells.push({
-        date: d,
-        str,
-        inWindow,
-        occupied: isOcc,
-        isToday: str === todayStr,
-      });
+
+      let status: Status = "available";
+      if (inWindow) {
+        const periods = blocksByDate.get(str);
+        const closedFull =
+          !!periods &&
+          (periods.has("full") ||
+            (periods.has("morning") && periods.has("afternoon")));
+        if (closedFull) status = "full";
+        else if (periods?.has("morning")) status = "morning";
+        else if (periods?.has("afternoon")) status = "afternoon";
+        else if (occupied.has(str)) status = "rented";
+        else {
+          status = "available";
+          available++;
+        }
+      }
+
+      cells.push({ date: d, str, inWindow, status, isToday: str === startStr });
     }
 
     const weeksArr: Cell[][] = [];
     for (let i = 0; i < cells.length; i += 7) weeksArr.push(cells.slice(i, i + 7));
 
     const label = `${start.getDate()} ${MONTHS_ABBR[start.getMonth()]} – ${end.getDate()} ${MONTHS_ABBR[end.getMonth()]}`;
-
     return { weeks: weeksArr, availableCount: available, periodLabel: label };
-  }, [occupied]);
+  }, [occupied, blocksByDate]);
 
   function bookDay(str: string) {
     setPrefill({ date: str, equip_id: equipId });
@@ -93,9 +125,7 @@ export function AvailabilityClient({
 
   return (
     <div>
-      <h1 className="font-display text-3xl tracking-tight">
-        Dias disponíveis
-      </h1>
+      <h1 className="font-display text-3xl tracking-tight">Dias disponíveis</h1>
       <p className="text-muted mt-1 mb-6">
         Próximos 30 dias do equipamento. Tire um print e envie os dias livres
         pelo WhatsApp.
@@ -138,12 +168,14 @@ export function AvailabilityClient({
                 <p className="font-display text-xl tracking-tight leading-tight truncate">
                   {equip?.name ?? "—"}
                 </p>
-                <p className="text-sm text-muted">Disponibilidade · {periodLabel}</p>
+                <p className="text-sm text-muted">
+                  Disponibilidade · {periodLabel}
+                </p>
               </div>
             </div>
 
             <p className="text-sm mb-4">
-              <span className="font-semibold text-[#2f6f4f]">
+              <span className="font-semibold" style={{ color: C_AVAILABLE }}>
                 {availableCount}
               </span>{" "}
               <span className="text-muted">
@@ -169,12 +201,42 @@ export function AvailabilityClient({
               {weeks.map((week, wi) => (
                 <div key={wi} className="grid grid-cols-7 gap-1.5">
                   {week.map((c) => {
-                    if (!c.inWindow) {
+                    if (!c.inWindow)
                       return <div key={c.str} className="aspect-square" />;
-                    }
+
                     const base =
                       "aspect-square rounded-md flex flex-col items-center justify-center leading-none select-none";
-                    if (c.occupied) {
+                    const dayLabel = (
+                      <>
+                        <span className="text-base font-bold">
+                          {c.date.getDate()}
+                        </span>
+                        <span className="text-[9px] mt-0.5 opacity-90">
+                          {MONTHS_ABBR[c.date.getMonth()]}
+                        </span>
+                      </>
+                    );
+
+                    if (c.status === "available") {
+                      return (
+                        <button
+                          key={c.str}
+                          type="button"
+                          onClick={() => bookDay(c.str)}
+                          title="Disponível — toque para agendar"
+                          className={`${base} text-white hover:brightness-110 transition ${
+                            c.isToday
+                              ? "ring-2 ring-accent ring-offset-1 ring-offset-paper"
+                              : ""
+                          }`}
+                          style={{ backgroundColor: C_AVAILABLE }}
+                        >
+                          {dayLabel}
+                        </button>
+                      );
+                    }
+
+                    if (c.status === "rented") {
                       return (
                         <div
                           key={c.str}
@@ -190,23 +252,28 @@ export function AvailabilityClient({
                         </div>
                       );
                     }
+
+                    const color =
+                      c.status === "full"
+                        ? C_FULL
+                        : c.status === "morning"
+                        ? C_MORNING
+                        : C_AFTERNOON;
+                    const label =
+                      c.status === "full"
+                        ? "Agenda fechada (dia todo)"
+                        : c.status === "morning"
+                        ? "Agenda fechada (manhã)"
+                        : "Agenda fechada (tarde)";
                     return (
-                      <button
+                      <div
                         key={c.str}
-                        type="button"
-                        onClick={() => bookDay(c.str)}
-                        title="Disponível — toque para agendar"
-                        className={`${base} bg-[#2f6f4f] text-white hover:brightness-110 transition ${
-                          c.isToday ? "ring-2 ring-accent ring-offset-1 ring-offset-paper" : ""
-                        }`}
+                        className={`${base} text-white`}
+                        style={{ backgroundColor: color }}
+                        title={label}
                       >
-                        <span className="text-base font-bold">
-                          {c.date.getDate()}
-                        </span>
-                        <span className="text-[9px] mt-0.5 opacity-90">
-                          {MONTHS_ABBR[c.date.getMonth()]}
-                        </span>
-                      </button>
+                        {dayLabel}
+                      </div>
                     );
                   })}
                 </div>
@@ -214,20 +281,18 @@ export function AvailabilityClient({
             </div>
 
             {/* Legenda */}
-            <div className="flex gap-5 text-xs text-muted mt-4 flex-wrap">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-[#2f6f4f] inline-block" />
-                Disponível
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-line inline-block" />
-                Alugado
-              </span>
+            <div className="flex gap-x-4 gap-y-1.5 text-xs text-muted mt-4 flex-wrap">
+              <Legend color={C_AVAILABLE} label="Disponível" />
+              <Legend color="#d9d4c9" label="Alugado" />
+              <Legend color={C_FULL} label="Fechada (dia todo)" />
+              <Legend color={C_MORNING} label="Fechada (manhã)" />
+              <Legend color={C_AFTERNOON} label="Fechada (tarde)" />
             </div>
           </div>
 
           <p className="text-xs text-muted mt-3">
-            Dica: toque num dia verde para já criar um aluguel nele.
+            Dica: toque num dia verde para já criar um aluguel. Para fechar a
+            agenda de um dia, use “Fechar agenda” na aba Agenda.
           </p>
         </>
       )}
@@ -240,5 +305,17 @@ export function AvailabilityClient({
         prefill={prefill}
       />
     </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className="w-3.5 h-3.5 rounded inline-block"
+        style={{ backgroundColor: color }}
+      />
+      {label}
+    </span>
   );
 }

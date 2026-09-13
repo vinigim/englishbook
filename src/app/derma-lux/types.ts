@@ -23,3 +23,13 @@ export type Rental = {
   sterilized: boolean | null;
   specialized_technique: boolean | null;
 };
+
+export type BlockPeriod = "full" | "morning" | "afternoon";
+
+export type Block = {
+  id: string;
+  equip_id: string | null;
+  date: string; // yyyy-mm-dd
+  period: BlockPeriod;
+  note: string | null;
+};

@@ -2,23 +2,28 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Equipment, Rental } from "../types";
-import {
-  fmtBRL,
-  fmtDayHeading,
-  groupByDate,
-  todayStr,
-  whatsAppUrl,
-} from "../shared";
-import { deleteRental } from "../actions";
+import type { Block, BlockPeriod, Equipment, Rental } from "../types";
+import { fmtBRL, fmtDayHeading, minutes, todayStr, whatsAppUrl } from "../shared";
+import { deleteRental, deleteBlock } from "../actions";
 import { RentalModal } from "./RentalModal";
+import { BlockModal } from "./BlockModal";
+
+const PERIOD_LABEL: Record<BlockPeriod, string> = {
+  full: "Dia todo",
+  morning: "Manhã",
+  afternoon: "Tarde",
+};
+
+type DayEntry = { rentals: Rental[]; blocks: Block[] };
 
 export function AgendaClient({
   equipment,
   rentals,
+  blocks,
 }: {
   equipment: Equipment[];
   rentals: Rental[];
+  blocks: Block[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -26,6 +31,7 @@ export function AgendaClient({
   const [showPast, setShowPast] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Rental | null>(null);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
 
   const equipMap = useMemo(
     () => new Map(equipment.map((e) => [e.id, e])),
@@ -45,25 +51,51 @@ export function AgendaClient({
     };
   }, [rentals, equipment, today]);
 
-  const filtered = useMemo(() => {
+  const days = useMemo(() => {
     const q = search.toLowerCase().trim();
-    let items = rentals.slice();
-    if (!showPast) items = items.filter((r) => r.date >= today);
-    if (filterEquip) items = items.filter((r) => r.equip_id === filterEquip);
-    if (q) {
-      items = items.filter((r) => {
+    const map = new Map<string, DayEntry>();
+    const ensure = (d: string) => {
+      let e = map.get(d);
+      if (!e) {
+        e = { rentals: [], blocks: [] };
+        map.set(d, e);
+      }
+      return e;
+    };
+
+    let rItems = rentals.slice();
+    if (!showPast) rItems = rItems.filter((r) => r.date >= today);
+    if (filterEquip) rItems = rItems.filter((r) => r.equip_id === filterEquip);
+    if (q)
+      rItems = rItems.filter((r) => {
         const eq = r.equip_id ? equipMap.get(r.equip_id) : null;
         return [r.client, r.address, r.notes, r.phone, eq?.name]
           .join(" ")
           .toLowerCase()
           .includes(q);
       });
-    }
-    return items;
-  }, [rentals, search, filterEquip, showPast, today, equipMap]);
+    for (const r of rItems) ensure(r.date).rentals.push(r);
 
-  const groups = useMemo(() => groupByDate(filtered), [filtered]);
-  const orderedDates = useMemo(() => Object.keys(groups).sort(), [groups]);
+    let bItems = blocks.slice();
+    if (!showPast) bItems = bItems.filter((b) => b.date >= today);
+    if (filterEquip) bItems = bItems.filter((b) => b.equip_id === filterEquip);
+    if (q)
+      bItems = bItems.filter((b) => {
+        const eq = b.equip_id ? equipMap.get(b.equip_id) : null;
+        return [b.note, eq?.name, "fechada", "fechamento"]
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      });
+    for (const b of bItems) ensure(b.date).blocks.push(b);
+
+    for (const e of map.values())
+      e.rentals.sort((a, b) => minutes(a.start_time) - minutes(b.start_time));
+
+    return map;
+  }, [rentals, blocks, search, filterEquip, showPast, today, equipMap]);
+
+  const orderedDates = useMemo(() => [...days.keys()].sort(), [days]);
 
   function openNew() {
     if (equipment.length === 0) {
@@ -72,6 +104,13 @@ export function AgendaClient({
     }
     setEditing(null);
     setModalOpen(true);
+  }
+  function openBlock() {
+    if (equipment.length === 0) {
+      router.push("/derma-lux/equipamentos");
+      return;
+    }
+    setBlockModalOpen(true);
   }
   function openEdit(r: Rental) {
     setEditing(r);
@@ -86,6 +125,15 @@ export function AgendaClient({
     }
     router.refresh();
   }
+  async function handleDeleteBlock(b: Block) {
+    if (!confirm("Reabrir a agenda deste dia (remover o fechamento)?")) return;
+    const res = await deleteBlock(b.id);
+    if (!res.ok) {
+      alert(res.error ?? "Não foi possível reabrir.");
+      return;
+    }
+    router.refresh();
+  }
 
   return (
     <div>
@@ -95,15 +143,23 @@ export function AgendaClient({
             Próximas obrigações de aluguel
           </h1>
           <p className="text-muted mt-1">
-            Todos os aluguéis agendados, organizados por data.
+            Aluguéis e fechamentos de agenda, organizados por data.
           </p>
         </div>
-        <button
-          onClick={openNew}
-          className="h-11 px-6 bg-ink text-paper font-medium hover:bg-accent transition-colors"
-        >
-          + Novo aluguel
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={openBlock}
+            className="h-11 px-5 bg-paper text-ink border border-ink font-medium hover:bg-ink hover:text-paper transition-colors"
+          >
+            Fechar agenda
+          </button>
+          <button
+            onClick={openNew}
+            className="h-11 px-6 bg-ink text-paper font-medium hover:bg-accent transition-colors"
+          >
+            + Novo aluguel
+          </button>
+        </div>
       </div>
 
       {/* Estatísticas */}
@@ -153,15 +209,16 @@ export function AgendaClient({
         <div className="text-center py-20 text-muted border border-dashed border-line">
           <div className="text-5xl mb-3">📅</div>
           <p className="font-display text-xl text-ink mb-1">
-            Nenhum aluguel {showPast ? "" : "futuro "}encontrado
+            Nada {showPast ? "" : "futuro "}encontrado
           </p>
-          <p>Clique em “+ Novo aluguel” para agendar o uso de um laser.</p>
+          <p>Use “+ Novo aluguel” ou “Fechar agenda” para começar.</p>
         </div>
       ) : (
         orderedDates.map((date) => {
           const heading = fmtDayHeading(date);
           const isToday = date === today;
           const isPast = date < today;
+          const entry = days.get(date)!;
           return (
             <section key={date} className="mb-8">
               <div className="flex items-baseline gap-3 border-b border-dashed border-line pb-2 mb-3">
@@ -177,12 +234,18 @@ export function AgendaClient({
                   </span>
                 ) : null}
                 <span className="ml-auto text-sm text-muted">
-                  {groups[date].length} aluguel(éis)
+                  {entry.rentals.length > 0
+                    ? `${entry.rentals.length} aluguel(éis)`
+                    : ""}
+                  {entry.rentals.length > 0 && entry.blocks.length > 0 ? " · " : ""}
+                  {entry.blocks.length > 0
+                    ? `${entry.blocks.length} fechamento(s)`
+                    : ""}
                 </span>
               </div>
 
               <div className="space-y-2.5">
-                {groups[date].map((r) => {
+                {entry.rentals.map((r) => {
                   const eq = r.equip_id ? equipMap.get(r.equip_id) : null;
                   const wa = whatsAppUrl(r, eq?.name ?? null);
                   return (
@@ -266,6 +329,56 @@ export function AgendaClient({
                     </div>
                   );
                 })}
+
+                {entry.blocks.map((b) => {
+                  const eq = b.equip_id ? equipMap.get(b.equip_id) : null;
+                  return (
+                    <div
+                      key={b.id}
+                      className={`flex items-center gap-4 p-4 border border-dashed border-line bg-line/25 ${
+                        isPast ? "opacity-60" : ""
+                      }`}
+                    >
+                      <div className="min-w-[104px] text-center px-2 py-2 bg-ink/80 text-paper font-semibold text-sm leading-tight">
+                        🚫
+                        <span className="block text-xs font-medium">
+                          {PERIOD_LABEL[b.period]}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold">
+                          Agenda fechada — {PERIOD_LABEL[b.period].toLowerCase()}
+                        </p>
+                        {b.note ? (
+                          <div className="text-sm text-muted mt-0.5">
+                            📝 {b.note}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {eq ? (
+                        <span
+                          className="px-2.5 py-1 text-xs font-semibold text-paper whitespace-nowrap"
+                          style={{ backgroundColor: eq.color }}
+                        >
+                          {eq.name}
+                        </span>
+                      ) : null}
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleDeleteBlock(b)}
+                          className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
+                          title="Reabrir (remover fechamento)"
+                          aria-label="Reabrir agenda"
+                        >
+                          ↩️
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           );
@@ -278,6 +391,11 @@ export function AgendaClient({
         equipment={equipment}
         rentals={rentals}
         initial={editing}
+      />
+      <BlockModal
+        open={blockModalOpen}
+        onClose={() => setBlockModalOpen(false)}
+        equipment={equipment}
       />
     </div>
   );

@@ -31,6 +31,11 @@ export function RealtimeRefresher() {
         { event: "*", schema: "public", table: "equipment" },
         refresh
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "blocks" },
+        refresh
+      )
       .subscribe();
 
     return () => {

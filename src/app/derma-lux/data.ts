@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Equipment, Rental } from "./types";
+import type { Block, BlockPeriod, Equipment, Rental } from "./types";
 
 type RawRental = {
   id: string;
@@ -41,17 +41,41 @@ function toRental(r: RawRental): Rental {
   };
 }
 
+type RawBlock = {
+  id: string;
+  equip_id: string | null;
+  date: string;
+  period: string | null;
+  note: string | null;
+};
+
+function toBlock(b: RawBlock): Block {
+  const period = (b.period ?? "full") as BlockPeriod;
+  return {
+    id: b.id,
+    equip_id: b.equip_id ?? null,
+    date: b.date,
+    period: ["full", "morning", "afternoon"].includes(period) ? period : "full",
+    note: b.note ?? null,
+  };
+}
+
 export async function getDermaLuxData(): Promise<{
   equipment: Equipment[];
   rentals: Rental[];
+  blocks: Block[];
 }> {
   const supabase = await createClient();
-  const [eqRes, rtRes] = await Promise.all([
+  const [eqRes, rtRes, blRes] = await Promise.all([
     supabase.from("equipment").select("*").order("created_at", { ascending: true }),
     supabase.from("rentals").select("*"),
+    supabase.from("blocks").select("*"),
   ]);
 
   const equipment = (eqRes.data ?? []) as Equipment[];
   const rentals = ((rtRes.data ?? []) as RawRental[]).map(toRental);
-  return { equipment, rentals };
+  // Se a tabela blocks ainda não existir (migração não rodada), blRes.data vem
+  // null e caímos em [] sem quebrar a página.
+  const blocks = ((blRes.data ?? []) as RawBlock[]).map(toBlock);
+  return { equipment, rentals, blocks };
 }
