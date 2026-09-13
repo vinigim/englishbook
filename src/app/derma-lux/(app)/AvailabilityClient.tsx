@@ -171,12 +171,12 @@ export function AvailabilityClient({
 
           {/* Cartão para print */}
           <div className="border border-line bg-paper shadow-[4px_4px_0_0_rgba(26,26,26,0.06)] p-5 max-w-2xl">
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-start gap-3 mb-1">
               <div className="w-9 h-9 bg-accent text-paper grid place-items-center font-display text-base font-semibold shrink-0">
                 DL
               </div>
               <div className="min-w-0">
-                <p className="font-display text-xl tracking-tight leading-tight truncate">
+                <p className="font-display text-xl tracking-tight leading-tight break-words">
                   {equip?.name ?? "—"}
                 </p>
                 <p className="text-sm text-muted">
