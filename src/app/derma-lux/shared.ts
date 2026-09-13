@@ -94,6 +94,56 @@ export function checkConflict(
   );
 }
 
+/**
+ * Converte o telefone digitado para o formato do WhatsApp (só dígitos, com
+ * código do país). Assume Brasil (55) quando não há código. Retorna null se
+ * não houver dígitos suficientes.
+ */
+export function toWhatsAppNumber(phone: string | null): string | null {
+  if (!phone) return null;
+  const d = phone.replace(/\D/g, "");
+  if (d.length < 8) return null;
+  if (d.startsWith("55") && d.length >= 12) return d; // já tem DDI
+  if (d.length === 10 || d.length === 11) return "55" + d; // DDD + número
+  return d; // fallback: usa como veio
+}
+
+/** Monta a mensagem de confirmação do aluguel para o WhatsApp. */
+export function buildConfirmationMessage(
+  r: Rental,
+  equipmentName: string | null
+): string {
+  const dt = fmtDayHeading(r.date);
+  const lines: string[] = [];
+  lines.push(`Olá, ${r.client}! 👋`);
+  lines.push("");
+  lines.push("Passando para confirmar o aluguel do laser:");
+  lines.push("");
+  if (equipmentName) lines.push(`🔬 Equipamento: ${equipmentName}`);
+  lines.push(`📅 Data: ${dt.day} (${dt.dow})`);
+  lines.push(`🕑 Horário: ${r.start_time} às ${r.end_time}`);
+  if (r.address) lines.push(`📍 Endereço: ${r.address}`);
+  if (r.specialty) lines.push(`🩺 Especialidade: ${r.specialty}`);
+  if (r.price != null) lines.push(`💰 Valor: ${fmtBRL(r.price)}`);
+  if (r.tips_used) lines.push(`🔧 Ponteiras: ${r.tips_used}`);
+  if (r.sterilized != null)
+    lines.push(`🧼 Esterilização: ${r.sterilized ? "Sim" : "Não"}`);
+  if (r.specialized_technique != null)
+    lines.push(
+      `🎯 Técnica especializada: ${r.specialized_technique ? "Sim" : "Não"}`
+    );
+  lines.push("");
+  lines.push("Podemos confirmar? 🙏");
+  return lines.join("\n");
+}
+
+export function whatsAppUrl(r: Rental, equipmentName: string | null): string | null {
+  const number = toWhatsAppNumber(r.phone);
+  if (!number) return null;
+  const text = encodeURIComponent(buildConfirmationMessage(r, equipmentName));
+  return `https://wa.me/${number}?text=${text}`;
+}
+
 export function groupByDate(rentals: Rental[]): Record<string, Rental[]> {
   const groups: Record<string, Rental[]> = {};
   for (const r of rentals) {

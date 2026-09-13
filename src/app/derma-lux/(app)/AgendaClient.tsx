@@ -8,6 +8,7 @@ import {
   fmtDayHeading,
   groupByDate,
   todayStr,
+  whatsAppUrl,
 } from "../shared";
 import { deleteRental } from "../actions";
 import { RentalModal } from "./RentalModal";
@@ -183,6 +184,7 @@ export function AgendaClient({
               <div className="space-y-2.5">
                 {groups[date].map((r) => {
                   const eq = r.equip_id ? equipMap.get(r.equip_id) : null;
+                  const wa = whatsAppUrl(r, eq?.name ?? null);
                   return (
                     <div
                       key={r.id}
@@ -234,6 +236,18 @@ export function AgendaClient({
                       ) : null}
 
                       <div className="flex items-center gap-1 shrink-0">
+                        {wa ? (
+                          <a
+                            href={wa}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-[#25D366] hover:bg-line transition-colors"
+                            title="Enviar confirmação no WhatsApp"
+                            aria-label="Enviar confirmação no WhatsApp"
+                          >
+                            💬
+                          </a>
+                        ) : null}
                         <button
                           onClick={() => openEdit(r)}
                           className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
