@@ -20,7 +20,7 @@ export default async function DermaLuxLoginPage() {
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-8">
           <div className="w-11 h-11 bg-accent text-paper grid place-items-center font-display text-xl font-semibold">
-            DL
+            LD
           </div>
           <div>
             <p className="font-display text-2xl tracking-tight leading-none text-paper">
