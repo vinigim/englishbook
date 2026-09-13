@@ -117,7 +117,7 @@ export function buildConfirmationMessage(
   const lines: string[] = [];
   lines.push(`Olá, ${r.client}! 👋`);
   lines.push("");
-  lines.push("Passando para confirmar o aluguel do laser:");
+  lines.push("Passando para te lembrar do aluguel do laser:");
   lines.push("");
   if (equipmentName) lines.push(`🔬 Equipamento: ${equipmentName}`);
   lines.push(`📅 Data: ${dt.day} (${dt.dow})`);
