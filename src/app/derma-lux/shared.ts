@@ -135,7 +135,15 @@ export function buildConfirmationMessage(
       }`
     );
   lines.push("");
-  lines.push("Podemos confirmar? 🙏");
+  lines.push(
+    "🕧 Nossa equipe chega sempre com 30 minutos de antecedência para inspeção do local e instalação do equipamento."
+  );
+  lines.push("");
+  lines.push(
+    "Se possível, nos informe um contato para auxiliar na recepção do equipamento. 🙏"
+  );
+  lines.push("");
+  lines.push("Podemos confirmar?");
   return lines.join("\n");
 }
 
