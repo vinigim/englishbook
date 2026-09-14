@@ -7,7 +7,11 @@ import { dlLogout } from "../auth-actions";
 
 const LINKS = [
   { href: "/derma-lux", label: "Agenda" },
-  { href: "/derma-lux/disponibilidade", label: "Disponibilidade" },
+  { href: "/derma-lux/disponibilidade", label: "Disponibilidade Locação" },
+  {
+    href: "/derma-lux/disponibilidade-clinica",
+    label: "Disponibilidade Clínica Dra Gabriella",
+  },
   { href: "/derma-lux/equipamentos", label: "Equipamentos" },
 ];
 
@@ -46,10 +50,7 @@ export function DermaLuxNav({ email }: { email: string }) {
 
         <nav className="flex items-center gap-1 mt-1 overflow-x-auto">
           {LINKS.map((l) => {
-            const active =
-              l.href === "/derma-lux"
-                ? pathname === "/derma-lux"
-                : pathname.startsWith(l.href);
+            const active = pathname === l.href;
             return (
               <Link
                 key={l.href}

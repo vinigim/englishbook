@@ -50,11 +50,14 @@ export function AvailabilityClient({
   equipment,
   rentals,
   blocks,
+  mode = "locacao",
 }: {
   equipment: Equipment[];
   rentals: Rental[];
   blocks: Block[];
+  mode?: "locacao" | "clinica";
 }) {
+  const isClinica = mode === "clinica";
   const [equipId, setEquipId] = useState(equipment[0]?.id ?? "");
   const [modalOpen, setModalOpen] = useState(false);
   const [prefill, setPrefill] = useState<RentalPrefill | undefined>(undefined);
@@ -98,25 +101,35 @@ export function AvailabilityClient({
 
       let status: Status = "available";
       if (inWindow) {
-        const periods = blocksByDate.get(str);
-        const closedFull =
-          !!periods &&
-          (periods.has("full") ||
-            (periods.has("morning") && periods.has("afternoon")));
-        if (closedFull) status = "full";
-        else if (occupied.has(str)) status = "rented";
-        else if (periods?.has("morning"))
-          status = "avail_afternoon"; // manhã fechada → tarde livre
-        else if (periods?.has("afternoon"))
-          status = "avail_morning"; // tarde fechada → manhã livre
-        else status = "available";
+        if (isClinica) {
+          // Para a clínica: só as LOCAÇÕES deixam o dia indisponível.
+          // Os fechamentos de agenda são ignorados nesta visão.
+          if (occupied.has(str)) status = "rented";
+          else {
+            status = "available";
+            available++;
+          }
+        } else {
+          const periods = blocksByDate.get(str);
+          const closedFull =
+            !!periods &&
+            (periods.has("full") ||
+              (periods.has("morning") && periods.has("afternoon")));
+          if (closedFull) status = "full";
+          else if (occupied.has(str)) status = "rented";
+          else if (periods?.has("morning"))
+            status = "avail_afternoon"; // manhã fechada → tarde livre
+          else if (periods?.has("afternoon"))
+            status = "avail_morning"; // tarde fechada → manhã livre
+          else status = "available";
 
-        if (
-          status === "available" ||
-          status === "avail_morning" ||
-          status === "avail_afternoon"
-        )
-          available++;
+          if (
+            status === "available" ||
+            status === "avail_morning" ||
+            status === "avail_afternoon"
+          )
+            available++;
+        }
       }
 
       cells.push({ date: d, str, inWindow, status, isToday: str === startStr });
@@ -127,7 +140,7 @@ export function AvailabilityClient({
 
     const label = `${start.getDate()} ${MONTHS_ABBR[start.getMonth()]} – ${end.getDate()} ${MONTHS_ABBR[end.getMonth()]}`;
     return { weeks: weeksArr, availableCount: available, periodLabel: label };
-  }, [occupied, blocksByDate]);
+  }, [occupied, blocksByDate, isClinica]);
 
   function bookDay(str: string) {
     setPrefill({ date: str, equip_id: equipId });
@@ -136,10 +149,13 @@ export function AvailabilityClient({
 
   return (
     <div>
-      <h1 className="font-display text-3xl tracking-tight">Dias disponíveis</h1>
+      <h1 className="font-display text-3xl tracking-tight">
+        {isClinica ? "Disponibilidade — Clínica Dra Gabriella" : "Dias disponíveis"}
+      </h1>
       <p className="text-muted mt-1 mb-6">
-        Próximos 30 dias do equipamento. Tire um print e envie os dias livres
-        pelo WhatsApp.
+        {isClinica
+          ? "Próximos 30 dias: dias livres para usar o laser na clínica. As locações para médicos aparecem como indisponíveis (os fechamentos de agenda não entram aqui)."
+          : "Próximos 30 dias do equipamento. Tire um print e envie os dias livres pelo WhatsApp."}
       </p>
 
       {equipment.length === 0 ? (
@@ -180,7 +196,8 @@ export function AvailabilityClient({
                   {equip?.name ?? "—"}
                 </p>
                 <p className="text-sm text-paper/70">
-                  Disponibilidade · {periodLabel}
+                  {isClinica ? "Clínica Dra Gabriella" : "Disponibilidade"} ·{" "}
+                  {periodLabel}
                 </p>
               </div>
             </div>
@@ -224,7 +241,11 @@ export function AvailabilityClient({
                           key={c.str}
                           className={`${base} text-muted`}
                           style={{ backgroundColor: C_UNAVAILABLE }}
-                          title="Indisponível"
+                          title={
+                            isClinica
+                              ? "Locado — indisponível para a clínica"
+                              : "Indisponível"
+                          }
                         >
                           <span className="text-base font-semibold line-through decoration-1">
                             {c.date.getDate()}
@@ -255,6 +276,29 @@ export function AvailabilityClient({
                         : c.status === "avail_afternoon"
                         ? "Disponível à tarde — toque para agendar"
                         : "Disponível — toque para agendar";
+
+                    if (isClinica) {
+                      return (
+                        <div
+                          key={c.str}
+                          className={`${base} text-white ${
+                            c.isToday
+                              ? "ring-2 ring-accent ring-offset-1 ring-offset-paper"
+                              : ""
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title="Disponível para a clínica"
+                        >
+                          <span className="text-base font-bold">
+                            {c.date.getDate()}
+                          </span>
+                          <span className="text-[9px] mt-0.5 opacity-90">
+                            {small}
+                          </span>
+                        </div>
+                      );
+                    }
+
                     return (
                       <button
                         key={c.str}
@@ -283,16 +327,26 @@ export function AvailabilityClient({
 
             {/* Legenda */}
             <div className="flex gap-x-4 gap-y-1.5 text-xs text-muted mt-4 flex-wrap">
-              <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
-              <Legend color={C_MORNING} label="Disponível de manhã" />
-              <Legend color={C_AFTERNOON} label="Disponível à tarde" />
-              <Legend color={C_UNAVAILABLE} label="Indisponível" />
+              {isClinica ? (
+                <>
+                  <Legend color={C_AVAILABLE} label="Disponível para a clínica" />
+                  <Legend color={C_UNAVAILABLE} label="Locado (indisponível)" />
+                </>
+              ) : (
+                <>
+                  <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
+                  <Legend color={C_MORNING} label="Disponível de manhã" />
+                  <Legend color={C_AFTERNOON} label="Disponível à tarde" />
+                  <Legend color={C_UNAVAILABLE} label="Indisponível" />
+                </>
+              )}
             </div>
           </div>
 
           <p className="text-xs text-muted mt-3">
-            Dica: toque num dia verde para já criar um aluguel. Para fechar a
-            agenda de um dia, use “Fechar agenda” na aba Agenda.
+            {isClinica
+              ? "Só as locações para médicos deixam o dia indisponível. Escolha o laser e tire um print para a clínica."
+              : "Dica: toque num dia verde para já criar um aluguel. Para fechar a agenda de um dia, use “Fechar agenda” na aba Agenda."}
           </p>
         </>
       )}
