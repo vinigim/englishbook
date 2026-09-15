@@ -31,6 +31,7 @@ export function BlockModal({
   const [date, setDate] = useState(todayStr());
   const [period, setPeriod] = useState<BlockPeriod>("full");
   const [reason, setReason] = useState<"" | BlockReason>("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -40,6 +41,7 @@ export function BlockModal({
       setDate(prefillDate ?? todayStr());
       setPeriod("full");
       setReason("");
+      setNote("");
       setError(null);
       setSaving(false);
     }
@@ -51,7 +53,13 @@ export function BlockModal({
     e.preventDefault();
     setError(null);
     setSaving(true);
-    const res = await createBlock({ equip_id: equipId, date, period, reason });
+    const res = await createBlock({
+      equip_id: equipId,
+      date,
+      period,
+      reason,
+      note,
+    });
     setSaving(false);
     if (!res.ok) {
       setError(res.error ?? "Não foi possível fechar a agenda.");
@@ -156,6 +164,18 @@ export function BlockModal({
               <br />
               <b>Para locação:</b> indisponível só na Locação.
             </p>
+          </label>
+
+          <label className="block">
+            <span className="block text-sm font-medium text-ink mb-1.5">
+              Observações (opcional)
+            </span>
+            <input
+              className={inputCls}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ex.: nome do paciente, detalhes…"
+            />
           </label>
 
           {error ? (
