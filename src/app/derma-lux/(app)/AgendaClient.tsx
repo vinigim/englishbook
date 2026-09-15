@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Block, BlockPeriod, Equipment, Rental } from "../types";
+import type { Block, BlockPeriod, BlockReason, Equipment, Rental } from "../types";
 import { fmtBRL, fmtDayHeading, minutes, todayStr, whatsAppUrl } from "../shared";
 import { deleteRental, deleteBlock } from "../actions";
 import { RentalModal } from "./RentalModal";
@@ -12,6 +12,11 @@ const PERIOD_LABEL: Record<BlockPeriod, string> = {
   full: "Dia todo",
   morning: "Manhã",
   afternoon: "Tarde",
+};
+
+const REASON_LABEL: Record<BlockReason, string> = {
+  patient: "Com paciente",
+  locacao: "Para locação",
 };
 
 type DayEntry = { rentals: Rental[]; blocks: Block[] };
@@ -350,11 +355,10 @@ export function AgendaClient({
                         <p className="font-semibold">
                           Agenda fechada — {PERIOD_LABEL[b.period].toLowerCase()}
                         </p>
-                        {b.note ? (
-                          <div className="text-sm text-muted mt-0.5">
-                            📝 {b.note}
-                          </div>
-                        ) : null}
+                        <div className="text-sm text-muted mt-0.5">
+                          {REASON_LABEL[b.reason]}
+                          {b.note ? ` · ${b.note}` : ""}
+                        </div>
                       </div>
 
                       {eq ? (

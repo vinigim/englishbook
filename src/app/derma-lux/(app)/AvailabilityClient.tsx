@@ -74,6 +74,9 @@ export function AvailabilityClient({
     const m = new Map<string, Set<BlockPeriod>>();
     for (const b of blocks) {
       if (b.equip_id !== equipId) continue;
+      // Na visão da Clínica, só os fechamentos "com paciente" tornam o dia
+      // indisponível. Na Locação, todos os fechamentos valem.
+      if (isClinica && b.reason !== "patient") continue;
       let set = m.get(b.date);
       if (!set) {
         set = new Set();
@@ -82,7 +85,7 @@ export function AvailabilityClient({
       set.add(b.period);
     }
     return m;
-  }, [blocks, equipId]);
+  }, [blocks, equipId, isClinica]);
 
   const { weeks, availableCount, periodLabel } = useMemo(() => {
     const start = startOfToday();
@@ -101,35 +104,25 @@ export function AvailabilityClient({
 
       let status: Status = "available";
       if (inWindow) {
-        if (isClinica) {
-          // Para a clínica: só as LOCAÇÕES deixam o dia indisponível.
-          // Os fechamentos de agenda são ignorados nesta visão.
-          if (occupied.has(str)) status = "rented";
-          else {
-            status = "available";
-            available++;
-          }
-        } else {
-          const periods = blocksByDate.get(str);
-          const closedFull =
-            !!periods &&
-            (periods.has("full") ||
-              (periods.has("morning") && periods.has("afternoon")));
-          if (closedFull) status = "full";
-          else if (occupied.has(str)) status = "rented";
-          else if (periods?.has("morning"))
-            status = "avail_afternoon"; // manhã fechada → tarde livre
-          else if (periods?.has("afternoon"))
-            status = "avail_morning"; // tarde fechada → manhã livre
-          else status = "available";
+        const periods = blocksByDate.get(str);
+        const closedFull =
+          !!periods &&
+          (periods.has("full") ||
+            (periods.has("morning") && periods.has("afternoon")));
+        if (closedFull) status = "full";
+        else if (occupied.has(str)) status = "rented";
+        else if (periods?.has("morning"))
+          status = "avail_afternoon"; // manhã indisponível → tarde livre
+        else if (periods?.has("afternoon"))
+          status = "avail_morning"; // tarde indisponível → manhã livre
+        else status = "available";
 
-          if (
-            status === "available" ||
-            status === "avail_morning" ||
-            status === "avail_afternoon"
-          )
-            available++;
-        }
+        if (
+          status === "available" ||
+          status === "avail_morning" ||
+          status === "avail_afternoon"
+        )
+          available++;
       }
 
       cells.push({ date: d, str, inWindow, status, isToday: str === startStr });
@@ -241,11 +234,7 @@ export function AvailabilityClient({
                           key={c.str}
                           className={`${base} text-muted`}
                           style={{ backgroundColor: C_UNAVAILABLE }}
-                          title={
-                            isClinica
-                              ? "Locado — indisponível para a clínica"
-                              : "Indisponível"
-                          }
+                          title="Indisponível"
                         >
                           <span className="text-base font-semibold line-through decoration-1">
                             {c.date.getDate()}
@@ -327,19 +316,10 @@ export function AvailabilityClient({
 
             {/* Legenda */}
             <div className="flex gap-x-4 gap-y-1.5 text-xs text-muted mt-4 flex-wrap">
-              {isClinica ? (
-                <>
-                  <Legend color={C_AVAILABLE} label="Disponível para a clínica" />
-                  <Legend color={C_UNAVAILABLE} label="Locado (indisponível)" />
-                </>
-              ) : (
-                <>
-                  <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
-                  <Legend color={C_MORNING} label="Disponível de manhã" />
-                  <Legend color={C_AFTERNOON} label="Disponível à tarde" />
-                  <Legend color={C_UNAVAILABLE} label="Indisponível" />
-                </>
-              )}
+              <Legend color={C_AVAILABLE} label="Disponível (dia todo)" />
+              <Legend color={C_MORNING} label="Disponível de manhã" />
+              <Legend color={C_AFTERNOON} label="Disponível à tarde" />
+              <Legend color={C_UNAVAILABLE} label="Indisponível" />
             </div>
           </div>
 

@@ -28,6 +28,9 @@ const blockSchema = z.object({
   equip_id: z.string().uuid("Selecione um equipamento"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
   period: z.enum(["full", "morning", "afternoon"]),
+  reason: z.enum(["patient", "locacao"], {
+    errorMap: () => ({ message: "Selecione o motivo" }),
+  }),
   note: z.string().trim().nullish(),
 });
 
@@ -44,6 +47,7 @@ export async function createBlock(input: unknown): Promise<ActionResult> {
     equip_id: parsed.data.equip_id,
     date: parsed.data.date,
     period: parsed.data.period,
+    reason: parsed.data.reason,
     note: parsed.data.note || null,
   });
 

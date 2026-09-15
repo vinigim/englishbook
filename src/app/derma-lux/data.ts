@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Block, BlockPeriod, Equipment, Rental } from "./types";
+import type {
+  Block,
+  BlockPeriod,
+  BlockReason,
+  Equipment,
+  Rental,
+} from "./types";
 
 type RawRental = {
   id: string;
@@ -46,16 +52,20 @@ type RawBlock = {
   equip_id: string | null;
   date: string;
   period: string | null;
+  reason: string | null;
   note: string | null;
 };
 
 function toBlock(b: RawBlock): Block {
   const period = (b.period ?? "full") as BlockPeriod;
+  // Fechamentos antigos (sem motivo) valem como "locacao".
+  const reason = (b.reason === "patient" ? "patient" : "locacao") as BlockReason;
   return {
     id: b.id,
     equip_id: b.equip_id ?? null,
     date: b.date,
     period: ["full", "morning", "afternoon"].includes(period) ? period : "full",
+    reason,
     note: b.note ?? null,
   };
 }

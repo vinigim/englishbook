@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Equipment, BlockPeriod } from "../types";
+import type { Equipment, BlockPeriod, BlockReason } from "../types";
 import { createBlock } from "../actions";
 
 function todayStr() {
@@ -30,7 +30,7 @@ export function BlockModal({
   const [equipId, setEquipId] = useState(equipment[0]?.id ?? "");
   const [date, setDate] = useState(todayStr());
   const [period, setPeriod] = useState<BlockPeriod>("full");
-  const [note, setNote] = useState("");
+  const [reason, setReason] = useState<"" | BlockReason>("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -39,7 +39,7 @@ export function BlockModal({
       setEquipId(equipment[0]?.id ?? "");
       setDate(prefillDate ?? todayStr());
       setPeriod("full");
-      setNote("");
+      setReason("");
       setError(null);
       setSaving(false);
     }
@@ -51,7 +51,7 @@ export function BlockModal({
     e.preventDefault();
     setError(null);
     setSaving(true);
-    const res = await createBlock({ equip_id: equipId, date, period, note });
+    const res = await createBlock({ equip_id: equipId, date, period, reason });
     setSaving(false);
     if (!res.ok) {
       setError(res.error ?? "Não foi possível fechar a agenda.");
@@ -139,14 +139,23 @@ export function BlockModal({
 
           <label className="block">
             <span className="block text-sm font-medium text-ink mb-1.5">
-              Motivo (opcional)
+              Motivo *
             </span>
-            <input
+            <select
               className={inputCls}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Ex.: Manutenção, folga…"
-            />
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value as "" | BlockReason)}
+            >
+              <option value="">— selecione o motivo —</option>
+              <option value="patient">Fechar agenda com paciente</option>
+              <option value="locacao">Fechar agenda para locação</option>
+            </select>
+            <p className="text-xs text-muted mt-1.5">
+              <b>Com paciente:</b> indisponível na Clínica <i>e</i> na Locação.
+              <br />
+              <b>Para locação:</b> indisponível só na Locação.
+            </p>
           </label>
 
           {error ? (

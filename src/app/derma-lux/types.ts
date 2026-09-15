@@ -26,10 +26,15 @@ export type Rental = {
 
 export type BlockPeriod = "full" | "morning" | "afternoon";
 
+// 'patient' = fechado com paciente (indisponível na Clínica e na Locação)
+// 'locacao' = fechado para locação (indisponível só na Locação)
+export type BlockReason = "patient" | "locacao";
+
 export type Block = {
   id: string;
   equip_id: string | null;
   date: string; // yyyy-mm-dd
   period: BlockPeriod;
+  reason: BlockReason;
   note: string | null;
 };
