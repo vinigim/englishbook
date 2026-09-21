@@ -6,33 +6,46 @@ import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import {
   ACTION_LABEL,
+  EFFECTIVE_TEMPERATURES,
+  isConfirmada,
   STAGE_LABEL,
   TEMPERATURE_LABEL,
-  type Temperature,
+  type EffectiveTemperature,
 } from "@/lib/leads/taxonomy";
 import {
   leadDisplayName,
   messagePreview,
   relativeDays,
+  temperaturaEfetiva,
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
 
 const TEMPERATURE_VARIANT: Record<
-  Temperature,
+  EffectiveTemperature,
   "danger" | "info" | "neutral"
 > = {
   quente: "danger",
   morno: "info",
   frio: "neutral",
+  quente_confirmado: "danger",
+  frio_confirmado: "neutral",
 };
 
-type Filtro = "todos" | Temperature | "sem_analise" | "aguardando_resposta";
+type Filtro =
+  | "todos"
+  | EffectiveTemperature
+  | "sem_analise"
+  | "aguardando_resposta";
 
+// Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
+// leitura natural da barra é do mais quente para o mais frio.
 const FILTROS: { id: Filtro; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "quente", label: "Quentes" },
+  { id: "quente_confirmado", label: "Quente confirmado" },
   { id: "morno", label: "Mornos" },
   { id: "frio", label: "Frios" },
+  { id: "frio_confirmado", label: "Frio confirmado" },
   { id: "aguardando_resposta", label: "Esperando resposta" },
   { id: "sem_analise", label: "Sem análise" },
 ];
@@ -56,9 +69,11 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "aguardando_resposta" && !aguardandoResposta(row)) {
         return false;
       }
+      // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
+      // que vale — senão o lead sumiria do chip que ele mesmo escolheu.
       if (
-        (filtro === "quente" || filtro === "morno" || filtro === "frio") &&
-        row.analysis?.temperature !== filtro
+        EFFECTIVE_TEMPERATURES.includes(filtro as EffectiveTemperature) &&
+        temperaturaEfetiva(row.lead, row.analysis) !== filtro
       ) {
         return false;
       }
@@ -89,12 +104,17 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       quente: 0,
       morno: 0,
       frio: 0,
+      quente_confirmado: 0,
+      frio_confirmado: 0,
       sem_analise: 0,
       aguardando_resposta: 0,
     };
     for (const row of rows) {
-      if (row.analysis?.temperature) c[row.analysis.temperature] += 1;
-      else c.sem_analise += 1;
+      const t = temperaturaEfetiva(row.lead, row.analysis);
+      if (t) c[t] += 1;
+      // "Sem análise" continua significando o que a IA ainda não leu, mesmo
+      // que o dono já tenha marcado a temperatura à mão.
+      if (!row.analysis) c.sem_analise += 1;
       if (aguardandoResposta(row)) c.aguardando_resposta += 1;
     }
     return c;
@@ -152,6 +172,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
 function LeadRow({ row }: { row: LeadInboxRow }) {
   const { lead, analysis, lastMessage } = row;
+  const temperatura = temperaturaEfetiva(lead, analysis);
   const esperando = aguardandoResposta(row);
 
   return (
@@ -181,14 +202,18 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          {temperatura ? (
+            <Badge
+              variant={TEMPERATURE_VARIANT[temperatura]}
+              className="whitespace-nowrap"
+            >
+              {/* O ✓ diz que foi o dono quem marcou, não a IA. */}
+              {isConfirmada(temperatura) ? "✓ " : ""}
+              {TEMPERATURE_LABEL[temperatura]}
+            </Badge>
+          ) : null}
           {analysis ? (
             <>
-              <Badge
-                variant={TEMPERATURE_VARIANT[analysis.temperature]}
-                className="whitespace-nowrap"
-              >
-                {TEMPERATURE_LABEL[analysis.temperature]}
-              </Badge>
               <Badge variant="neutral" className="whitespace-nowrap">
                 {STAGE_LABEL[analysis.stage]}
               </Badge>

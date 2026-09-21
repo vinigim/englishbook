@@ -122,14 +122,50 @@ export const STAGE_LABEL: Record<FunnelStage, string> = {
 // ============================================================================
 //  Temperatura
 // ============================================================================
+/**
+ * O que a IA pode concluir. Esta lista alimenta o prompt e o `check` de
+ * wa_lead_analyses.temperature.
+ */
 export const TEMPERATURES = ["quente", "morno", "frio"] as const;
 export type Temperature = (typeof TEMPERATURES)[number];
 
-export const TEMPERATURE_LABEL: Record<Temperature, string> = {
+/**
+ * O que SÓ o dono pode marcar.
+ *
+ * Fica fora de TEMPERATURES de propósito: assim a lista que vai no prompt
+ * continua com três valores e a IA não tem como se autoconfirmar. Confirmar é
+ * julgamento de quem conhece o cliente, não de quem leu a conversa.
+ */
+export const MANUAL_TEMPERATURES = [
+  "quente_confirmado",
+  "frio_confirmado",
+] as const;
+export type ManualTemperature = (typeof MANUAL_TEMPERATURES)[number];
+
+/**
+ * A escala que a TELA usa: o que a IA conclui mais o que o dono confirma.
+ *
+ * A temperatura efetiva de um lead é a marcação manual quando existe, e a
+ * leitura da IA caso contrário.
+ */
+export const EFFECTIVE_TEMPERATURES = [
+  ...TEMPERATURES,
+  ...MANUAL_TEMPERATURES,
+] as const;
+export type EffectiveTemperature = (typeof EFFECTIVE_TEMPERATURES)[number];
+
+export const TEMPERATURE_LABEL: Record<EffectiveTemperature, string> = {
   quente: "Quente",
   morno: "Morno",
   frio: "Frio",
+  quente_confirmado: "Quente confirmado",
+  frio_confirmado: "Frio confirmado",
 };
+
+/** Marcação do dono vale mais que leitura de IA — inclusive na ordenação. */
+export function isConfirmada(t: EffectiveTemperature): t is ManualTemperature {
+  return (MANUAL_TEMPERATURES as readonly string[]).includes(t);
+}
 
 // ============================================================================
 //  Objeções

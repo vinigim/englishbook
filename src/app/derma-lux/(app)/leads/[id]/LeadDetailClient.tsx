@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardTitle } from "@/components/ui/Card";
 import {
   ACTION_LABEL,
+  EFFECTIVE_TEMPERATURES,
+  isConfirmada,
   OBJECTION_LABEL,
   STAGE_LABEL,
   TEMPERATURE_LABEL,
+  type EffectiveTemperature,
   type Objection,
-  type Temperature,
 } from "@/lib/leads/taxonomy";
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
@@ -20,14 +22,24 @@ import {
   formatPhoneBR,
   leadDisplayName,
   relativeDays,
+  temperaturaEfetiva,
 } from "../../../leads-shared";
-import { registerDraftCopied, reanalyzeLead } from "../../../leads-actions";
+import {
+  registerDraftCopied,
+  reanalyzeLead,
+  updateLeadTemperature,
+} from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
 
-const TEMPERATURE_VARIANT: Record<Temperature, "danger" | "info" | "neutral"> = {
+const TEMPERATURE_VARIANT: Record<
+  EffectiveTemperature,
+  "danger" | "info" | "neutral"
+> = {
   quente: "danger",
   morno: "info",
   frio: "neutral",
+  quente_confirmado: "danger",
+  frio_confirmado: "neutral",
 };
 
 const MEDIA_LABEL: Record<string, string> = {
@@ -50,7 +62,32 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const [pendente, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const temperatura = temperaturaEfetiva(lead, analysis);
   const [rascunho, setRascunho] = useState(analysis?.draft_message ?? "");
+
+  /**
+   * Marca a temperatura à mão, ou devolve o lead para a leitura da IA.
+   *
+   * Não mexe na análise: o que o modelo concluiu continua gravado e visível,
+   * para a divergência ficar à vista em vez de sumir.
+   */
+  function marcarTemperatura(valor: EffectiveTemperature | null) {
+    setErro(null);
+    setStatus(null);
+    startTransition(async () => {
+      const r = await updateLeadTemperature(lead.id, valor);
+      if (!r.ok) {
+        setErro(r.error ?? "Não consegui salvar a temperatura.");
+        return;
+      }
+      setStatus(
+        valor === null
+          ? "Voltou a seguir a leitura da IA."
+          : `Marcado como ${TEMPERATURE_LABEL[valor]}.`,
+      );
+      router.refresh();
+    });
+  }
   const [copiado, setCopiado] = useState(false);
 
   // O inicializador do useState roda uma vez só, na montagem. Depois de
@@ -140,13 +177,14 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {temperatura ? (
+              <Badge variant={TEMPERATURE_VARIANT[temperatura]}>
+                {isConfirmada(temperatura) ? "✓ " : ""}
+                {TEMPERATURE_LABEL[temperatura]}
+              </Badge>
+            ) : null}
             {analysis ? (
-              <>
-                <Badge variant={TEMPERATURE_VARIANT[analysis.temperature]}>
-                  {TEMPERATURE_LABEL[analysis.temperature]}
-                </Badge>
-                <Badge variant="neutral">{STAGE_LABEL[analysis.stage]}</Badge>
-              </>
+              <Badge variant="neutral">{STAGE_LABEL[analysis.stage]}</Badge>
             ) : (
               <Badge variant="neutral">sem análise</Badge>
             )}
@@ -226,6 +264,63 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
+            </div>
+
+            {/* ------------------------------------ temperatura à mão */}
+            <div className="mb-4 pb-4 border-b border-line">
+              <p className="text-xs uppercase tracking-wide text-muted mb-2">
+                Qualificação
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {EFFECTIVE_TEMPERATURES.map((t) => {
+                  const ativo = temperatura === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={pendente}
+                      onClick={() => marcarTemperatura(ativo ? null : t)}
+                      className={cn(
+                        "px-2.5 py-1 text-xs border transition-colors disabled:opacity-50",
+                        ativo
+                          ? "bg-ink text-paper border-ink"
+                          : "bg-paper text-ink border-line hover:border-ink",
+                      )}
+                    >
+                      {isConfirmada(t) ? "✓ " : ""}
+                      {TEMPERATURE_LABEL[t]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* A divergência fica à vista: marcar à mão não apaga o que o
+                  modelo concluiu, e saber que ele discorda é informação. */}
+              {lead.temperature_manual && analysis &&
+              lead.temperature_manual !== analysis.temperature ? (
+                <p className="text-xs text-muted mt-2">
+                  Você marcou{" "}
+                  <strong>{TEMPERATURE_LABEL[lead.temperature_manual]}</strong>;
+                  a IA leu como {TEMPERATURE_LABEL[analysis.temperature]}.
+                </p>
+              ) : null}
+
+              {lead.temperature_manual ? (
+                <button
+                  type="button"
+                  disabled={pendente}
+                  onClick={() => marcarTemperatura(null)}
+                  className="text-xs text-muted underline mt-2 disabled:opacity-50"
+                >
+                  Voltar a seguir a IA
+                </button>
+              ) : (
+                <p className="text-xs text-muted mt-2">
+                  Seguindo a leitura da IA. Toque para marcar à mão — só você
+                  pode confirmar.
+                </p>
+              )}
             </div>
 
             {!analysis ? (

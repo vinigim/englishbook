@@ -1,4 +1,7 @@
-import type { FunnelStage, Temperature } from "@/lib/leads/taxonomy";
+import type {
+  EffectiveTemperature,
+  FunnelStage,
+} from "@/lib/leads/taxonomy";
 import type { Lead, LeadAnalysis, MessageType, WaMessage } from "./leads-types";
 
 /**
@@ -8,11 +11,29 @@ import type { Lead, LeadAnalysis, MessageType, WaMessage } from "./leads-types";
  * uma fórmula determinística ele consegue conferir de cabeça. A IA responde
  * "o que dizer"; a ordem de "com quem falar primeiro" é aritmética.
  */
-const TEMPERATURE_WEIGHT: Record<Temperature, number> = {
+const TEMPERATURE_WEIGHT: Record<EffectiveTemperature, number> = {
   quente: 3,
   morno: 2,
   frio: 1,
+  // Confirmado pelo dono pesa mais que a leitura equivalente da IA: quente que
+  // ele validou vai na frente de quente que o modelo supôs, e frio que ele
+  // validou afunda mais que frio suposto.
+  quente_confirmado: 4,
+  frio_confirmado: 0,
 };
+
+/**
+ * A temperatura que a tela usa.
+ *
+ * A marcação do dono prevalece; sem ela, vale a leitura da IA. Devolve `null`
+ * quando não há nenhuma das duas — lead ainda sem análise e sem marcação.
+ */
+export function temperaturaEfetiva(
+  lead: Pick<Lead, "temperature_manual">,
+  analysis: Pick<LeadAnalysis, "temperature"> | null,
+): EffectiveTemperature | null {
+  return lead.temperature_manual ?? analysis?.temperature ?? null;
+}
 
 const STAGE_WEIGHT: Record<FunnelStage, number> = {
   negociacao: 5,
@@ -46,7 +67,8 @@ export function priorityScore(
   if (analysis.recommended_action === "descartar") return -100;
   if (lead.snoozed_until && new Date(lead.snoozed_until) > new Date()) return -50;
 
-  let score = TEMPERATURE_WEIGHT[analysis.temperature] * 10;
+  let score =
+    TEMPERATURE_WEIGHT[temperaturaEfetiva(lead, analysis) ?? analysis.temperature] * 10;
   score += STAGE_WEIGHT[analysis.stage] * 5;
 
   // O sinal mais forte: ele falou por último e ninguém respondeu.

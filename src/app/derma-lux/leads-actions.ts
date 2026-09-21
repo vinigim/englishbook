@@ -7,7 +7,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAiConfigured } from "@/lib/ai/anthropic";
 import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
-import { LEAD_STATUSES, type RecommendedAction } from "@/lib/leads/taxonomy";
+import {
+  EFFECTIVE_TEMPERATURES,
+  LEAD_STATUSES,
+  type RecommendedAction,
+} from "@/lib/leads/taxonomy";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -118,6 +122,47 @@ export async function updateLeadStatus(
   const { error } = await supabase
     .from("wa_leads")
     .update({ status: parsed.data })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
+/**
+ * Marca a temperatura à mão, ou devolve o lead para a leitura da IA.
+ *
+ * `null` limpa a marcação — a tela volta a exibir o que o modelo concluiu.
+ *
+ * NÃO toca em wa_lead_analyses: aquilo é o registro versionado do que a IA
+ * disse, e sobrescrever falsificaria o histórico além de sumir na próxima
+ * reanálise. A opinião do dono mora no lead, ao lado.
+ *
+ * Também não marca needs_analysis: discordar da temperatura não torna a
+ * análise obsoleta — o resumo, as objeções e o rascunho seguem valendo.
+ */
+const temperaturaSchema = z.enum(EFFECTIVE_TEMPERATURES).nullable();
+
+export async function updateLeadTemperature(
+  id: string,
+  temperatura: string | null,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const parsed = temperaturaSchema.safeParse(temperatura);
+  if (!parsed.success) {
+    return { ok: false, error: "Temperatura inválida." };
+  }
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({ temperature_manual: parsed.data })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };

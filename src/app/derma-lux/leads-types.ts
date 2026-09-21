@@ -4,6 +4,7 @@ import type {
   Objection,
   RecommendedAction,
   Temperature,
+  EffectiveTemperature,
 } from "@/lib/leads/taxonomy";
 
 export type LeadKind = "medico" | "clinica" | "desconhecido" | "outro";
@@ -42,6 +43,8 @@ export type Lead = {
   last_message_at: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;
+  /** Marcado pelo dono. Prevalece sobre a leitura da IA. Nulo = seguir a IA. */
+  temperature_manual: EffectiveTemperature | null;
   needs_analysis: boolean;
   snoozed_until: string | null;
   archived: boolean;
