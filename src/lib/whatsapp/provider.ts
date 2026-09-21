@@ -57,6 +57,27 @@ export type WaChat = {
   lastMessageAt: string | null;
 };
 
+/**
+ * Uma página de mensagens, com o que foi descartado à vista.
+ *
+ * `brutas` existe porque o fim dos dados tem que ser decidido pelo que o
+ * provedor DEVOLVEU, não pelo que sobrou depois de normalizar. Olhando só o
+ * que sobrou, uma página cheia de mensagens descartáveis parece fim da lista —
+ * e a varredura para no começo, em silêncio.
+ *
+ * Os contadores de descarte existem porque adivinhar por que uma mensagem
+ * sumiu custou caro neste projeto. Melhor o backfill dizer.
+ */
+export type MessagePage = {
+  mensagens: NormalizedMessage[];
+  /** Quantos registros o provedor devolveu, antes de qualquer filtro nosso. */
+  brutas: number;
+  /** Descartadas por serem endereçadas só por LID, sem telefone ao lado. */
+  descartadasLid: number;
+  /** Descartadas por faltar id, JID ou qualquer coisa que o parser exija. */
+  descartadasOutras: number;
+};
+
 export type WaConnection = {
   connected: boolean;
   label: string;
@@ -111,7 +132,7 @@ export interface WhatsAppProvider {
   fetchMessagesPage(opts: {
     page: number;
     pageSize: number;
-  }): Promise<NormalizedMessage[]>;
+  }): Promise<MessagePage>;
 
   /**
    * Implementado, mas NÃO ligado a nenhum botão na v1.
