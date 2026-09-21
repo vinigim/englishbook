@@ -68,12 +68,34 @@ export type WaChat = {
  * Os contadores de descarte existem porque adivinhar por que uma mensagem
  * sumiu custou caro neste projeto. Melhor o backfill dizer.
  */
+/**
+ * Mensagem que só tem LID: vira mensagem de verdade assim que o telefone
+ * daquele LID for conhecido.
+ *
+ * O `resolver` é um closure de propósito. Mantém o formato bruto de cada
+ * provedor fora deste contrato e evita que quem monta o mapa precise
+ * reimplementar a normalização.
+ */
+export type PendingLidMessage = {
+  lid: string;
+  resolver: (phoneE164: string) => NormalizedMessage;
+};
+
 export type MessagePage = {
   mensagens: NormalizedMessage[];
   /** Quantos registros o provedor devolveu, antes de qualquer filtro nosso. */
   brutas: number;
-  /** Descartadas por serem endereçadas só por LID, sem telefone ao lado. */
-  descartadasLid: number;
+  /**
+   * LID → telefone E.164, aprendido das chaves desta página.
+   *
+   * A Evolution grava a MESMA mensagem duas vezes: a cópia crua da
+   * sincronização de histórico, só com o LID, e a cópia enriquecida do fluxo
+   * ao vivo, essa com `remoteJidAlt`. Uma única cópia enriquecida basta para
+   * recuperar a conversa inteira daquele contato.
+   */
+  lidMap: Record<string, string>;
+  /** Só tinham LID. Guardadas para resolver depois, quando o mapa fechar. */
+  pendentes: PendingLidMessage[];
   /** Descartadas por faltar id, JID ou qualquer coisa que o parser exija. */
   descartadasOutras: number;
 };

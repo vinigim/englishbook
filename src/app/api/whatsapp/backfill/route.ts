@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
+import type {
+  NormalizedMessage,
+  PendingLidMessage,
+} from "@/lib/whatsapp/provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +39,9 @@ const PAGE_SIZE = 200;
 
 /** Trava contra laço infinito se o provedor nunca sinalizar fim de dados. */
 const MAX_PAGINAS = 200;
+
+/** Mensagens por chamada ao gravar as recuperadas. */
+const LOTE_INGEST = 200;
 
 const bodySchema = z.object({
   /**
@@ -103,8 +110,11 @@ export async function POST(request: NextRequest) {
         let leadsTotal = 0;
         let semTelefone = 0;
         let brutasTotal = 0;
-        let descartadasLid = 0;
         let descartadasOutras = 0;
+        // O mapa vale para o conjunto inteiro, não para uma página: a cópia
+        // enriquecida de uma conversa pode estar em qualquer página.
+        const lidMap: Record<string, string> = {};
+        const pendentes: PendingLidMessage[] = [];
         let continuar = false;
 
         for (;;) {
@@ -139,8 +149,9 @@ export async function POST(request: NextRequest) {
           const ultimaPagina = lote.brutas < PAGE_SIZE;
 
           brutasTotal += lote.brutas;
-          descartadasLid += lote.descartadasLid;
           descartadasOutras += lote.descartadasOutras;
+          Object.assign(lidMap, lote.lidMap);
+          pendentes.push(...lote.pendentes);
 
           if (lote.mensagens.length > 0) {
             const resultado = await ingestMessages(
@@ -173,11 +184,60 @@ export async function POST(request: NextRequest) {
           if (ultimaPagina) break;
         }
 
+        // ------------------------------------------------ segunda passada
+        //
+        // Agora o mapa está fechado. As mensagens que só tinham LID e cujo
+        // telefone apareceu em ALGUMA página viram mensagens de verdade.
+        //
+        // É aqui que o histórico é recuperado: 99,6% das mensagens chegam
+        // cruas, e uma única cópia enriquecida por contato basta para trazer a
+        // conversa inteira dele.
+        let recuperadas = 0;
+        let semMapa = 0;
+        const resolvidas: NormalizedMessage[] = [];
+
+        for (const p of pendentes) {
+          const telefone = lidMap[p.lid];
+          if (!telefone) {
+            semMapa += 1;
+            continue;
+          }
+          resolvidas.push(p.resolver(telefone));
+        }
+
+        // Em lotes: são milhares, e mandar tudo de uma vez estoura payload.
+        for (let i = 0; i < resolvidas.length; i += LOTE_INGEST) {
+          if (Date.now() - inicio > LIMITE_MS) {
+            continuar = true;
+            linha({
+              tipo: "parcial",
+              mensagem: "Tempo limite ao gravar as recuperadas. Rode de novo.",
+            });
+            break;
+          }
+
+          const lote = resolvidas.slice(i, i + LOTE_INGEST);
+          const resultado = await ingestMessages(admin, provider.id, lote);
+          recuperadas += lote.length;
+          mensagensVistas += lote.length;
+          mensagensTotal += resultado.mensagensGravadas;
+          leadsTotal += resultado.leadsCriados;
+          semTelefone += resultado.telefoneInvalido;
+
+          linha({
+            tipo: "recuperacao",
+            recuperadas,
+            total: resolvidas.length,
+          });
+        }
+
         linha({
           tipo: "fim",
           paginas: pagina,
           brutasTotal,
-          descartadasLid,
+          recuperadas,
+          semMapa,
+          lidsConhecidos: Object.keys(lidMap).length,
           descartadasOutras,
           mensagensVistas,
           continuar,

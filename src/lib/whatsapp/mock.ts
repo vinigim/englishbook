@@ -139,11 +139,12 @@ export function createMockProvider(): WhatsAppProvider {
 
       const inicio = (Math.max(1, page) - 1) * pageSize;
       const fatia = todas.slice(inicio, inicio + pageSize);
-      // O mock não descarta nada: as fixtures são todas parseáveis.
+      // As fixtures usam JID de telefone, então não há LID a resolver.
       return {
         mensagens: fatia,
         brutas: fatia.length,
-        descartadasLid: 0,
+        lidMap: {},
+        pendentes: [],
         descartadasOutras: 0,
       };
     },

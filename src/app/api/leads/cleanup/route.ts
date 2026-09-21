@@ -97,24 +97,37 @@ export async function POST(request: NextRequest) {
 
   const candidatos = (data ?? []) as LeadCandidato[];
 
-  // Dois critérios, e o primeiro é o que importa.
+  // Um lead é lixo quando NÃO TEM TELEFONE DE VERDADE. Dois jeitos de detectar.
   //
-  // 1. O JID diz "@lid" — sinal ESTRUTURAL, exato, sem heurístico.
+  // 1. O telefone é o próprio LID.
   //
-  //    Validar só a forma do número não basta: um LID de 14 dígitos pode
-  //    começar com algo que parece código de país e passar como telefone
-  //    legítimo. Vistos em produção: 43155848216636 valida como austríaco
-  //    (43 = Áustria, 431 = Viena), 86290674528502 como chinês,
-  //    92874406424691 como paquistanês, 38336978763967 como kosovar. São
-  //    todos lixo, e a primeira versão desta rota deixou os quatro passarem.
+  //    Não basta olhar se o wa_jid é "@lid": desde a recuperação por mapa, um
+  //    lead legítimo pode ter wa_jid "@lid" e telefone certo ao lado — é o
+  //    caso da Gabriella, cujo chat é 24515790798917@lid e cujo telefone é
+  //    5518996387418. Apagar por "@lid" jogaria fora justamente o que a
+  //    recuperação salvou.
+  //
+  //    O que caracteriza o lixo é o telefone ser os dígitos do próprio LID.
+  //
+  //    E validar só a FORMA do número também não basta: um LID de 14 dígitos
+  //    pode começar com algo que parece código de país. Vistos em produção,
+  //    todos "válidos" para o libphonenumber: 43155848216636 (Áustria, 431 é
+  //    Viena), 86290674528502 (China), 92874406424691 (Paquistão),
+  //    38336978763967 (Kosovo).
   //
   // 2. O telefone não é discável — rede para lead antigo cujo wa_jid é nulo,
   //    ou para algum formato de JID que ainda não conhecemos.
-  const invalidos = candidatos.filter(
-    (l) =>
-      (l.wa_jid ? isLidJid(l.wa_jid) : false) ||
-      !waJidPhone(l.phone_e164 ?? l.phone_key),
-  );
+  const invalidos = candidatos.filter((l) => {
+    const telefone = l.phone_e164 ?? l.phone_key;
+    if (!waJidPhone(telefone)) return true;
+
+    if (l.wa_jid && isLidJid(l.wa_jid)) {
+      const lid = l.wa_jid.split("@")[0].replace(/\D/g, "");
+      return lid === String(telefone ?? "").replace(/\D/g, "");
+    }
+
+    return false;
+  });
 
   const resumo = {
     leadsDoWhatsapp: candidatos.length,

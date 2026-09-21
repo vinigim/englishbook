@@ -202,18 +202,26 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
             setStatus(
               `página ${evento.pagina} · ${evento.vistas} mensagem(ns) aproveitada(s) de ${evento.brutas} nesta página`,
             );
+          } else if (evento.tipo === "recuperacao") {
+            setStatus(
+              `recuperando conversas: ${evento.recuperadas} de ${evento.total}`,
+            );
           } else if (evento.tipo === "fim") {
-            const descartadas =
-              Number(evento.descartadasLid) + Number(evento.descartadasOutras);
             const partes = [
               `${evento.brutasTotal} mensagem(ns) no servidor`,
               `${evento.mensagensVistas} aproveitada(s)`,
               `${evento.mensagensGravadas} nova(s)`,
               `${evento.leadsNovos} lead(s) novo(s)`,
-              // Descarte em massa é o tipo de coisa que precisa aparecer: sem
-              // isso, "poucas mensagens" vira um mistério em vez de um número.
-              descartadas > 0
-                ? `${descartadas} descartada(s) (${evento.descartadasLid} só com LID, ${evento.descartadasOutras} não reconhecida(s))`
+              // Recuperadas pelo mapa e sem mapa são números diferentes: um
+              // mede o que o truque salvou, o outro o que ficou mesmo de fora.
+              Number(evento.recuperadas) > 0
+                ? `${evento.recuperadas} recuperada(s) por LID (${evento.lidsConhecidos} contato(s) identificado(s))`
+                : null,
+              Number(evento.semMapa) > 0
+                ? `${evento.semMapa} sem telefone em lugar nenhum`
+                : null,
+              Number(evento.descartadasOutras) > 0
+                ? `${evento.descartadasOutras} não reconhecida(s)`
                 : null,
               Number(evento.semTelefone) > 0
                 ? `${evento.semTelefone} sem telefone identificável`
