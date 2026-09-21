@@ -3,6 +3,7 @@ import {
   isGroupJid,
   isLidJid,
   jidToPhone,
+  type LidMapResult,
   type MessagePage,
   type PendingLidMessage,
   toIsoDate,
@@ -275,6 +276,7 @@ function cruzarPorNome(
   contatos: Record<string, unknown>[],
   limit: number,
 ): {
+  map: Record<string, string>;
   lidComNome: number;
   casamentosUnicos: number;
   ambiguos: number;
@@ -305,6 +307,7 @@ function cruzarPorNome(
   let ambiguos = 0;
   let semPar = 0;
   const exemplos: { nome: string; lid: string; telefone: string }[] = [];
+  const map: Record<string, string> = {};
 
   for (const c of contatos) {
     const jid = String(c.remoteJid ?? "");
@@ -320,13 +323,16 @@ function cruzarPorNome(
       ambiguos += 1;
     } else {
       casamentosUnicos += 1;
+      const lidDigitos = jidToPhone(jid);
+      const telefone = jidToPhone(candidatos[0]);
+      if (lidDigitos && telefone) map[lidDigitos] = telefone;
       if (exemplos.length < limit) {
         exemplos.push({ nome: String(c.pushName), lid: jid, telefone: candidatos[0] });
       }
     }
   }
 
-  return { lidComNome, casamentosUnicos, ambiguos, semPar, exemplos };
+  return { map, lidComNome, casamentosUnicos, ambiguos, semPar, exemplos };
 }
 
 /** O campo `data` pode vir como objeto único ou como array, conforme a versão. */
@@ -558,6 +564,25 @@ export function createEvolutionProvider(): WhatsAppProvider {
         { method: "POST", body: { number: phoneE164, text } },
       );
       return { providerMessageId: data?.key?.id ?? "" };
+    },
+
+    async fetchLidMap(): Promise<LidMapResult> {
+      const cfg = readConfig();
+      const d = await call<unknown>(`/chat/findContacts/${cfg.instance}`, {
+        method: "POST",
+        body: {},
+      });
+      const arr = Array.isArray(d)
+        ? d
+        : ((d as Record<string, unknown>)?.findContacts as unknown[]) ?? [];
+
+      const r = cruzarPorNome(arr as Record<string, unknown>[], 0);
+      return {
+        map: r.map,
+        unicos: r.casamentosUnicos,
+        ambiguos: r.ambiguos,
+        semPar: r.semPar,
+      };
     },
 
     async debugKeySample(limit: number): Promise<unknown[]> {

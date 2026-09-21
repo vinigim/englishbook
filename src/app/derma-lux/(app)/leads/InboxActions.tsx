@@ -202,6 +202,10 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
             setStatus(
               `página ${evento.pagina} · ${evento.vistas} mensagem(ns) aproveitada(s) de ${evento.brutas} nesta página`,
             );
+          } else if (evento.tipo === "agenda") {
+            setStatus(
+              `agenda cruzada: ${evento.unicos} contato(s) identificado(s)${Number(evento.ambiguos) > 0 ? `, ${evento.ambiguos} ambíguo(s) ignorado(s)` : ""}`,
+            );
           } else if (evento.tipo === "recuperacao") {
             setStatus(
               `recuperando conversas: ${evento.recuperadas} de ${evento.total}`,
@@ -215,7 +219,7 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
               // Recuperadas pelo mapa e sem mapa são números diferentes: um
               // mede o que o truque salvou, o outro o que ficou mesmo de fora.
               Number(evento.recuperadas) > 0
-                ? `${evento.recuperadas} recuperada(s) por LID (${evento.lidsConhecidos} contato(s) identificado(s))`
+                ? `${evento.recuperadas} recuperada(s) (${evento.porAlt} pelo WhatsApp, ${evento.porNome} pelo nome na agenda)`
                 : null,
               Number(evento.semMapa) > 0
                 ? `${evento.semMapa} sem telefone em lugar nenhum`

@@ -100,6 +100,18 @@ export type MessagePage = {
   descartadasOutras: number;
 };
 
+/** Resultado do cruzamento de agenda que resolve LIDs. */
+export type LidMapResult = {
+  /** LID (só dígitos) → telefone E.164. Só casamentos inequívocos. */
+  map: Record<string, string>;
+  /** Nomes com homônimo único: viraram mapeamento. */
+  unicos: number;
+  /** Mesmo nome em mais de um telefone: descartados de propósito. */
+  ambiguos: number;
+  /** Contatos em LID sem nenhum homônimo do lado dos telefones. */
+  semPar: number;
+};
+
 export type WaConnection = {
   connected: boolean;
   label: string;
@@ -169,6 +181,17 @@ export interface WhatsAppProvider {
   ): Promise<{ providerMessageId: string }>;
 
   connectionStatus(): Promise<WaConnection>;
+
+  /**
+   * Mapa LID → telefone E.164 montado a partir da agenda do provedor.
+   *
+   * O WhatsApp guarda a mesma pessoa duas vezes: a entrada do caderno de
+   * endereços, com telefone, e a do chat, endereçada por LID. O nome liga as
+   * duas. É inferência, não verdade — por isso só casa nome com homônimo
+   * ÚNICO do outro lado, e o `remoteJidAlt` de uma mensagem, quando existe,
+   * tem precedência sobre isto.
+   */
+  fetchLidMap?(): Promise<LidMapResult>;
 
   /**
    * Amostra de diagnóstico: as CHAVES cruas de algumas mensagens, como o
