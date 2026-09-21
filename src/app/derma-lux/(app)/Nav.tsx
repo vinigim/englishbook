@@ -13,6 +13,7 @@ const LINKS = [
     label: "Disponibilidade Clínica Dra Gabriella",
   },
   { href: "/derma-lux/equipamentos", label: "Equipamentos" },
+  { href: "/derma-lux/leads", label: "Leads" },
 ];
 
 export function DermaLuxNav({ email }: { email: string }) {

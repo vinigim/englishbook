@@ -9,20 +9,23 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@stripe/stripe-js": "^4.10.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",
-    "@stripe/stripe-js": "^4.10.0",
-    "stripe": "17.4.0",
-    "resend": "^4.0.1",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "libphonenumber-js": "^1.13.13",
     "lucide-react": "^0.460.0",
     "next": "15.5.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.23.8",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.4"
+    "resend": "^4.0.1",
+    "stripe": "17.4.0",
+    "tailwind-merge": "^2.5.4",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22",
