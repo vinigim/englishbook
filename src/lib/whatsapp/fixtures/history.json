@@ -1,0 +1,120 @@
+[
+  {
+    "key": { "id": "FIX-GAB-001", "remoteJid": "5535988887777@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dra Gabriela Nunes",
+    "messageTimestamp": 1789914720,
+    "message": {
+      "conversation": "Boa tarde! Vi o perfil de vocês. Trabalho com dermatologia clínica em Pouso Alegre e queria saber se vocês alugam laser de CO2 fracionado."
+    }
+  },
+  {
+    "key": { "id": "FIX-GAB-002", "remoteJid": "5535988887777@s.whatsapp.net", "fromMe": true },
+    "messageTimestamp": 1789914900,
+    "message": {
+      "conversation": "Boa tarde, Dra. Gabriela! Alugamos sim. Trabalhamos com CO2 fracionado e também com luz intensa pulsada. A locação é por período, e a equipe entrega e instala no consultório. Posso te passar os valores?"
+    }
+  },
+  {
+    "key": { "id": "FIX-GAB-003", "remoteJid": "5535988887777@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dra Gabriela Nunes",
+    "messageTimestamp": 1789914960,
+    "message": {
+      "extendedTextMessage": {
+        "text": "Por favor! E vocês atendem Pouso Alegre mesmo? Queria começar já no mês que vem, tenho umas 6 pacientes na fila pra rejuvenescimento."
+      }
+    }
+  },
+
+  {
+    "key": { "id": "FIX-BEL-001", "remoteJid": "5511987654321@s.whatsapp.net", "fromMe": false },
+    "pushName": "Clínica Belle Estética",
+    "messageTimestamp": 1789809300,
+    "message": {
+      "conversation": "Oi, quanto fica a diária do laser de depilação?"
+    }
+  },
+  {
+    "key": { "id": "FIX-BEL-002", "remoteJid": "5511987654321@s.whatsapp.net", "fromMe": true },
+    "messageTimestamp": 1789809600,
+    "message": {
+      "conversation": "Olá! A diária do laser de depilação fica R$ 1.200, com frete incluso na região metropolitana e ponteiras esterilizadas."
+    }
+  },
+  {
+    "key": { "id": "FIX-BEL-003", "remoteJid": "5511987654321@s.whatsapp.net", "fromMe": false },
+    "pushName": "Clínica Belle Estética",
+    "messageTimestamp": 1789809720,
+    "message": {
+      "extendedTextMessage": {
+        "text": "Nossa, achei salgado. Tem uma empresa aqui que faz por 850. O que muda no de vocês?"
+      }
+    }
+  },
+
+  {
+    "key": { "id": "FIX-RAF-001", "remoteJid": "5521996543210@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dr. Rafael Amorim",
+    "messageTimestamp": 1778580300,
+    "message": {
+      "conversation": "Bom dia! Preciso do CO2 pro dia 14, das 8h às 13h. Consegue?"
+    }
+  },
+  {
+    "key": { "id": "FIX-RAF-002", "remoteJid": "5521996543210@s.whatsapp.net", "fromMe": true },
+    "messageTimestamp": 1778581800,
+    "message": {
+      "conversation": "Bom dia, Dr. Rafael! Consigo sim, dia 14 das 8h às 13h está livre. Já deixo reservado. A equipe chega 30 minutos antes para instalar."
+    }
+  },
+  {
+    "key": { "id": "FIX-RAF-003", "remoteJid": "5521996543210@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dr. Rafael Amorim",
+    "messageTimestamp": 1778745600,
+    "message": {
+      "conversation": "Correu tudo certo, obrigado! Equipamento excelente. Qualquer coisa eu chamo."
+    }
+  },
+
+  {
+    "key": { "id": "FIX-CAR-001", "remoteJid": "5531991112222@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dra Carolina Reis",
+    "messageTimestamp": 1789470000,
+    "message": {
+      "imageMessage": {
+        "mimetype": "image/jpeg",
+        "url": "https://mmg.whatsapp.net/fixture/exemplo.enc",
+        "caption": "Esse tipo de lesão dá pra tratar com o laser de vocês?"
+      }
+    }
+  },
+  {
+    "key": { "id": "FIX-CAR-002", "remoteJid": "5531991112222@s.whatsapp.net", "fromMe": false },
+    "pushName": "Dra Carolina Reis",
+    "messageTimestamp": 1789978200,
+    "message": {
+      "audioMessage": {
+        "mimetype": "audio/ogg; codecs=opus",
+        "url": "https://mmg.whatsapp.net/fixture/audio.enc",
+        "seconds": 42
+      }
+    }
+  },
+
+  {
+    "key": { "id": "FIX-SPAM-001", "remoteJid": "5511900000000@s.whatsapp.net", "fromMe": false },
+    "pushName": "Promoções Já",
+    "messageTimestamp": 1789749600,
+    "message": {
+      "conversation": "APROVEITE! Consórcio de equipamentos médicos com taxa zero. Responda SAIR para não receber mais."
+    }
+  },
+
+  {
+    "key": { "id": "FIX-GRUPO-001", "remoteJid": "120363000000000000@g.us", "fromMe": false },
+    "pushName": "Fornecedores Derma MG",
+    "messageTimestamp": 1789749600,
+    "message": {
+      "conversation": "Pessoal, alguém tem ponteira sobrando pro CO2?"
+    }
+  }
+]

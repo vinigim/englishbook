@@ -1,0 +1,16 @@
+{
+  "event": "messages.upsert",
+  "instance": "luxderma",
+  "data": {
+    "key": {
+      "id": "FIX-WEBHOOK-001",
+      "remoteJid": "5535988887777@s.whatsapp.net",
+      "fromMe": false
+    },
+    "pushName": "Dra Gabriela Nunes",
+    "messageTimestamp": 1789978800,
+    "message": {
+      "conversation": "Oi! Conseguiu ver os valores? Preciso fechar a agenda dessa semana ainda."
+    }
+  }
+}
