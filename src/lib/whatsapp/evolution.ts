@@ -282,6 +282,8 @@ function cruzarPorNome(
   ambiguos: number;
   semPar: number;
   exemplos: { nome: string; lid: string; telefone: string }[];
+  /** Os recusados, com os candidatos — é por aqui que se resolve na mão. */
+  naoResolvidos: { nome: string | null; lid: string; motivo: string; candidatos: string[] }[];
 } {
   const norm = (v: unknown) =>
     String(v ?? "")
@@ -308,19 +310,48 @@ function cruzarPorNome(
   let semPar = 0;
   const exemplos: { nome: string; lid: string; telefone: string }[] = [];
   const map: Record<string, string> = {};
+  const naoResolvidos: {
+    nome: string | null;
+    lid: string;
+    motivo: string;
+    candidatos: string[];
+  }[] = [];
 
   for (const c of contatos) {
     const jid = String(c.remoteJid ?? "");
     if (!jid.includes("@lid")) continue;
     const n = norm(c.pushName);
-    if (!n) continue;
+    if (!n) {
+      // Contato em LID sem nome: não há por onde cruzar.
+      naoResolvidos.push({
+        nome: null,
+        lid: jid,
+        motivo: "sem nome",
+        candidatos: [],
+      });
+      continue;
+    }
     lidComNome += 1;
 
     const candidatos = porNomeTelefone.get(n);
     if (!candidatos) {
       semPar += 1;
+      naoResolvidos.push({
+        nome: String(c.pushName),
+        lid: jid,
+        motivo: "sem homônimo com telefone",
+        candidatos: [],
+      });
     } else if (candidatos.length > 1) {
       ambiguos += 1;
+      // O nome está em mais de um telefone. Recusamos de propósito, mas o
+      // dono sabe qual é o certo — então mostramos os candidatos.
+      naoResolvidos.push({
+        nome: String(c.pushName),
+        lid: jid,
+        motivo: "nome em mais de um telefone",
+        candidatos,
+      });
     } else {
       casamentosUnicos += 1;
       const lidDigitos = jidToPhone(jid);
@@ -332,7 +363,15 @@ function cruzarPorNome(
     }
   }
 
-  return { map, lidComNome, casamentosUnicos, ambiguos, semPar, exemplos };
+  return {
+    map,
+    lidComNome,
+    casamentosUnicos,
+    ambiguos,
+    semPar,
+    exemplos,
+    naoResolvidos,
+  };
 }
 
 /** O campo `data` pode vir como objeto único ou como array, conforme a versão. */
@@ -660,7 +699,19 @@ export function createEvolutionProvider(): WhatsAppProvider {
             .filter((r) => String(r.remoteJid ?? "").includes("@s.whatsapp.net"))
             .slice(0, limit)
             .map((r) => ({ remoteJid: r.remoteJid, pushName: r.pushName })),
-          cruzamentoPorNome: cruzarPorNome(c, limit),
+          cruzamentoPorNome: (() => {
+            const r = cruzarPorNome(c, limit);
+            return {
+              lidComNome: r.lidComNome,
+              casamentosUnicos: r.casamentosUnicos,
+              ambiguos: r.ambiguos,
+              semPar: r.semPar,
+              exemplos: r.exemplos,
+              // Os recusados por inteiro: são poucos e é por aqui que o dono
+              // descobre quem ficou de fora e por quê.
+              naoResolvidos: r.naoResolvidos,
+            };
+          })(),
         };
       } catch (err) {
         contatos = { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
