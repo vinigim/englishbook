@@ -143,13 +143,17 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
         {/* -------------------------------------------------------- conversa */}
         <Card variant="bordered" className="order-2 lg:order-1">
           <CardTitle className="text-xl mb-3">Conversa</CardTitle>
+          {/*
+            A altura da conversa é relativa à tela no celular: um bloco fixo de
+            32rem ocuparia quase tudo e o scroll aninhado prenderia o dedo.
+          */}
           {messages.length === 0 ? (
             <p className="text-sm text-muted">
               Nenhuma mensagem registrada. Este lead veio da planilha — conecte
               o WhatsApp e sincronize o histórico para ver a conversa aqui.
             </p>
           ) : (
-            <ol className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+            <ol className="space-y-2 max-h-[60vh] lg:max-h-[32rem] overflow-y-auto pr-1">
               {messages.map((m) => (
                 <MessageBubble key={m.id} msg={m} />
               ))}
@@ -256,12 +260,16 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
               </div>
             ) : null}
 
+            {/*
+              text-base no celular: abaixo de 16px o Safari do iPhone dá zoom
+              na página inteira quando o campo recebe foco.
+            */}
             <textarea
               value={rascunho}
               onChange={(e) => setRascunho(e.target.value)}
               rows={7}
               placeholder="A mensagem sugerida aparece aqui. Você pode editar antes de enviar."
-              className="w-full px-3 py-2 text-sm bg-paper border border-line focus:border-ink focus:outline-none resize-y"
+              className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none resize-y"
             />
 
             <div className="flex flex-wrap items-center gap-2 mt-3">

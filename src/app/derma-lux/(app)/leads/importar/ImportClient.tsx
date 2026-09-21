@@ -184,7 +184,7 @@ export function ImportClient() {
                       [col.header]: e.target.value as ColumnRole,
                     }))
                   }
-                  className="px-3 py-1.5 text-sm bg-paper border border-line focus:border-ink focus:outline-none"
+                  className="px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
                 >
                   {ROLE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>

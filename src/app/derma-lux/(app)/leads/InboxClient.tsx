@@ -97,30 +97,36 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {FILTROS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => setFiltro(f.id)}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium border transition-colors",
-              filtro === f.id
-                ? "bg-ink text-paper border-ink"
-                : "bg-paper text-ink border-line hover:border-ink",
-            )}
-          >
-            {f.label}
-            <span className="ml-1.5 opacity-60">{contagem[f.id]}</span>
-          </button>
-        ))}
+      <div className="mb-4 space-y-2">
+        {/*
+          No celular os chips rolam na horizontal em vez de quebrar em três
+          linhas — senão o primeiro lead só apareceria abaixo da dobra.
+        */}
+        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+          {FILTROS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltro(f.id)}
+              className={cn(
+                "shrink-0 px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-colors",
+                filtro === f.id
+                  ? "bg-ink text-paper border-ink"
+                  : "bg-paper text-ink border-line hover:border-ink",
+              )}
+            >
+              {f.label}
+              <span className="ml-1.5 opacity-60">{contagem[f.id]}</span>
+            </button>
+          ))}
+        </div>
 
         <input
           type="search"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por nome, clínica, cidade ou telefone"
-          className="flex-1 min-w-[220px] px-3 py-1.5 text-sm bg-paper border border-line focus:border-ink focus:outline-none"
+          placeholder="Buscar nome, clínica, cidade ou telefone"
+          className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
         />
       </div>
 
@@ -149,61 +155,66 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
         href={`/derma-lux/leads/${lead.id}`}
         className="block bg-paper border border-line hover:border-ink transition-colors p-4"
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display text-lg text-ink tracking-tight truncate">
-                {leadDisplayName(lead)}
-              </span>
-
-              {analysis ? (
-                <>
-                  <Badge variant={TEMPERATURE_VARIANT[analysis.temperature]}>
-                    {TEMPERATURE_LABEL[analysis.temperature]}
-                  </Badge>
-                  <Badge variant="neutral">
-                    {STAGE_LABEL[analysis.stage]}
-                  </Badge>
-                </>
-              ) : (
-                <Badge variant="neutral">sem análise</Badge>
-              )}
-
-              {esperando ? (
-                <Badge variant="warning">esperando resposta</Badge>
-              ) : null}
-            </div>
-
-            <p className="text-sm text-muted mt-1 truncate">
-              {lastMessage ? (
-                <>
-                  <span className="font-medium text-ink/70">
-                    {lastMessage.direction === "in" ? "Ele: " : "Nós: "}
-                  </span>
-                  {messagePreview(
-                    { ...lastMessage, caption: null },
-                    140,
-                  )}
-                </>
-              ) : (
-                [lead.clinic_name, lead.specialty, lead.city]
-                  .filter(Boolean)
-                  .join(" · ") || "Sem conversa registrada"
-              )}
-            </p>
-          </div>
-
-          <div className="text-right shrink-0">
-            {analysis?.recommended_action ? (
-              <p className="text-sm font-semibold text-accent tracking-tight">
-                {ACTION_LABEL[analysis.recommended_action]}
-              </p>
-            ) : null}
-            <p className="text-xs text-muted mt-0.5">
-              {relativeDays(lead.last_message_at)}
-            </p>
-          </div>
+        {/*
+          Layout empilhado, e não duas colunas: em 390px a coluna da direita
+          espremia o nome a ponto de virar "Clínica B…" e a prévia da mensagem
+          a "Ele: Noss…". Aqui cada informação tem a largura inteira.
+        */}
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-display text-lg text-ink tracking-tight truncate">
+            {leadDisplayName(lead)}
+          </span>
+          <span className="text-xs text-muted shrink-0">
+            {relativeDays(lead.last_message_at)}
+          </span>
         </div>
+
+        {analysis?.recommended_action ? (
+          <p className="text-sm font-semibold text-accent tracking-tight mt-0.5">
+            {ACTION_LABEL[analysis.recommended_action]}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          {analysis ? (
+            <>
+              <Badge
+                variant={TEMPERATURE_VARIANT[analysis.temperature]}
+                className="whitespace-nowrap"
+              >
+                {TEMPERATURE_LABEL[analysis.temperature]}
+              </Badge>
+              <Badge variant="neutral" className="whitespace-nowrap">
+                {STAGE_LABEL[analysis.stage]}
+              </Badge>
+            </>
+          ) : (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              sem análise
+            </Badge>
+          )}
+
+          {esperando ? (
+            <Badge variant="warning" className="whitespace-nowrap">
+              esperando resposta
+            </Badge>
+          ) : null}
+        </div>
+
+        <p className="text-sm text-muted mt-1.5 truncate">
+          {lastMessage ? (
+            <>
+              <span className="font-medium text-ink/70">
+                {lastMessage.direction === "in" ? "Ele: " : "Nós: "}
+              </span>
+              {messagePreview({ ...lastMessage, caption: null }, 140)}
+            </>
+          ) : (
+            [lead.clinic_name, lead.specialty, lead.city]
+              .filter(Boolean)
+              .join(" · ") || "Sem conversa registrada"
+          )}
+        </p>
       </Link>
     </li>
   );

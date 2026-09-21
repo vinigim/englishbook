@@ -61,9 +61,23 @@ Em desenvolvimento, `WHATSAPP_PROVIDER=mock` usa as conversas de exemplo em
 ### 3. Conectar o WhatsApp (Evolution API)
 
 A Evolution precisa de um servidor sempre ligado; a Vercel é serverless e não
-sustenta o socket do WhatsApp. Uma VPS pequena resolve.
+sustenta o socket do WhatsApp.
 
-1. Suba o container da Evolution API na VPS.
+**Configurando pelo celular?** Só este passo exige um servidor, e é o único da
+lista que normalmente pediria terminal e SSH — coisa ruim de fazer no telefone.
+Duas saídas, ambas pelo navegador:
+
+- **Plataforma com deploy por imagem Docker** (Railway, Render e similares):
+  você aponta para a imagem da Evolution API, define as variáveis na interface
+  e ela sobe. Sem SSH em momento nenhum.
+- **Provedor hospedado** (Z-API, UazAPI): não tem servidor nenhum para
+  administrar — cria a instância, lê o QR e pronto. Custa mais por mês e exige
+  um adaptador novo em `src/lib/whatsapp/`, que é barato de escrever porque a
+  interface já está pronta.
+
+Ler o QR Code é naturalmente uma tarefa de celular, então essa parte não muda.
+
+1. Suba a Evolution API (VPS, plataforma Docker ou provedor hospedado).
 2. Crie a instância e leia o QR Code **com um chip dedicado ao comercial**,
    não com o celular pessoal.
 3. Preencha no `.env`: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`,
