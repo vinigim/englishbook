@@ -9,7 +9,7 @@ import {
  * PROMPT_VERSION entra no hash, então todo lead é reavaliado com as regras
  * novas em vez de continuar exibindo conclusões da versão anterior.
  */
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 export type EquipmentInfo = { name: string; use: string | null };
 
@@ -93,6 +93,13 @@ senhora enviou"), jamais com detalhes que identifiquem a pessoa.
   recomende "descartar" e devolva draft_message como null — não adianta redigir
   uma mensagem que não pode ser enviada. Se disser que já houve contato e
   quando, use isso para calibrar o tom em vez de tratar como primeiro contato.
+- **Tempo decorrido decide a ação.** Toda data na ficha vem com o tempo
+  decorrido ao lado. "Mensagem enviada há 3 dias" sem resposta é "aguardar";
+  a MESMA mensagem enviada há 2 meses não é — é "follow_up_sem_resposta", ou
+  "reativacao_inativo" se a pessoa já foi cliente. Silêncio longo depois de um
+  primeiro contato é motivo para escrever de novo, não para continuar esperando.
+  Só recomende "aguardar" quando o contato for recente o bastante para a pessoa
+  ainda não ter tido tempo de responder.
 - Quem falou por último importa muito: se o lead falou e ninguém respondeu, a
   temperatura sobe e quase sempre há uma ação a tomar.
 - Silêncio longo depois de um orçamento não é o mesmo que silêncio depois de

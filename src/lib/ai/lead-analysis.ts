@@ -7,6 +7,9 @@ import {
   daysSince,
   extraFields,
   leadDisplayName,
+  parseSheetDate,
+  relativeDays,
+  sheetContactDate,
 } from "@/app/derma-lux/leads-shared";
 import { DRAFT_MODEL, TRIAGE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd } from "./cost";
@@ -117,6 +120,18 @@ function buildContext(input: AnalysisInput): string {
   const diasSemContato = daysSince(lead.last_message_at);
   const diasDesdeEntrada = daysSince(lead.last_inbound_at);
 
+  const extras = extraFields(lead.extra);
+
+  // Lead vindo da planilha não tem mensagem, então `last_message_at` é nulo e
+  // o modelo ficaria sem qualquer noção de tempo. A data anotada na planilha é
+  // a única pista de quando houve contato — e dois meses de silêncio pedem
+  // follow-up, não "aguardar resposta".
+  const contatoNaPlanilha =
+    diasSemContato == null ? sheetContactDate(extras) : null;
+  const diasPelaPlanilha = contatoNaPlanilha
+    ? daysSince(contatoNaPlanilha.data.toISOString())
+    : null;
+
   const esperandoResposta =
     lead.last_inbound_at != null &&
     (lead.last_outbound_at == null ||
@@ -130,7 +145,9 @@ function buildContext(input: AnalysisInput): string {
     `Origem do cadastro: ${lead.source}`,
     diasSemContato != null
       ? `Dias desde a última mensagem (qualquer lado): ${diasSemContato}`
-      : "Nenhuma mensagem registrada",
+      : contatoNaPlanilha && diasPelaPlanilha != null
+        ? `Nenhuma mensagem de WhatsApp registrada. Mas a planilha anota, em "${contatoNaPlanilha.chave}", um contato em ${contatoNaPlanilha.data.toISOString().slice(0, 10)} — ou seja, há ${diasPelaPlanilha} dias (${relativeDays(contatoNaPlanilha.data.toISOString())}).`
+        : "Nenhuma mensagem registrada",
     diasDesdeEntrada != null
       ? `Dias desde a última mensagem DELE: ${diasDesdeEntrada}`
       : null,
@@ -164,11 +181,19 @@ function buildContext(input: AnalysisInput): string {
   // Colunas que vieram da planilha e não têm campo próprio. Costumam trazer
   // justamente o que decide a abordagem: status do último contato, se o
   // número tem WhatsApp, o Instagram da clínica.
-  const extras = extraFields(lead.extra);
   const blocoExtras =
     extras.length > 0
       ? `\n\n<ficha_da_planilha>
-${extras.map(([chave, valor]) => `${chave}: ${valor}`).join("\n")}
+${extras
+  .map(([chave, valor]) => {
+    // Toda data ganha o tempo decorrido ao lado: "17/07/2026" sozinho não
+    // diz nada ao modelo, "há 2 meses" diz tudo.
+    const data = parseSheetDate(valor);
+    return data
+      ? `${chave}: ${valor} (${relativeDays(data.toISOString())})`
+      : `${chave}: ${valor}`;
+  })
+  .join("\n")}
 </ficha_da_planilha>`
       : "";
 

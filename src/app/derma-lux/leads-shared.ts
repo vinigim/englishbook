@@ -165,6 +165,84 @@ export function extraFields(
     .slice(0, MAX_EXTRA_FIELDS);
 }
 
+/**
+ * Interpreta uma data escrita na planilha.
+ *
+ * Sem isto, a IA lê "17/07/2026" como um rótulo qualquer e não percebe que
+ * aquilo foi há dois meses. Foi exatamente assim que um lead parado desde
+ * julho virou "aguardar resposta" em vez de follow-up: a data estava lá, o
+ * tempo decorrido não.
+ *
+ * Aceita o formato brasileiro (17/07/2026) e o ISO (2026-07-17). Devolve
+ * `null` para qualquer outra coisa — é melhor não saber a data do que inventar
+ * uma.
+ */
+export function parseSheetDate(valor: string): Date | null {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return null;
+
+  let ano: number;
+  let mes: number;
+  let dia: number;
+
+  const br = texto.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  const iso = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+
+  if (br) {
+    // Planilha brasileira: o dia vem primeiro. Ler como mm/dd colocaria
+    // 07/06 no mês errado sem avisar ninguém.
+    dia = Number(br[1]);
+    mes = Number(br[2]);
+    ano = Number(br[3]);
+  } else if (iso) {
+    ano = Number(iso[1]);
+    mes = Number(iso[2]);
+    dia = Number(iso[3]);
+  } else {
+    return null;
+  }
+
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+
+  // O construtor normaliza 31/02 para 03/03 em silêncio. Comparar de volta é
+  // o que separa uma data real de uma inventada.
+  if (
+    data.getUTCFullYear() !== ano ||
+    data.getUTCMonth() !== mes - 1 ||
+    data.getUTCDate() !== dia
+  ) {
+    return null;
+  }
+
+  return data;
+}
+
+function semAcento(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Acha, entre as colunas extras, a data que representa o último contato.
+ *
+ * Uma coluna chamada "Data do Contato" vale mais que uma data qualquer perdida
+ * na planilha; entre várias, a mais recente é a que diz há quanto tempo o lead
+ * esfriou.
+ */
+export function sheetContactDate(
+  extras: [string, string][],
+): { chave: string; data: Date } | null {
+  const comData = extras
+    .map(([chave, valor]) => ({ chave, data: parseSheetDate(valor) }))
+    .filter((e): e is { chave: string; data: Date } => e.data !== null);
+
+  if (comData.length === 0) return null;
+
+  const doContato = comData.filter((e) => /contat|contact/i.test(semAcento(e.chave)));
+  const candidatos = doContato.length > 0 ? doContato : comData;
+
+  return candidatos.reduce((a, b) => (a.data > b.data ? a : b));
+}
+
 /** "há 3 dias", "hoje", "ontem" — para a lista da caixa de entrada. */
 export function relativeDays(iso: string | null): string {
   const dias = daysSince(iso);
