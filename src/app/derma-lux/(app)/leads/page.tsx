@@ -5,6 +5,7 @@ import {
   getAnalysisSpend,
   getLeadsInbox,
 } from "../../leads-data";
+import { InboxActions } from "./InboxActions";
 import { InboxClient } from "./InboxClient";
 
 export const dynamic = "force-dynamic";
@@ -37,13 +38,14 @@ export default async function LeadsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start sm:items-end gap-2">
           <Link
             href="/derma-lux/leads/importar"
-            className="px-4 py-2 text-sm font-medium border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+            className="text-sm text-muted hover:text-ink underline transition-colors"
           >
             Importar planilha
           </Link>
+          <InboxActions pendentes={pending} />
         </div>
       </div>
 
