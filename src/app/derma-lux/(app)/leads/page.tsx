@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Alert } from "@/components/ui/Badge";
 import {
+  countLeads,
   countPendingAnalysis,
   getAnalysisSpend,
   getLeadsInbox,
@@ -15,11 +16,16 @@ export const metadata = {
 };
 
 export default async function LeadsPage() {
-  const [rows, pending, spend] = await Promise.all([
+  const [rows, total, pending, spend] = await Promise.all([
     getLeadsInbox(),
+    countLeads(),
     countPendingAnalysis(),
     getAnalysisSpend(),
   ]);
+
+  // Os filtros e a busca rodam sobre `rows`, então um lead não carregado é um
+  // lead que não dá para achar. Se isso acontecer, é melhor dizer.
+  const truncado = total > rows.length;
 
   return (
     <div>
@@ -29,9 +35,9 @@ export default async function LeadsPage() {
             Radar de Leads
           </h1>
           <p className="text-muted text-sm mt-1">
-            {rows.length === 0
+            {total === 0
               ? "Nenhum lead ainda."
-              : `${rows.length} ${rows.length === 1 ? "lead" : "leads"} · ${pending} aguardando análise`}
+              : `${total} ${total === 1 ? "lead" : "leads"} · ${pending} aguardando análise`}
             {spend.count > 0
               ? ` · US$ ${spend.total.toFixed(2)} gastos em ${spend.count} análises`
               : ""}
@@ -71,7 +77,16 @@ export default async function LeadsPage() {
           </ol>
         </Alert>
       ) : (
-        <InboxClient rows={rows} />
+        <>
+          {truncado ? (
+            <Alert variant="warning" className="mb-4">
+              Mostrando os {rows.length} leads mais recentes, de {total}. Os
+              filtros e a busca só alcançam esses — se precisar chegar nos
+              outros, me avise que eu acrescento paginação.
+            </Alert>
+          ) : null}
+          <InboxClient rows={rows} />
+        </>
       )}
     </div>
   );

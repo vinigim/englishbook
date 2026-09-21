@@ -17,6 +17,16 @@ const MESSAGE_COLS =
   "id, lead_id, provider, provider_message_id, chat_id, direction, message_type, body, caption, media_url, media_mime, sent_at";
 
 /**
+ * Teto de leads carregados na caixa de entrada.
+ *
+ * Os filtros e a busca da tela rodam sobre o que foi carregado, então um teto
+ * baixo não "esconde" leads: ele os torna inalcançáveis, inclusive pela busca.
+ * Por isso o número é alto o bastante para caber a carteira inteira, e a tela
+ * avisa quando esbarra nele em vez de omitir em silêncio.
+ */
+export const INBOX_LIMIT = 1000;
+
+/**
  * Caixa de entrada: leads + a análise mais recente de cada um + a última
  * mensagem, ordenados por prioridade.
  *
@@ -24,14 +34,20 @@ const MESSAGE_COLS =
  * análises dos leads da página e reduzimos em memória. O volume aqui é de
  * centenas de leads, não de milhões — não vale a complexidade de uma view.
  */
-export async function getLeadsInbox(limit = 200): Promise<LeadInboxRow[]> {
+export async function getLeadsInbox(
+  limit = INBOX_LIMIT,
+): Promise<LeadInboxRow[]> {
   const supabase = await createClient();
 
   const { data: leadsData, error: leadsErr } = await supabase
     .from("wa_leads")
     .select("*")
     .eq("archived", false)
+    // Lead vindo de planilha não tem mensagem, então `last_message_at` é nulo
+    // para todos eles. Sem o desempate por `created_at` o banco devolveria um
+    // subconjunto arbitrário quando o teto fosse atingido.
     .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (leadsErr || !leadsData || leadsData.length === 0) return [];
@@ -153,6 +169,22 @@ export async function getLeadDetail(
     analysis: (analysisRes.data as LeadAnalysis | null) ?? null,
     rentals,
   };
+}
+
+/**
+ * Total de leads ativos, contado no banco.
+ *
+ * O cabeçalho mostrava `rows.length`, que é o tamanho da página carregada —
+ * com 379 leads e teto de 200, ele anunciava "200 leads". Número errado, e que
+ * escondia o fato de o resto estar inalcançável.
+ */
+export async function countLeads(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("wa_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("archived", false);
+  return count ?? 0;
 }
 
 /** Quantos leads estão esperando análise — mostrado no topo da caixa de entrada. */
