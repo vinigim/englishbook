@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
+  extraFields,
   formatPhoneBR,
   leadDisplayName,
   relativeDays,
@@ -42,6 +43,9 @@ const MEDIA_LABEL: Record<string, string> = {
 
 export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const { lead, messages, analysis, rentals } = detail;
+  // Mesma normalização que alimenta a IA, para a tela mostrar exatamente o que
+  // o modelo leu — nem mais, nem menos.
+  const extras = extraFields(lead.extra);
   const router = useRouter();
   const [pendente, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -119,6 +123,22 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
             ) : null}
           </div>
         </div>
+
+        {extras.length > 0 ? (
+          <div className="mt-4 pt-4 border-t border-line">
+            <p className="text-xs uppercase tracking-wide text-muted mb-1.5">
+              Da sua planilha
+            </p>
+            <dl className="text-sm grid gap-x-3 gap-y-1 sm:grid-cols-[auto_1fr]">
+              {extras.map(([chave, valor]) => (
+                <div key={chave} className="sm:contents">
+                  <dt className="text-muted sm:text-right">{chave}</dt>
+                  <dd className="text-ink m-0 break-words">{valor}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
 
         {rentals.length > 0 ? (
           <div className="mt-4 pt-4 border-t border-line">

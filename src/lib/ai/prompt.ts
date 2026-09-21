@@ -9,7 +9,7 @@ import {
  * PROMPT_VERSION entra no hash, então todo lead é reavaliado com as regras
  * novas em vez de continuar exibindo conclusões da versão anterior.
  */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export type EquipmentInfo = { name: string; use: string | null };
 
@@ -87,6 +87,12 @@ senhora enviou"), jamais com detalhes que identifiquem a pessoa.
 
 - Mídia aparece como rótulo ("[imagem]", "[áudio 0:42]") porque o conteúdo não
   é baixado. Trate como sinal de engajamento, não adivinhe o que havia nela.
+- Quando vier uma <ficha_da_planilha>, são anotações do próprio dono sobre o
+  contato, e valem mais que qualquer inferência sua. Se uma delas disser que o
+  número não tem WhatsApp, ou que a pessoa pediu para não receber mensagens,
+  recomende "descartar" e devolva draft_message como null — não adianta redigir
+  uma mensagem que não pode ser enviada. Se disser que já houve contato e
+  quando, use isso para calibrar o tom em vez de tratar como primeiro contato.
 - Quem falou por último importa muito: se o lead falou e ninguém respondeu, a
   temperatura sobe e quase sempre há uma ação a tomar.
 - Silêncio longo depois de um orçamento não é o mesmo que silêncio depois de

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { isAiConfigured } from "@/lib/ai/anthropic";
 import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
@@ -64,7 +64,15 @@ export async function POST(request: NextRequest) {
 
   const { limit = 25, leadIds, force = false } = parsed.data;
 
-  const admin = createAdminClient();
+  const adminResult = tryCreateAdminClient();
+  if (!adminResult.ok) {
+    console.error("[leads-analyze] SUPABASE_SERVICE_ROLE_KEY ausente");
+    return NextResponse.json(
+      { error: "admin_not_configured", message: adminResult.message },
+      { status: 500 },
+    );
+  }
+  const admin = adminResult.admin;
   const inicio = Date.now();
 
   // Quais leads analisar.

@@ -22,6 +22,36 @@ const ROLE_OPTIONS: { value: ColumnRole; label: string }[] = [
   { value: "custom", label: "Guardar como extra" },
 ];
 
+/**
+ * Lê a resposta sem estourar quando ela não é JSON.
+ *
+ * Um erro não tratado no servidor volta como página de erro do Next, não como
+ * JSON. Fazer `res.json()` direto nesse caso lança, o `catch` engole tudo e o
+ * usuário vê só "Falha ao importar" — sem nenhuma pista do que aconteceu.
+ */
+async function lerResposta(
+  res: Response,
+): Promise<Record<string, unknown> | null> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function mensagemDeErro(
+  json: Record<string, unknown> | null,
+  res: Response,
+  padrao: string,
+): string {
+  if (typeof json?.message === "string") return json.message;
+  if (typeof json?.error === "string") return json.error;
+  if (res.status >= 500) {
+    return `O servidor respondeu ${res.status}. Se acabou de configurar uma variável de ambiente na Vercel, refaça o deploy — ela só vale depois disso.`;
+  }
+  return padrao;
+}
+
 export function ImportClient() {
   const router = useRouter();
   const [parsed, setParsed] = useState<ParseResult | null>(null);
@@ -41,12 +71,12 @@ export function ImportClient() {
         method: "POST",
         body: form,
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setErro(json.message ?? "Não consegui ler este arquivo.");
+      const json = await lerResposta(res);
+      if (!res.ok || !json) {
+        setErro(mensagemDeErro(json, res, "Não consegui ler este arquivo."));
         return;
       }
-      const result = json as ParseResult;
+      const result = json as unknown as ParseResult;
       setParsed(result);
       setMapping(
         Object.fromEntries(result.columns.map((c) => [c.header, c.role])),
@@ -68,12 +98,12 @@ export function ImportClient() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ rows: parsed.rows, mapping }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setErro(json.message ?? "Não consegui importar.");
+      const json = await lerResposta(res);
+      if (!res.ok || !json) {
+        setErro(mensagemDeErro(json, res, "Não consegui importar."));
         return;
       }
-      setReport(json as ImportReport);
+      setReport(json as unknown as ImportReport);
       setParsed(null);
       router.refresh();
     } catch {

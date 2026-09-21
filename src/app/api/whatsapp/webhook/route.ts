@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 
@@ -48,7 +48,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, ignored: true });
   }
 
-  const admin = createAdminClient();
+  const adminResult = tryCreateAdminClient();
+  if (!adminResult.ok) {
+    console.error("[wa-webhook] SUPABASE_SERVICE_ROLE_KEY ausente");
+    return NextResponse.json(
+      { error: "admin_not_configured", message: adminResult.message },
+      { status: 500 },
+    );
+  }
+  const admin = adminResult.admin;
 
   const { error: insertError } = await admin.from("wa_webhook_events").insert({
     id: eventId,
