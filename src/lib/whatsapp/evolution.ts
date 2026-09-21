@@ -525,35 +525,80 @@ export function createEvolutionProvider(): WhatsAppProvider {
         contextInfoTem: r.contextInfo ? Object.keys(r.contextInfo as object) : null,
       }));
 
-      // As outras duas fontes que poderiam ligar LID a telefone. Só os campos
-      // de identificação — nada de conteúdo.
-      const pegar = async (rota: string) => {
-        try {
-          const d = await call<unknown>(`/chat/${rota}/${cfg.instance}`, {
-            method: "POST",
-            body: {},
-          });
-          const lista = Array.isArray(d)
-            ? d
-            : ((d as Record<string, unknown>)?.[rota] as unknown[]) ?? [];
-          return (lista as Record<string, unknown>[])
-            .slice(0, limit)
-            .map((c) => ({
-              campos: Object.keys(c),
-              remoteJid: c.remoteJid,
-              id: c.id,
-              pushName: c.pushName,
-              name: c.name,
-            }));
-        } catch (err) {
-          return { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
-        }
+      const lista = async (rota: string): Promise<Record<string, unknown>[]> => {
+        const d = await call<unknown>(`/chat/${rota}/${cfg.instance}`, {
+          method: "POST",
+          body: {},
+        });
+        const arr = Array.isArray(d)
+          ? d
+          : ((d as Record<string, unknown>)?.[rota] as unknown[]) ?? [];
+        return arr as Record<string, unknown>[];
       };
+
+      /** Quantos registros usam LID e quantos têm telefone de verdade. */
+      const composicao = (l: Record<string, unknown>[]) => {
+        let lid = 0;
+        let telefone = 0;
+        let outros = 0;
+        let comNome = 0;
+        for (const r of l) {
+          const j = String(r.remoteJid ?? "");
+          if (j.includes("@lid")) lid += 1;
+          else if (j.includes("@s.whatsapp.net")) telefone += 1;
+          else outros += 1;
+          if (r.pushName) comNome += 1;
+        }
+        return { total: l.length, lid, telefone, outros, comNome };
+      };
+
+      let contatos: unknown = null;
+      let chats: unknown = null;
+
+      try {
+        const c = await lista("findContacts");
+        contatos = {
+          composicao: composicao(c),
+          // Nome é a única ponte possível entre a forma LID e a forma
+          // telefone do mesmo contato. Vale ver se os nomes se repetem.
+          amostraLid: c.filter((r) => String(r.remoteJid ?? "").includes("@lid"))
+            .slice(0, limit)
+            .map((r) => ({ remoteJid: r.remoteJid, pushName: r.pushName })),
+          amostraTelefone: c
+            .filter((r) => String(r.remoteJid ?? "").includes("@s.whatsapp.net"))
+            .slice(0, limit)
+            .map((r) => ({ remoteJid: r.remoteJid, pushName: r.pushName })),
+        };
+      } catch (err) {
+        contatos = { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
+      }
+
+      try {
+        const ch = await lista("findChats");
+        const comLid = ch.filter((r) => String(r.remoteJid ?? "").includes("@lid"));
+        chats = {
+          composicao: composicao(ch),
+          // A aposta: lastMessage é um objeto de mensagem, e mensagem tem
+          // key. Se a key do lastMessage de um chat LID trouxer
+          // remoteJidAlt, uma chamada resolve os 287 chats de uma vez.
+          lastMessageDeChatsLid: comLid.slice(0, limit).map((r) => {
+            const lm = r.lastMessage as Record<string, unknown> | undefined;
+            return {
+              remoteJid: r.remoteJid,
+              temLastMessage: Boolean(lm),
+              camposLastMessage: lm ? Object.keys(lm) : null,
+              key: lm?.key ?? null,
+            };
+          }),
+        };
+      } catch (err) {
+        chats = { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
+      }
 
       return [
         { fonte: "findMessages", amostra: chaves },
-        { fonte: "findContacts", amostra: await pegar("findContacts") },
-        { fonte: "findChats", amostra: await pegar("findChats") },
+        { fonte: "findContacts", ...(contatos as object) },
+        { fonte: "findChats", ...(chats as object) },
       ];
     },
 
