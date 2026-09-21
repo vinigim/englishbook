@@ -147,15 +147,26 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
     }
   }
 
-  async function sincronizar() {
+  /**
+   * Importa o histórico.
+   *
+   * `force` reprocessa conversa já marcada como concluída em `wa_sync_state`.
+   *
+   * Sem ele, a sincronização normal PULA tudo que já leu uma vez — e `done`
+   * vira true assim que uma conversa devolve menos que o teto por chat, que é
+   * o caso de quase todas. O efeito é que ligar o Sync Full History no
+   * Evolution não adiantaria nada: o histórico novo chegaria ao Railway e o
+   * nosso lado nunca olharia de novo.
+   */
+  async function sincronizar(force = false) {
     setOcupado("sync");
     setErro(null);
-    setStatus("Conectando…");
+    setStatus(force ? "Relendo tudo…" : "Conectando…");
     try {
       const res = await fetch("/api/whatsapp/backfill", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(force ? { force: true } : {}),
       });
 
       if (!res.ok || !res.body) {
@@ -241,11 +252,30 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={sincronizar}
+          onClick={() => sincronizar(false)}
           loading={ocupado === "sync"}
           disabled={ocupado !== null}
         >
           Sincronizar histórico
+        </Button>
+
+        {/* Separado do botão normal de propósito: relê as 287 conversas, leva
+            minutos e só faz sentido depois de mudar algo do lado do Evolution
+            (ligar o Sync Full History, reler o QR). No uso do dia a dia o
+            botão de cima é o certo.
+            Mesmo assim vai de `secondary`, não `ghost`: neste fundo claro o
+            ghost some e passa a parecer legenda — foi o que aconteceu com o
+            "Testar conexão". Distinguir pelo texto funciona; por peso visual,
+            não. */}
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => sincronizar(true)}
+          loading={ocupado === "sync"}
+          disabled={ocupado !== null}
+          title="Relê todas as conversas, inclusive as já sincronizadas"
+        >
+          Reler tudo
         </Button>
 
         <Button
