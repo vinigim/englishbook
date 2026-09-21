@@ -128,6 +128,19 @@ export function createMockProvider(): WhatsAppProvider {
       return opts?.limit ? mensagens.slice(0, opts.limit) : mensagens;
     },
 
+    async fetchMessagesPage({ page, pageSize }): Promise<NormalizedMessage[]> {
+      const historico = await loadHistory();
+      // Mesma ordem da Evolution: da mais recente para a mais antiga, senão
+      // o mock não exercita o mesmo caminho do backfill.
+      const todas = historico
+        .map(normalizeOne)
+        .filter((m): m is NormalizedMessage => m !== null)
+        .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+
+      const inicio = (Math.max(1, page) - 1) * pageSize;
+      return todas.slice(inicio, inicio + pageSize);
+    },
+
     async sendText(phoneE164, text) {
       console.log(`[wa-mock] enviaria para ${phoneE164}: ${text.slice(0, 80)}…`);
       return { providerMessageId: `mock-${Date.now()}` };

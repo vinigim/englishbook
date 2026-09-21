@@ -24,10 +24,27 @@ export const maxDuration = 300;
 // elegância, em vez de ser cortado no meio por timeout da plataforma.
 const LIMITE_MS = 250_000;
 
+/**
+ * Mensagens por página.
+ *
+ * Grande o bastante para a carteira inteira caber em poucas dezenas de
+ * chamadas, pequeno o bastante para o JSON de cada resposta não ficar pesado —
+ * cada mensagem carrega o payload bruto do Baileys.
+ */
+const PAGE_SIZE = 200;
+
+/** Trava contra laço infinito se o provedor nunca sinalizar fim de dados. */
+const MAX_PAGINAS = 200;
+
 const bodySchema = z.object({
-  chatLimit: z.number().int().positive().max(500).optional(),
-  messagesPerChat: z.number().int().positive().max(2000).optional(),
-  /** Reprocessa chats já marcados como concluídos. */
+  /**
+   * Percorre TODAS as páginas, em vez de parar na primeira já conhecida.
+   *
+   * O modo incremental para cedo porque a listagem vem da mais recente para a
+   * mais antiga: página inteira já conhecida significa que chegamos ao que já
+   * tínhamos. Isso é errado depois de ligar o Sync Full History no Evolution,
+   * porque aí o histórico novo entra pelo FIM da lista — daí o "Reler tudo".
+   */
   force: z.boolean().optional(),
 });
 
@@ -56,7 +73,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { chatLimit, messagesPerChat = 500, force = false } = parsed.data;
+  const { force = false } = parsed.data;
 
   const provider = getWhatsAppProvider();
   const adminResult = tryCreateAdminClient();
@@ -78,121 +95,74 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
 
       try {
-        const chats = await provider.listChats(
-          chatLimit ? { limit: chatLimit } : undefined,
-        );
+        linha({ tipo: "inicio", pageSize: PAGE_SIZE });
 
-        const conversas = chats.filter((c) => !c.isGroup);
-        linha({
-          tipo: "inicio",
-          totalChats: conversas.length,
-          gruposIgnorados: chats.length - conversas.length,
-        });
-
-        // `force` DESMARCA os concluídos uma vez, em vez de ignorar a marca.
-        //
-        // Ignorar era o que fazia antes, e tornava a releitura irretomável: o
-        // laço tem teto de tempo (LIMITE_MS) e 287 conversas não cabem numa
-        // execução só. Como nada era pulado, cada clique recomeçava do
-        // primeiro chat e as conversas do fim da lista nunca eram alcançadas.
-        //
-        // Desmarcando, a releitura vira uma sincronização normal: cada chat
-        // relido é marcado de novo, e a rodada seguinte continua de onde parou.
-        if (force) {
-          const { error } = await admin
-            .from("wa_sync_state")
-            .update({ done: false })
-            .eq("done", true);
-          if (error) throw new Error(`falha ao reabrir o histórico: ${error.message}`);
-        }
-
-        // Quais já terminamos, para não refazer trabalho.
-        const concluidos = new Set<string>();
-        {
-          const { data } = await admin
-            .from("wa_sync_state")
-            .select("chat_id")
-            .eq("done", true);
-          for (const r of (data ?? []) as { chat_id: string }[]) {
-            concluidos.add(r.chat_id);
-          }
-        }
-
-        let processados = 0;
+        let pagina = 0;
+        let mensagensVistas = 0;
         let mensagensTotal = 0;
         let leadsTotal = 0;
-        // Conversas que não viraram lead porque o WhatsApp só deu um LID, sem
-        // telefone ao lado. Contadas para aparecerem no fim: uma conversa que
-        // some sem explicação é pior que uma que o dono sabe que ficou de fora.
         let semTelefone = 0;
+        let continuar = false;
 
-        for (const chat of conversas) {
+        for (;;) {
           if (Date.now() - inicio > LIMITE_MS) {
+            continuar = true;
             linha({
               tipo: "parcial",
-              restantes: conversas.length - processados,
-              mensagem:
-                "Tempo limite atingido. Continuando de onde parou…",
+              mensagem: "Tempo limite atingido. Continuando de onde parou…",
             });
             break;
           }
 
-          if (concluidos.has(chat.chatId)) {
-            processados += 1;
-            continue;
+          pagina += 1;
+          if (pagina > MAX_PAGINAS) {
+            continuar = true;
+            linha({
+              tipo: "parcial",
+              mensagem: "Muitas páginas numa rodada. Continuando…",
+            });
+            break;
           }
 
-          try {
-            const historico = await provider.fetchChatHistory(chat.chatId, {
-              limit: messagesPerChat,
-            });
+          const lote = await provider.fetchMessagesPage({
+            page: pagina,
+            pageSize: PAGE_SIZE,
+          });
 
-            const resultado = await ingestMessages(
-              admin,
-              provider.id,
-              historico,
-            );
+          // Menos que o pedido: chegamos ao fim dos dados da instância.
+          const ultimaPagina = lote.length < PAGE_SIZE;
 
+          if (lote.length > 0) {
+            const resultado = await ingestMessages(admin, provider.id, lote);
+            mensagensVistas += lote.length;
             mensagensTotal += resultado.mensagensGravadas;
             leadsTotal += resultado.leadsCriados;
-            if (resultado.telefoneInvalido > 0) semTelefone += 1;
-
-            const datas = historico.map((m) => m.sentAt).sort();
-
-            await admin.from("wa_sync_state").upsert(
-              {
-                chat_id: chat.chatId,
-                oldest_fetched_at: datas[0] ?? null,
-                newest_fetched_at: datas[datas.length - 1] ?? null,
-                // Voltou menos que o pedido: chegamos ao começo da conversa.
-                done: historico.length < messagesPerChat,
-              },
-              { onConflict: "chat_id" },
-            );
+            semTelefone += resultado.telefoneInvalido;
 
             linha({
-              tipo: "chat",
-              telefone: chat.phoneE164,
-              nome: chat.name,
-              recebidas: historico.length,
+              tipo: "pagina",
+              pagina,
+              recebidas: lote.length,
               gravadas: resultado.mensagensGravadas,
+              vistas: mensagensVistas,
             });
-          } catch (err) {
-            // Um chat problemático não pode derrubar a sincronização inteira.
-            console.error(`[wa-backfill] falha em ${chat.chatId}:`, err);
-            linha({
-              tipo: "erro",
-              telefone: chat.phoneE164,
-              mensagem: err instanceof Error ? err.message : "falha",
-            });
+
+            // Modo incremental: a listagem vem da mais recente para a mais
+            // antiga, então uma página inteira já conhecida significa que
+            // chegamos ao que já tínhamos. "Reler tudo" (force) ignora isso,
+            // porque o histórico novo do WhatsApp chega pelo FIM da lista —
+            // é justamente o caso em que parar cedo esconderia tudo.
+            if (!force && resultado.mensagensGravadas === 0) break;
           }
 
-          processados += 1;
+          if (ultimaPagina) break;
         }
 
         linha({
           tipo: "fim",
-          chatsProcessados: processados,
+          paginas: pagina,
+          mensagensVistas,
+          continuar,
           mensagensGravadas: mensagensTotal,
           leadsNovos: leadsTotal,
           semTelefone,
