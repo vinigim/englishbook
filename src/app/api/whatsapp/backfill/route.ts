@@ -111,10 +111,38 @@ export async function POST(request: NextRequest) {
         let semTelefone = 0;
         let brutasTotal = 0;
         let descartadasOutras = 0;
-        // O mapa vale para o conjunto inteiro, não para uma página: a cópia
-        // enriquecida de uma conversa pode estar em qualquer página.
-        const lidMap: Record<string, string> = {};
+        // DOIS mapas, com precedências diferentes.
+        //
+        // `lidMapAlt` vem do remoteJidAlt de mensagens que passaram pelo fluxo
+        // ao vivo: é verdade conhecida, dita pelo próprio WhatsApp.
+        //
+        // `lidMapNome` vem de cruzar a agenda do provedor por nome: a mesma
+        // pessoa aparece duas vezes, uma com telefone e outra por LID. É
+        // INFERÊNCIA, e por isso perde para o alt sempre que os dois existem.
+        const lidMapAlt: Record<string, string> = {};
+        let lidMapNome: Record<string, string> = {};
+        let nomeUnicos = 0;
+        let nomeAmbiguos = 0;
         const pendentes: PendingLidMessage[] = [];
+
+        if (provider.fetchLidMap) {
+          try {
+            const r = await provider.fetchLidMap();
+            lidMapNome = r.map;
+            nomeUnicos = r.unicos;
+            nomeAmbiguos = r.ambiguos;
+            linha({
+              tipo: "agenda",
+              unicos: r.unicos,
+              ambiguos: r.ambiguos,
+              semPar: r.semPar,
+            });
+          } catch (err) {
+            // Agenda indisponível não pode derrubar a sincronização: sem ela,
+            // o backfill volta a depender só do remoteJidAlt.
+            console.error("[wa-backfill] falha ao cruzar agenda:", err);
+          }
+        }
         let continuar = false;
 
         for (;;) {
@@ -150,7 +178,7 @@ export async function POST(request: NextRequest) {
 
           brutasTotal += lote.brutas;
           descartadasOutras += lote.descartadasOutras;
-          Object.assign(lidMap, lote.lidMap);
+          Object.assign(lidMapAlt, lote.lidMap);
           pendentes.push(...lote.pendentes);
 
           if (lote.mensagens.length > 0) {
@@ -190,18 +218,26 @@ export async function POST(request: NextRequest) {
         // telefone apareceu em ALGUMA página viram mensagens de verdade.
         //
         // É aqui que o histórico é recuperado: 99,6% das mensagens chegam
-        // cruas, e uma única cópia enriquecida por contato basta para trazer a
-        // conversa inteira dele.
+        // cruas, e basta UM par LID→telefone por contato — venha do
+        // remoteJidAlt de uma mensagem ou do cruzamento da agenda — para
+        // trazer a conversa inteira dele.
         let recuperadas = 0;
         let semMapa = 0;
         const resolvidas: NormalizedMessage[] = [];
 
+        // Verdade conhecida primeiro, inferência depois.
+        const resolverLid = (lid: string) => lidMapAlt[lid] ?? lidMapNome[lid];
+        let porAlt = 0;
+        let porNome = 0;
+
         for (const p of pendentes) {
-          const telefone = lidMap[p.lid];
+          const telefone = resolverLid(p.lid);
           if (!telefone) {
             semMapa += 1;
             continue;
           }
+          if (lidMapAlt[p.lid]) porAlt += 1;
+          else porNome += 1;
           resolvidas.push(p.resolver(telefone));
         }
 
@@ -237,7 +273,11 @@ export async function POST(request: NextRequest) {
           brutasTotal,
           recuperadas,
           semMapa,
-          lidsConhecidos: Object.keys(lidMap).length,
+          lidsConhecidos: Object.keys(lidMapAlt).length + Object.keys(lidMapNome).length,
+          porAlt,
+          porNome,
+          nomeUnicos,
+          nomeAmbiguos,
           descartadasOutras,
           mensagensVistas,
           continuar,
