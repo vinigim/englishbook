@@ -89,9 +89,26 @@ export async function POST(request: NextRequest) {
           gruposIgnorados: chats.length - conversas.length,
         });
 
+        // `force` DESMARCA os concluídos uma vez, em vez de ignorar a marca.
+        //
+        // Ignorar era o que fazia antes, e tornava a releitura irretomável: o
+        // laço tem teto de tempo (LIMITE_MS) e 287 conversas não cabem numa
+        // execução só. Como nada era pulado, cada clique recomeçava do
+        // primeiro chat e as conversas do fim da lista nunca eram alcançadas.
+        //
+        // Desmarcando, a releitura vira uma sincronização normal: cada chat
+        // relido é marcado de novo, e a rodada seguinte continua de onde parou.
+        if (force) {
+          const { error } = await admin
+            .from("wa_sync_state")
+            .update({ done: false })
+            .eq("done", true);
+          if (error) throw new Error(`falha ao reabrir o histórico: ${error.message}`);
+        }
+
         // Quais já terminamos, para não refazer trabalho.
         const concluidos = new Set<string>();
-        if (!force) {
+        {
           const { data } = await admin
             .from("wa_sync_state")
             .select("chat_id")
@@ -115,7 +132,7 @@ export async function POST(request: NextRequest) {
               tipo: "parcial",
               restantes: conversas.length - processados,
               mensagem:
-                "Tempo limite atingido. Rode de novo para continuar de onde parou.",
+                "Tempo limite atingido. Continuando de onde parou…",
             });
             break;
           }
