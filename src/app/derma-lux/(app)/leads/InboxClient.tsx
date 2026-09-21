@@ -66,6 +66,11 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (!termo) return true;
       const alvo = [
         leadDisplayName(row.lead),
+        // Os nomes alternativos entram SEMPRE, não só quando são o exibido.
+        // Se o display_name vier ruim — e já veio, quando o pushName do
+        // WhatsApp era o próprio LID — o nome da planilha continua achável.
+        row.lead.sheet_name,
+        row.lead.display_name,
         row.lead.clinic_name,
         row.lead.specialty,
         row.lead.city,

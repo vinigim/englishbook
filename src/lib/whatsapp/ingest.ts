@@ -146,7 +146,16 @@ export async function ingestMessages(
       g.temEntrada = true;
       g.ultimaEntrada = maisRecente(g.ultimaEntrada, msg.sentAt);
       // Só a mensagem recebida traz o nome que a pessoa escolheu no WhatsApp.
-      if (msg.pushName) g.pushName = msg.pushName;
+      //
+      // Mas nem todo pushName é nome. Nas cópias cruas do histórico, o
+      // WhatsApp preenche o campo com o PRÓPRIO LID ("24515790798917"), e
+      // gravar isso como display_name apaga o nome que veio da planilha — o
+      // lead passa a se chamar por um número, na tela e na busca.
+      //
+      // Nome de gente tem letra. Sem letra, não é nome.
+      if (msg.pushName && /\p{L}/u.test(msg.pushName)) {
+        g.pushName = msg.pushName;
+      }
     } else {
       g.ultimaSaida = maisRecente(g.ultimaSaida, msg.sentAt);
     }
