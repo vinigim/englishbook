@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/Button";
 
 type Etapa = { nome: string; ok: boolean; detalhe?: string };
 
+type PreviaLimpeza = {
+  invalidos: number;
+  amostra: { phoneKey: string; nome: string | null; jid: string | null }[];
+};
+
 /**
  * Botões de "Analisar pendentes" e "Sincronizar histórico".
  *
@@ -16,12 +21,59 @@ type Etapa = { nome: string; ok: boolean; detalhe?: string };
  */
 export function InboxActions({ pendentes }: { pendentes: number }) {
   const router = useRouter();
-  const [ocupado, setOcupado] = useState<"analise" | "sync" | "teste" | null>(
-    null,
-  );
+  const [ocupado, setOcupado] = useState<
+    "analise" | "sync" | "teste" | "limpeza" | null
+  >(null);
   const [status, setStatus] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [diagnostico, setDiagnostico] = useState<Etapa[] | null>(null);
+  const [previa, setPrevia] = useState<PreviaLimpeza | null>(null);
+
+  /**
+   * Remove os leads cujo "telefone" não é telefone.
+   *
+   * A sincronização antiga tratava LID como número e criou um lead fantasma por
+   * conversa. A origem está corrigida; isto limpa o que já entrou.
+   *
+   * São dois toques de propósito. O primeiro é dry-run e mostra a lista; só o
+   * segundo apaga. Apagar lead é irreversível, e a conferência tem que estar na
+   * tela de quem clica — não escondida no corpo de um request.
+   */
+  async function limpar(confirmar: boolean) {
+    setOcupado("limpeza");
+    setErro(null);
+    setStatus(null);
+    setDiagnostico(null);
+    try {
+      const res = await fetch("/api/leads/cleanup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(confirmar ? { confirmar: true } : {}),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setErro(json.message ?? json.error ?? "Falha ao limpar.");
+        return;
+      }
+
+      if (!confirmar) {
+        setPrevia({ invalidos: json.invalidos ?? 0, amostra: json.amostra ?? [] });
+        setStatus(json.mensagem ?? null);
+        return;
+      }
+
+      setPrevia(null);
+      setStatus(
+        `${json.apagados} lead(s) apagado(s) · ${json.chatsLiberados ?? 0} conversa(s) liberada(s) para nova sincronização`,
+      );
+      router.refresh();
+    } catch {
+      setErro("Falha de rede ao limpar.");
+    } finally {
+      setOcupado(null);
+    }
+  }
 
   /**
    * Checa a conexão com o WhatsApp e mostra em que passo ela quebra.
@@ -205,7 +257,60 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         >
           Testar conexão
         </Button>
+
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => limpar(false)}
+          loading={ocupado === "limpeza" && !previa}
+          disabled={ocupado !== null}
+        >
+          Limpar leads inválidos
+        </Button>
       </div>
+
+      {previa && previa.invalidos > 0 ? (
+        <div className="space-y-2 border border-accent p-3">
+          <p className="text-xs">
+            Seriam apagados <strong>{previa.invalidos}</strong> lead(s) sem
+            telefone válido. Exemplos:
+          </p>
+          <ul className="text-xs text-muted space-y-0.5">
+            {previa.amostra.map((l) => (
+              <li key={l.phoneKey}>
+                {l.nome ? `${l.nome} — ` : ""}
+                {l.phoneKey}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">
+            As mensagens deles saem junto. As conversas voltam na próxima
+            sincronização, coladas no lead certo pelo telefone.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => limpar(true)}
+              loading={ocupado === "limpeza"}
+              disabled={ocupado !== null}
+            >
+              Confirmar exclusão
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setPrevia(null);
+                setStatus(null);
+              }}
+              disabled={ocupado !== null}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {diagnostico ? (
         <ul className="text-xs space-y-0.5">
