@@ -128,7 +128,7 @@ export function createMockProvider(): WhatsAppProvider {
       return opts?.limit ? mensagens.slice(0, opts.limit) : mensagens;
     },
 
-    async fetchMessagesPage({ page, pageSize }): Promise<NormalizedMessage[]> {
+    async fetchMessagesPage({ page, pageSize }) {
       const historico = await loadHistory();
       // Mesma ordem da Evolution: da mais recente para a mais antiga, senão
       // o mock não exercita o mesmo caminho do backfill.
@@ -138,7 +138,14 @@ export function createMockProvider(): WhatsAppProvider {
         .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
 
       const inicio = (Math.max(1, page) - 1) * pageSize;
-      return todas.slice(inicio, inicio + pageSize);
+      const fatia = todas.slice(inicio, inicio + pageSize);
+      // O mock não descarta nada: as fixtures são todas parseáveis.
+      return {
+        mensagens: fatia,
+        brutas: fatia.length,
+        descartadasLid: 0,
+        descartadasOutras: 0,
+      };
     },
 
     async sendText(phoneE164, text) {

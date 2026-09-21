@@ -3,6 +3,7 @@ import {
   isGroupJid,
   isLidJid,
   jidToPhone,
+  type MessagePage,
   toIsoDate,
   type NormalizedMessage,
   type WaChat,
@@ -275,7 +276,7 @@ export function createEvolutionProvider(): WhatsAppProvider {
   async function buscarPagina(
     page: number,
     pageSize: number,
-  ): Promise<NormalizedMessage[]> {
+  ): Promise<MessagePage> {
     const cfg = readConfig();
 
     type Resposta =
@@ -296,9 +297,33 @@ export function createEvolutionProvider(): WhatsAppProvider {
       registros = data.messages.records;
     }
 
-    return registros
-      .map(normalizeOne)
-      .filter((m): m is NormalizedMessage => m !== null);
+    const mensagens: NormalizedMessage[] = [];
+    let descartadasLid = 0;
+    let descartadasOutras = 0;
+
+    for (const raw of registros) {
+      const m = normalizeOne(raw);
+      if (m) {
+        mensagens.push(m);
+        continue;
+      }
+      // Separar o descarte por LID do resto: um diz "o WhatsApp não nos deu o
+      // telefone", o outro diz "o parser não entendeu". São problemas
+      // diferentes e levam a correções diferentes.
+      const jid = raw?.key?.remoteJid;
+      if (jid && isLidJid(jid) && !jidDeIdentidade(raw.key ?? {})) {
+        descartadasLid += 1;
+      } else {
+        descartadasOutras += 1;
+      }
+    }
+
+    return {
+      mensagens,
+      brutas: registros.length,
+      descartadasLid,
+      descartadasOutras,
+    };
   }
 
   return {
@@ -396,7 +421,7 @@ export function createEvolutionProvider(): WhatsAppProvider {
       // pontual, e filtramos de novo do nosso lado para não devolver mensagem
       // de outra conversa a quem pediu uma.
       const pagina = await buscarPagina(1, opts?.limit ?? 100);
-      return pagina.filter((m) => m.chatId === chatId);
+      return pagina.mensagens.filter((m) => m.chatId === chatId);
     },
 
     fetchMessagesPage({ page, pageSize }) {

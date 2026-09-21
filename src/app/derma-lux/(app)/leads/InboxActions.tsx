@@ -200,13 +200,21 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
             setStatus("Lendo as mensagens…");
           } else if (evento.tipo === "pagina") {
             setStatus(
-              `${evento.vistas} mensagem(ns) lida(s) · ${evento.gravadas} nova(s) nesta página`,
+              `página ${evento.pagina} · ${evento.vistas} mensagem(ns) aproveitada(s) de ${evento.brutas} nesta página`,
             );
           } else if (evento.tipo === "fim") {
+            const descartadas =
+              Number(evento.descartadasLid) + Number(evento.descartadasOutras);
             const partes = [
-              `${evento.mensagensVistas} mensagem(ns) lida(s)`,
+              `${evento.brutasTotal} mensagem(ns) no servidor`,
+              `${evento.mensagensVistas} aproveitada(s)`,
               `${evento.mensagensGravadas} nova(s)`,
               `${evento.leadsNovos} lead(s) novo(s)`,
+              // Descarte em massa é o tipo de coisa que precisa aparecer: sem
+              // isso, "poucas mensagens" vira um mistério em vez de um número.
+              descartadas > 0
+                ? `${descartadas} descartada(s) (${evento.descartadasLid} só com LID, ${evento.descartadasOutras} não reconhecida(s))`
+                : null,
               Number(evento.semTelefone) > 0
                 ? `${evento.semTelefone} sem telefone identificável`
                 : null,

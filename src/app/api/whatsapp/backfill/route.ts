@@ -102,6 +102,9 @@ export async function POST(request: NextRequest) {
         let mensagensTotal = 0;
         let leadsTotal = 0;
         let semTelefone = 0;
+        let brutasTotal = 0;
+        let descartadasLid = 0;
+        let descartadasOutras = 0;
         let continuar = false;
 
         for (;;) {
@@ -129,12 +132,23 @@ export async function POST(request: NextRequest) {
             pageSize: PAGE_SIZE,
           });
 
-          // Menos que o pedido: chegamos ao fim dos dados da instância.
-          const ultimaPagina = lote.length < PAGE_SIZE;
+          // Fim dos dados se decide pelo que o provedor DEVOLVEU, nunca pelo
+          // que sobrou depois de normalizar. Olhando só o que sobrou, uma
+          // página cheia de mensagens descartáveis parece fim da lista, e a
+          // varredura morre na primeira página sem dizer por quê.
+          const ultimaPagina = lote.brutas < PAGE_SIZE;
 
-          if (lote.length > 0) {
-            const resultado = await ingestMessages(admin, provider.id, lote);
-            mensagensVistas += lote.length;
+          brutasTotal += lote.brutas;
+          descartadasLid += lote.descartadasLid;
+          descartadasOutras += lote.descartadasOutras;
+
+          if (lote.mensagens.length > 0) {
+            const resultado = await ingestMessages(
+              admin,
+              provider.id,
+              lote.mensagens,
+            );
+            mensagensVistas += lote.mensagens.length;
             mensagensTotal += resultado.mensagensGravadas;
             leadsTotal += resultado.leadsCriados;
             semTelefone += resultado.telefoneInvalido;
@@ -142,7 +156,8 @@ export async function POST(request: NextRequest) {
             linha({
               tipo: "pagina",
               pagina,
-              recebidas: lote.length,
+              brutas: lote.brutas,
+              recebidas: lote.mensagens.length,
               gravadas: resultado.mensagensGravadas,
               vistas: mensagensVistas,
             });
@@ -161,6 +176,9 @@ export async function POST(request: NextRequest) {
         linha({
           tipo: "fim",
           paginas: pagina,
+          brutasTotal,
+          descartadasLid,
+          descartadasOutras,
           mensagensVistas,
           continuar,
           mensagensGravadas: mensagensTotal,
