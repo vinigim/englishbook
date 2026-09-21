@@ -280,6 +280,15 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
               <li key={l.phoneKey}>
                 {l.nome ? `${l.nome} — ` : ""}
                 {l.phoneKey}
+                {/* O motivo, à vista: "@lid" é identificador interno do
+                    WhatsApp, não telefone. Alguns validam por acaso como
+                    número estrangeiro, então sem mostrar o JID a exclusão
+                    pareceria arbitrária. */}
+                {l.jid?.includes("@lid") ? (
+                  <span className="text-accent"> · LID, não é telefone</span>
+                ) : (
+                  <span className="text-accent"> · telefone inválido</span>
+                )}
               </li>
             ))}
           </ul>
