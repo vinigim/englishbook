@@ -262,6 +262,73 @@ export function normalizeComTelefone(
   };
 }
 
+
+/**
+ * Quantos contatos em LID têm um homônimo EXATO entre os contatos com
+ * telefone — e quantos desses cruzamentos são ambíguos.
+ *
+ * Existe para medir antes de agir. Ligar conversa a lead pelo nome é escrever
+ * no CRM do dono, e errar significa colar a conversa de um médico na ficha de
+ * outro. Só vale se o cruzamento for praticamente sempre 1-para-1.
+ */
+function cruzarPorNome(
+  contatos: Record<string, unknown>[],
+  limit: number,
+): {
+  lidComNome: number;
+  casamentosUnicos: number;
+  ambiguos: number;
+  semPar: number;
+  exemplos: { nome: string; lid: string; telefone: string }[];
+} {
+  const norm = (v: unknown) =>
+    String(v ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const porNomeTelefone = new Map<string, string[]>();
+  for (const c of contatos) {
+    const jid = String(c.remoteJid ?? "");
+    if (!jid.includes("@s.whatsapp.net")) continue;
+    const n = norm(c.pushName);
+    if (!n) continue;
+    const atual = porNomeTelefone.get(n) ?? [];
+    atual.push(jid);
+    porNomeTelefone.set(n, atual);
+  }
+
+  let lidComNome = 0;
+  let casamentosUnicos = 0;
+  let ambiguos = 0;
+  let semPar = 0;
+  const exemplos: { nome: string; lid: string; telefone: string }[] = [];
+
+  for (const c of contatos) {
+    const jid = String(c.remoteJid ?? "");
+    if (!jid.includes("@lid")) continue;
+    const n = norm(c.pushName);
+    if (!n) continue;
+    lidComNome += 1;
+
+    const candidatos = porNomeTelefone.get(n);
+    if (!candidatos) {
+      semPar += 1;
+    } else if (candidatos.length > 1) {
+      ambiguos += 1;
+    } else {
+      casamentosUnicos += 1;
+      if (exemplos.length < limit) {
+        exemplos.push({ nome: String(c.pushName), lid: jid, telefone: candidatos[0] });
+      }
+    }
+  }
+
+  return { lidComNome, casamentosUnicos, ambiguos, semPar, exemplos };
+}
+
 /** O campo `data` pode vir como objeto único ou como array, conforme a versão. */
 export function asArray(data: unknown): EvolutionRawMessage[] {
   if (Array.isArray(data)) return data as EvolutionRawMessage[];
@@ -568,6 +635,7 @@ export function createEvolutionProvider(): WhatsAppProvider {
             .filter((r) => String(r.remoteJid ?? "").includes("@s.whatsapp.net"))
             .slice(0, limit)
             .map((r) => ({ remoteJid: r.remoteJid, pushName: r.pushName })),
+          cruzamentoPorNome: cruzarPorNome(c, limit),
         };
       } catch (err) {
         contatos = { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
