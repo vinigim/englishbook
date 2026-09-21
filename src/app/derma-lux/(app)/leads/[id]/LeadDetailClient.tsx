@@ -49,8 +49,20 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const router = useRouter();
   const [pendente, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState(analysis?.draft_message ?? "");
   const [copiado, setCopiado] = useState(false);
+
+  // O inicializador do useState roda uma vez só, na montagem. Depois de
+  // router.refresh() a análise nova chega por props, mas o textarea ficaria
+  // preso no valor antigo — na prática, uma mensagem recém-escrita pela IA
+  // nunca apareceria na tela. Resetar comparando o id da análise durante o
+  // render é o padrão do React para isso, e dispensa um efeito.
+  const [analiseVista, setAnaliseVista] = useState(analysis?.id ?? null);
+  if ((analysis?.id ?? null) !== analiseVista) {
+    setAnaliseVista(analysis?.id ?? null);
+    setRascunho(analysis?.draft_message ?? "");
+  }
 
   const numero = toWhatsAppNumber(lead.phone_e164);
   const linkWhatsApp =
@@ -62,10 +74,28 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
 
   function analisar(gerarRascunho: boolean) {
     setErro(null);
+    setStatus(null);
     startTransition(async () => {
       const r = await reanalyzeLead(lead.id, { force: true, gerarRascunho });
-      if (!r.ok) setErro(r.error ?? "Falha na análise.");
-      else router.refresh();
+
+      if (!r.ok) {
+        setErro(r.error ?? "Falha na análise.");
+        return;
+      }
+
+      // Sem isto, uma recusa da IA é indistinguível de um botão quebrado:
+      // o spinner some e nada muda na tela.
+      if (r.gerouRascunho) {
+        setStatus("Mensagem gerada abaixo.");
+      } else if (r.acao) {
+        setStatus(
+          `A IA reavaliou e manteve "${ACTION_LABEL[r.acao]}" — não escreveu mensagem.`,
+        );
+      } else {
+        setStatus("Análise concluída.");
+      }
+
+      router.refresh();
     });
   }
 
@@ -90,6 +120,8 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
           {erro}
         </Alert>
       ) : null}
+
+      {status ? <Alert variant="info">{status}</Alert> : null}
 
       {/* ---------------------------------------------------- identificação */}
       <Card variant="bordered">

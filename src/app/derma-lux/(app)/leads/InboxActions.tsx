@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
+type Etapa = { nome: string; ok: boolean; detalhe?: string };
+
 /**
  * Botões de "Analisar pendentes" e "Sincronizar histórico".
  *
@@ -14,9 +16,46 @@ import { Button } from "@/components/ui/Button";
  */
 export function InboxActions({ pendentes }: { pendentes: number }) {
   const router = useRouter();
-  const [ocupado, setOcupado] = useState<"analise" | "sync" | null>(null);
+  const [ocupado, setOcupado] = useState<"analise" | "sync" | "teste" | null>(
+    null,
+  );
   const [status, setStatus] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [diagnostico, setDiagnostico] = useState<Etapa[] | null>(null);
+
+  /**
+   * Checa a conexão com o WhatsApp e mostra em que passo ela quebra.
+   *
+   * São quatro coisas que podem estar erradas na configuração, e sem este
+   * teste todas se parecem: o "Sincronizar histórico" simplesmente não traz
+   * nada.
+   */
+  async function testarConexao() {
+    setOcupado("teste");
+    setErro(null);
+    setStatus(null);
+    setDiagnostico(null);
+    try {
+      const res = await fetch("/api/whatsapp/status");
+      const json = (await res.json()) as {
+        etapas?: Etapa[];
+        resumo?: string;
+        error?: string;
+      };
+
+      if (!res.ok) {
+        setErro(json.error ?? "Não consegui checar a conexão.");
+        return;
+      }
+
+      setDiagnostico(json.etapas ?? []);
+      setStatus(json.resumo ?? null);
+    } catch {
+      setErro("Falha de rede ao checar a conexão.");
+    } finally {
+      setOcupado(null);
+    }
+  }
 
   async function analisar() {
     setOcupado("analise");
@@ -148,7 +187,30 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         >
           Sincronizar histórico
         </Button>
+
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={testarConexao}
+          loading={ocupado === "teste"}
+          disabled={ocupado !== null}
+        >
+          Testar conexão
+        </Button>
       </div>
+
+      {diagnostico ? (
+        <ul className="text-xs space-y-0.5">
+          {diagnostico.map((e) => (
+            <li key={e.nome} className={e.ok ? "text-ink" : "text-accent"}>
+              {e.ok ? "✓" : "✗"} {e.nome}
+              {e.detalhe ? (
+                <span className="text-muted"> — {e.detalhe}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {status ? <p className="text-xs text-muted">{status}</p> : null}
       {erro ? (

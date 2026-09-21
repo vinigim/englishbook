@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAiConfigured } from "@/lib/ai/anthropic";
 import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
-import { LEAD_STATUSES } from "@/lib/leads/taxonomy";
+import { LEAD_STATUSES, type RecommendedAction } from "@/lib/leads/taxonomy";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -38,10 +38,16 @@ const idSchema = z.string().uuid("ID inválido");
  * dono discorda da leitura. `gerarRascunho` força a redação mesmo num lead
  * frio, que é o botão "Gerar mensagem".
  */
+export type ReanalyzeResult = ActionResult & {
+  /** A IA escreveu mensagem, ou recusou? A tela precisa saber para dar retorno. */
+  gerouRascunho?: boolean;
+  acao?: RecommendedAction | null;
+};
+
 export async function reanalyzeLead(
   id: string,
   opts: { force?: boolean; gerarRascunho?: boolean } = {},
-): Promise<ActionResult> {
+): Promise<ReanalyzeResult> {
   const supabase = await requireSupabase();
   if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
 
@@ -63,12 +69,24 @@ export async function reanalyzeLead(
 
     if (!input) return { ok: false, error: "Lead não encontrado." };
 
-    await analyzeLead(admin, input, {
+    const resultado = await analyzeLead(admin, input, {
       force: opts.force ?? true,
       forceDraft: opts.gerarRascunho ?? true,
     });
 
     revalidateLead(id);
+
+    // Recusar a escrever é um desfecho legítimo — "aguardar" e "descartar"
+    // devolvem draft_message nulo de propósito. Sem dizer isso à tela, o
+    // clique termina em silêncio e parece que o botão não fez nada.
+    if (resultado.status === "analyzed") {
+      return {
+        ok: true,
+        gerouRascunho: Boolean(resultado.record.draft_message),
+        acao: resultado.record.recommended_action,
+      };
+    }
+
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Falha na análise.";
