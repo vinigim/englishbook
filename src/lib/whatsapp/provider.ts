@@ -46,7 +46,12 @@ export type NormalizedMessage = {
 
 export type WaChat = {
   chatId: string;
-  phoneE164: string;
+  /**
+   * Nulo quando o chat é endereçado por LID e o provedor não expôs o telefone.
+   * O `chatId` continua servindo para buscar o histórico; a identidade do lead
+   * sai das mensagens, não daqui.
+   */
+  phoneE164: string | null;
   name: string | null;
   isGroup: boolean;
   lastMessageAt: string | null;
@@ -108,7 +113,14 @@ export interface WhatsAppProvider {
 //  Utilidades compartilhadas entre adaptadores
 // ============================================================================
 
-/** "5535988887777@s.whatsapp.net" -> "5535988887777" */
+/**
+ * "5535988887777@s.whatsapp.net" -> "5535988887777"
+ *
+ * Extração pura, SEM validação: devolve os dígitos de qualquer JID. Um LID
+ * ("24515790798917@lid") sai daqui como se fosse telefone, porque a função não
+ * tem como saber. Quem vai usar o resultado como identidade de lead precisa
+ * checar `isLidJid()` antes e validar o número depois — ver `ingestMessages`.
+ */
 export function jidToPhone(jid: string): string {
   return String(jid ?? "")
     .split("@")[0]
@@ -118,6 +130,19 @@ export function jidToPhone(jid: string): string {
 
 export function isGroupJid(jid: string): boolean {
   return String(jid ?? "").includes("@g.us");
+}
+
+/**
+ * JID endereçado por LID (Linked ID), o identificador interno que o WhatsApp
+ * passou a usar no lugar do número por privacidade.
+ *
+ * O número dentro de um "@lid" NÃO é telefone: é opaco, tem 14–15 dígitos e
+ * não bate com nada da agenda. Tratá-lo como telefone cria um lead fantasma
+ * por conversa e quebra a deduplicação — foi o que aconteceu na primeira
+ * sincronização real.
+ */
+export function isLidJid(jid: string): boolean {
+  return String(jid ?? "").includes("@lid");
 }
 
 /** Aceita epoch em segundos ou milissegundos, ou uma data ISO. */

@@ -104,6 +104,10 @@ export async function POST(request: NextRequest) {
         let processados = 0;
         let mensagensTotal = 0;
         let leadsTotal = 0;
+        // Conversas que não viraram lead porque o WhatsApp só deu um LID, sem
+        // telefone ao lado. Contadas para aparecerem no fim: uma conversa que
+        // some sem explicação é pior que uma que o dono sabe que ficou de fora.
+        let semTelefone = 0;
 
         for (const chat of conversas) {
           if (Date.now() - inicio > LIMITE_MS) {
@@ -134,6 +138,7 @@ export async function POST(request: NextRequest) {
 
             mensagensTotal += resultado.mensagensGravadas;
             leadsTotal += resultado.leadsCriados;
+            if (resultado.telefoneInvalido > 0) semTelefone += 1;
 
             const datas = historico.map((m) => m.sentAt).sort();
 
@@ -173,6 +178,7 @@ export async function POST(request: NextRequest) {
           chatsProcessados: processados,
           mensagensGravadas: mensagensTotal,
           leadsNovos: leadsTotal,
+          semTelefone,
           segundos: Math.round((Date.now() - inicio) / 1000),
         });
       } catch (err) {

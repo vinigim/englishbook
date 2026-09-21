@@ -27,12 +27,49 @@ const MESSAGE_COLS =
 export const INBOX_LIMIT = 1000;
 
 /**
+ * Quantos ids cabem num filtro `.in(...)` por requisição.
+ *
+ * O supabase-js manda o filtro na QUERY STRING. Cada UUID custa ~37 caracteres,
+ * então algumas centenas de ids estouram o limite de tamanho da URL do gateway
+ * — e a requisição falha inteira. Com 665 leads isso deu ~25 mil caracteres e
+ * derrubou a caixa de entrada: a tela passou a dizer que ninguém tinha análise
+ * nem conversa, porque as duas consultas falhavam.
+ *
+ * 150 ids ≈ 5,5 mil caracteres, bem dentro de qualquer limite razoável.
+ */
+const ID_CHUNK = 150;
+
+/** Roda a mesma consulta em lotes de ids e concatena. Erro em qualquer lote derruba tudo. */
+async function emLotes<T>(
+  ids: string[],
+  busca: (lote: string[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    lotes.push(ids.slice(i, i + ID_CHUNK));
+  }
+
+  const resultados = await Promise.all(lotes.map(busca));
+  const saida: T[] = [];
+
+  for (const r of resultados) {
+    // Antes isto era `r.data ?? []`, e uma consulta que falhava virava lista
+    // vazia — a tela concluía "não existe" em vez de "não consegui ler".
+    if (r.error) throw new Error(r.error.message);
+    if (r.data) saida.push(...r.data);
+  }
+
+  return saida;
+}
+
+/**
  * Caixa de entrada: leads + a análise mais recente de cada um + a última
  * mensagem, ordenados por prioridade.
  *
- * O Postgres não tem "distinct on" exposto pelo supabase-js, então buscamos as
- * análises dos leads da página e reduzimos em memória. O volume aqui é de
- * centenas de leads, não de milhões — não vale a complexidade de uma view.
+ * As views `wa_latest_analyses` e `wa_latest_messages` (migração 0011) fazem o
+ * "mais recente por lead" no banco. Antes isso era feito trazendo TODAS as
+ * análises e TODAS as mensagens e reduzindo em memória, o que batia no teto de
+ * 1000 linhas do PostgREST e truncava em silêncio.
  */
 export async function getLeadsInbox(
   limit = INBOX_LIMIT,
@@ -55,29 +92,21 @@ export async function getLeadsInbox(
   const leads = leadsData as Lead[];
   const ids = leads.map((l) => l.id);
 
-  const [analysesRes, messagesRes] = await Promise.all([
-    supabase
-      .from("wa_lead_analyses")
-      .select(ANALYSIS_COLS)
-      .in("lead_id", ids)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("wa_messages")
-      .select(MESSAGE_COLS)
-      .in("lead_id", ids)
-      .order("sent_at", { ascending: false }),
+  const [analyses, messages] = await Promise.all([
+    emLotes<LeadAnalysis>(ids, (lote) =>
+      supabase.from("wa_latest_analyses").select(ANALYSIS_COLS).in("lead_id", lote),
+    ),
+    emLotes<WaMessage>(ids, (lote) =>
+      supabase.from("wa_latest_messages").select(MESSAGE_COLS).in("lead_id", lote),
+    ),
   ]);
 
-  // Primeira ocorrência vence: as duas queries já vêm em ordem decrescente.
+  // As views já garantem uma linha por lead — nada a reduzir aqui.
   const latestAnalysis = new Map<string, LeadAnalysis>();
-  for (const a of (analysesRes.data ?? []) as LeadAnalysis[]) {
-    if (!latestAnalysis.has(a.lead_id)) latestAnalysis.set(a.lead_id, a);
-  }
+  for (const a of analyses) latestAnalysis.set(a.lead_id, a);
 
   const latestMessage = new Map<string, WaMessage>();
-  for (const m of (messagesRes.data ?? []) as WaMessage[]) {
-    if (!latestMessage.has(m.lead_id)) latestMessage.set(m.lead_id, m);
-  }
+  for (const m of messages) latestMessage.set(m.lead_id, m);
 
   const rows: LeadInboxRow[] = leads.map((lead) => {
     const analysis = latestAnalysis.get(lead.id) ?? null;
