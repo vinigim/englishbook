@@ -4,6 +4,7 @@ import {
   isLidJid,
   jidToPhone,
   type MessagePage,
+  type PendingLidMessage,
   toIsoDate,
   type NormalizedMessage,
   type WaChat,
@@ -227,6 +228,40 @@ export function normalizeOne(
   };
 }
 
+/**
+ * Normaliza uma mensagem cujo telefone veio de fora — do mapa LID → telefone,
+ * montado a partir de outras mensagens do mesmo LID.
+ *
+ * Idêntica a `normalizeOne` no resto: mesmo extrator de conteúdo, mesmos
+ * campos. Só a identidade do interlocutor entra pronta, em vez de sair do JID.
+ *
+ * Quem chama garante que `raw.key.id` e `raw.key.remoteJid` existem — sem eles
+ * a mensagem nem chega a virar pendente.
+ */
+export function normalizeComTelefone(
+  raw: EvolutionRawMessage,
+  phoneE164: string,
+): NormalizedMessage {
+  const remoteJid = raw.key?.remoteJid ?? "";
+  const extracted = extractContent(raw.message);
+
+  return {
+    providerMessageId: raw.key?.id ?? "",
+    chatId: remoteJid,
+    phoneE164,
+    direction: raw.key?.fromMe ? "out" : "in",
+    type: extracted.type,
+    body: extracted.body,
+    caption: extracted.caption,
+    mediaUrl: extracted.mediaUrl,
+    mediaMime: extracted.mediaMime,
+    pushName: str(raw.pushName),
+    isGroup: isGroupJid(remoteJid),
+    sentAt: toIsoDate(raw.messageTimestamp),
+    raw,
+  };
+}
+
 /** O campo `data` pode vir como objeto único ou como array, conforme a versão. */
 export function asArray(data: unknown): EvolutionRawMessage[] {
   if (Array.isArray(data)) return data as EvolutionRawMessage[];
@@ -298,30 +333,51 @@ export function createEvolutionProvider(): WhatsAppProvider {
     }
 
     const mensagens: NormalizedMessage[] = [];
-    let descartadasLid = 0;
+    const pendentes: PendingLidMessage[] = [];
+    const lidMap: Record<string, string> = {};
     let descartadasOutras = 0;
 
     for (const raw of registros) {
+      const remoteJid = raw?.key?.remoteJid;
+      if (!raw?.key?.id || !remoteJid) {
+        descartadasOutras += 1;
+        continue;
+      }
+
       const m = normalizeOne(raw);
       if (m) {
         mensagens.push(m);
+        // Esta chave sabia o telefone. Se o endereçamento é por LID, o par
+        // vale para TODAS as outras mensagens do mesmo LID que vierem cruas.
+        if (isLidJid(remoteJid)) {
+          const lid = jidToPhone(remoteJid);
+          if (lid && !lidMap[lid]) lidMap[lid] = m.phoneE164;
+        }
         continue;
       }
-      // Separar o descarte por LID do resto: um diz "o WhatsApp não nos deu o
-      // telefone", o outro diz "o parser não entendeu". São problemas
-      // diferentes e levam a correções diferentes.
-      const jid = raw?.key?.remoteJid;
-      if (jid && isLidJid(jid) && !jidDeIdentidade(raw.key ?? {})) {
-        descartadasLid += 1;
-      } else {
-        descartadasOutras += 1;
+
+      // Sobrou o caso do LID sem telefone ao lado. Em vez de descartar, fica
+      // pendente: a cópia enriquecida da mesma conversa pode estar em
+      // qualquer outra página.
+      if (isLidJid(remoteJid)) {
+        const lid = jidToPhone(remoteJid);
+        if (lid) {
+          pendentes.push({
+            lid,
+            resolver: (phoneE164) => normalizeComTelefone(raw, phoneE164),
+          });
+          continue;
+        }
       }
+
+      descartadasOutras += 1;
     }
 
     return {
       mensagens,
       brutas: registros.length,
-      descartadasLid,
+      lidMap,
+      pendentes,
       descartadasOutras,
     };
   }
