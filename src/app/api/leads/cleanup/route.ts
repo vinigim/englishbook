@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { waJidPhone } from "@/lib/leads/phone";
+import { isLidJid } from "@/lib/whatsapp/provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,11 +97,23 @@ export async function POST(request: NextRequest) {
 
   const candidatos = (data ?? []) as LeadCandidato[];
 
-  // A validação é em TypeScript, com o MESMO validador do ingest. Um
-  // heurístico de SQL (length(phone_key) > 13) pegaria número internacional
-  // legítimo junto — E.164 vai até 15 dígitos, e um LID tem 14 ou 15.
+  // Dois critérios, e o primeiro é o que importa.
+  //
+  // 1. O JID diz "@lid" — sinal ESTRUTURAL, exato, sem heurístico.
+  //
+  //    Validar só a forma do número não basta: um LID de 14 dígitos pode
+  //    começar com algo que parece código de país e passar como telefone
+  //    legítimo. Vistos em produção: 43155848216636 valida como austríaco
+  //    (43 = Áustria, 431 = Viena), 86290674528502 como chinês,
+  //    92874406424691 como paquistanês, 38336978763967 como kosovar. São
+  //    todos lixo, e a primeira versão desta rota deixou os quatro passarem.
+  //
+  // 2. O telefone não é discável — rede para lead antigo cujo wa_jid é nulo,
+  //    ou para algum formato de JID que ainda não conhecemos.
   const invalidos = candidatos.filter(
-    (l) => !waJidPhone(l.phone_e164 ?? l.phone_key),
+    (l) =>
+      (l.wa_jid ? isLidJid(l.wa_jid) : false) ||
+      !waJidPhone(l.phone_e164 ?? l.phone_key),
   );
 
   const resumo = {
