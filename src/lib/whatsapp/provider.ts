@@ -95,6 +95,25 @@ export interface WhatsAppProvider {
   ): Promise<NormalizedMessage[]>;
 
   /**
+   * Uma página de mensagens da instância inteira, da mais recente para a mais
+   * antiga. É o que o backfill usa.
+   *
+   * Existe porque buscar conversa por conversa não é confiável: na Evolution
+   * v2.3, o filtro por `remoteJid` do findMessages é anulado pela forma como a
+   * cláusula é montada (um `{}` dentro de um `OR` casa com tudo no Prisma), e
+   * toda chamada devolve as mensagens mais recentes da instância, não as do
+   * chat pedido. Paginar sobre tudo evita depender desse filtro — e, de
+   * quebra, resolve o JID de cada mensagem individualmente, que é o que
+   * importa para identificar o lead.
+   *
+   * `page` começa em 1. Devolver menos que `pageSize` significa fim dos dados.
+   */
+  fetchMessagesPage(opts: {
+    page: number;
+    pageSize: number;
+  }): Promise<NormalizedMessage[]>;
+
+  /**
    * Implementado, mas NÃO ligado a nenhum botão na v1.
    *
    * Envio em volume por provedor não-oficial é exatamente o que dispara

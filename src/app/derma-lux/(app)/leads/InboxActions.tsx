@@ -148,103 +148,18 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
   }
 
   /**
-   * Máximo de rodadas encadeadas numa sincronização.
-   *
-   * Cada rodada do servidor para em 250s para não ser cortada pela plataforma,
-   * e 287 conversas não cabem numa só. Encadear evita exigir um clique por
-   * rodada — o que, além de chato, dava margem para o dono clicar em "Reler
-   * tudo" de novo e reiniciar o trabalho em vez de continuá-lo.
-   *
-   * O teto existe para que um erro de servidor que devolva "parcial" sem
-   * avançar não vire laço infinito.
-   */
-  const MAX_RODADAS = 12;
-
-  /**
    * Importa o histórico.
    *
-   * `force` manda o servidor desmarcar as conversas já concluídas, para reler
-   * tudo. Só faz sentido depois de mudar algo do lado do Evolution (ligar o
-   * Sync Full History, reler o QR) — no uso normal, `done` é o que impede
-   * refazer trabalho a cada clique.
-   *
-   * Continua sozinho enquanto o servidor devolver "parcial", e das rodadas
-   * seguintes em diante NUNCA manda force: a primeira já reabriu tudo, e
-   * repetir faria cada rodada zerar a anterior.
+   * `force` percorre todas as páginas; sem ele, para na primeira página já
+   * conhecida — a listagem da Evolution vem da mais recente para a mais
+   * antiga, então isso é o suficiente no dia a dia. Depois de ligar o Sync
+   * Full History, porém, o histórico novo entra pelo FIM da lista, e só o
+   * "Reler tudo" alcança.
    */
   async function sincronizar(force = false) {
     setOcupado("sync");
     setErro(null);
     setStatus(force ? "Relendo tudo…" : "Conectando…");
-    try {
-      let rodada = 0;
-      let totalChats = 0;
-      let totalMensagens = 0;
-      let totalLeads = 0;
-      let totalSemTelefone = 0;
-
-      for (;;) {
-        rodada += 1;
-        const parcial = await umaRodada(rodada === 1 && force, {
-          chatsAntes: totalChats,
-        });
-
-        if (!parcial.ok) return;
-
-        totalChats += parcial.chats;
-        totalMensagens += parcial.mensagens;
-        totalLeads += parcial.leads;
-        totalSemTelefone += parcial.semTelefone;
-
-        const resumo = [
-          `${totalChats} conversa(s)`,
-          `${totalMensagens} mensagem(ns) nova(s)`,
-          `${totalLeads} lead(s) novo(s)`,
-          totalSemTelefone > 0
-            ? `${totalSemTelefone} sem telefone identificável`
-            : null,
-        ].filter(Boolean);
-
-        // Sem "parcial", ou sem avanço, ou teto atingido: acabou.
-        if (!parcial.continuar || parcial.chats === 0 || rodada >= MAX_RODADAS) {
-          if (parcial.continuar) {
-            setStatus(
-              `${resumo.join(" · ")} — ainda faltam conversas. Clique em Sincronizar histórico para continuar.`,
-            );
-          } else {
-            setStatus(resumo.join(" · "));
-          }
-          router.refresh();
-          return;
-        }
-
-        setStatus(`${resumo.join(" · ")} · continuando…`);
-      }
-    } finally {
-      setOcupado(null);
-    }
-  }
-
-  /** Uma passada no servidor. Devolve o que andou e se ficou coisa para trás. */
-  async function umaRodada(
-    force: boolean,
-    ctx: { chatsAntes: number },
-  ): Promise<{
-    ok: boolean;
-    continuar: boolean;
-    chats: number;
-    mensagens: number;
-    leads: number;
-    semTelefone: number;
-  }> {
-    const vazio = {
-      ok: false,
-      continuar: false,
-      chats: 0,
-      mensagens: 0,
-      leads: 0,
-      semTelefone: 0,
-    };
     try {
       const res = await fetch("/api/whatsapp/backfill", {
         method: "POST",
@@ -256,19 +171,14 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         const json = await res.json().catch(() => ({}));
         setErro(json.message ?? json.error ?? "Falha ao sincronizar.");
         setStatus(null);
-        return vazio;
+        return;
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let chats = 0;
-      let mensagens = 0;
-      let leads = 0;
-      let semTelefone = 0;
-      let continuar = false;
 
-      // NDJSON: uma linha de progresso por chat.
+      // NDJSON: uma linha por página processada.
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -287,31 +197,40 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
           }
 
           if (evento.tipo === "inicio") {
-            setStatus(`Sincronizando ${evento.totalChats} conversa(s)…`);
-          } else if (evento.tipo === "chat") {
-            chats += 1;
-            // O acumulado entre rodadas, senão o contador zeraria a cada uma.
+            setStatus("Lendo as mensagens…");
+          } else if (evento.tipo === "pagina") {
             setStatus(
-              `${ctx.chatsAntes + chats} conversa(s) · última: ${evento.nome ?? evento.telefone}`,
+              `${evento.vistas} mensagem(ns) lida(s) · ${evento.gravadas} nova(s) nesta página`,
             );
           } else if (evento.tipo === "fim") {
-            mensagens = Number(evento.mensagensGravadas) || 0;
-            leads = Number(evento.leadsNovos) || 0;
-            semTelefone = Number(evento.semTelefone) || 0;
+            const partes = [
+              `${evento.mensagensVistas} mensagem(ns) lida(s)`,
+              `${evento.mensagensGravadas} nova(s)`,
+              `${evento.leadsNovos} lead(s) novo(s)`,
+              Number(evento.semTelefone) > 0
+                ? `${evento.semTelefone} sem telefone identificável`
+                : null,
+              // Parar por tempo não é o mesmo que terminar. Dizer qual foi o
+              // caso evita o dono achar que acabou quando não acabou.
+              evento.continuar
+                ? "parou no tempo limite — clique em Reler tudo para continuar"
+                : null,
+            ].filter(Boolean);
+            setStatus(partes.join(" · "));
           } else if (evento.tipo === "parcial") {
-            continuar = true;
             setStatus(String(evento.mensagem));
-          } else if (evento.tipo === "erro" && !evento.telefone) {
+          } else if (evento.tipo === "erro") {
             setErro(String(evento.mensagem));
           }
         }
       }
 
-      return { ok: true, continuar, chats, mensagens, leads, semTelefone };
+      router.refresh();
     } catch {
       setErro("Falha de rede ao sincronizar.");
       setStatus(null);
-      return vazio;
+    } finally {
+      setOcupado(null);
     }
   }
 

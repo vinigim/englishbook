@@ -264,6 +264,43 @@ export function createEvolutionProvider(): WhatsAppProvider {
     return (await res.json()) as T;
   }
 
+  /**
+   * Uma página de mensagens da instância, da mais recente para a mais antiga.
+   *
+   * `offset` é o TAMANHO DA PÁGINA na Evolution, não um deslocamento: o
+   * handler faz `take: query.offset` e `skip: offset * (page - 1)`. E não
+   * existe parâmetro `limit` — mandar um não dá erro, ele simplesmente cai no
+   * padrão de 50 mensagens. Era o que limitava o backfill sem nenhum sinal.
+   */
+  async function buscarPagina(
+    page: number,
+    pageSize: number,
+  ): Promise<NormalizedMessage[]> {
+    const cfg = readConfig();
+
+    type Resposta =
+      | EvolutionRawMessage[]
+      | { messages?: { records?: EvolutionRawMessage[] } | EvolutionRawMessage[] };
+
+    const data = await call<Resposta>(`/chat/findMessages/${cfg.instance}`, {
+      method: "POST",
+      body: { page, offset: pageSize },
+    });
+
+    let registros: EvolutionRawMessage[] = [];
+    if (Array.isArray(data)) {
+      registros = data;
+    } else if (Array.isArray(data.messages)) {
+      registros = data.messages;
+    } else if (data.messages?.records) {
+      registros = data.messages.records;
+    }
+
+    return registros
+      .map(normalizeOne)
+      .filter((m): m is NormalizedMessage => m !== null);
+  }
+
   return {
     id: "evolution",
 
@@ -346,34 +383,24 @@ export function createEvolutionProvider(): WhatsAppProvider {
     },
 
     async fetchChatHistory(chatId, opts): Promise<NormalizedMessage[]> {
-      const cfg = readConfig();
-      const limit = opts?.limit ?? 100;
+      // ATENÇÃO: o filtro por chat da Evolution v2.3 NÃO funciona. A cláusula
+      // é montada como
+      //
+      //   OR: [ remoteJid ? {...} : {}, remoteJidAlt ? {...} : {} ]
+      //
+      // e um `{}` dentro de um OR casa com tudo no Prisma. Mandando só o
+      // remoteJid, o segundo ramo vira `{}` e o filtro inteiro é anulado: a
+      // resposta são as mensagens mais recentes da INSTÂNCIA, não as do chat.
+      //
+      // Por isso o backfill usa fetchMessagesPage. Isto aqui fica para uso
+      // pontual, e filtramos de novo do nosso lado para não devolver mensagem
+      // de outra conversa a quem pediu uma.
+      const pagina = await buscarPagina(1, opts?.limit ?? 100);
+      return pagina.filter((m) => m.chatId === chatId);
+    },
 
-      type Resposta =
-        | EvolutionRawMessage[]
-        | { messages?: { records?: EvolutionRawMessage[] } | EvolutionRawMessage[] };
-
-      const data = await call<Resposta>(`/chat/findMessages/${cfg.instance}`, {
-        method: "POST",
-        body: {
-          where: { key: { remoteJid: chatId } },
-          limit,
-          ...(opts?.before ? { page: 1, before: opts.before } : {}),
-        },
-      });
-
-      let registros: EvolutionRawMessage[] = [];
-      if (Array.isArray(data)) {
-        registros = data;
-      } else if (Array.isArray(data.messages)) {
-        registros = data.messages;
-      } else if (data.messages?.records) {
-        registros = data.messages.records;
-      }
-
-      return registros
-        .map(normalizeOne)
-        .filter((m): m is NormalizedMessage => m !== null);
+    fetchMessagesPage({ page, pageSize }) {
+      return buscarPagina(page, pageSize);
     },
 
     async sendText(phoneE164, text) {
