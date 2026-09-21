@@ -437,6 +437,40 @@ export function createEvolutionProvider(): WhatsAppProvider {
       return { providerMessageId: data?.key?.id ?? "" };
     },
 
+    async debugKeySample(limit: number): Promise<unknown[]> {
+      const cfg = readConfig();
+
+      type Resposta =
+        | Record<string, unknown>[]
+        | { messages?: { records?: Record<string, unknown>[] } | Record<string, unknown>[] };
+
+      const data = await call<Resposta>(`/chat/findMessages/${cfg.instance}`, {
+        method: "POST",
+        body: { page: 1, offset: limit },
+      });
+
+      let registros: Record<string, unknown>[] = [];
+      if (Array.isArray(data)) {
+        registros = data;
+      } else if (Array.isArray(data.messages)) {
+        registros = data.messages;
+      } else if (data.messages?.records) {
+        registros = data.messages.records;
+      }
+
+      // Só endereçamento. `message` fica de fora de propósito: é lá que mora a
+      // conversa, e diagnóstico não precisa dela.
+      return registros.slice(0, limit).map((r) => ({
+        key: r.key,
+        messageType: r.messageType,
+        pushName: r.pushName,
+        source: r.source,
+        // Campos de nível superior que possam carregar JID, sem o conteúdo.
+        participant: r.participant,
+        contextInfoTem: r.contextInfo ? Object.keys(r.contextInfo as object) : null,
+      }));
+    },
+
     async connectionStatus(): Promise<WaConnection> {
       const cfg = readConfig();
       try {

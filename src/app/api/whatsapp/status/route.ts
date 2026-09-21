@@ -29,7 +29,7 @@ const VARS_EVOLUTION = [
   "WHATSAPP_WEBHOOK_SECRET",
 ] as const;
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -88,6 +88,35 @@ export async function GET() {
         ? "pronta para sincronizar"
         : "leia o QR Code no painel do provedor",
     });
+
+    // ?amostra=1 devolve as chaves cruas de algumas mensagens.
+    //
+    // Existe porque 99,6% do histórico chega endereçado só por LID, e decidir
+    // o que fazer com isso depende de ver o que mais vem no `key` — não de
+    // deduzir pela documentação, que já custou vários ciclos aqui.
+    //
+    // Nunca inclui o conteúdo da mensagem: só endereçamento.
+    const amostra = new URL(request.url).searchParams.get("amostra");
+    if (amostra && provider.debugKeySample) {
+      const n = Math.min(Math.max(Number(amostra) || 5, 1), 20);
+      try {
+        const chaves = await provider.debugKeySample(n);
+        return NextResponse.json({
+          provedor,
+          conectado: conexao.connected,
+          etapas,
+          amostraDeChaves: chaves,
+          resumo: `Amostra de ${chaves.length} chave(s). Só endereçamento — nenhum conteúdo de conversa.`,
+        });
+      } catch (err) {
+        return NextResponse.json({
+          provedor,
+          conectado: conexao.connected,
+          etapas,
+          resumo: `Falha ao coletar amostra: ${err instanceof Error ? err.message : "erro"}`,
+        });
+      }
+    }
 
     return NextResponse.json({
       provedor,

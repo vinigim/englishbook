@@ -147,6 +147,21 @@ export interface WhatsAppProvider {
   ): Promise<{ providerMessageId: string }>;
 
   connectionStatus(): Promise<WaConnection>;
+
+  /**
+   * Amostra de diagnóstico: as CHAVES cruas de algumas mensagens, como o
+   * provedor as devolve.
+   *
+   * Opcional — só a Evolution implementa. Existe porque 99,6% do histórico
+   * chega endereçado apenas por LID, e decidir o que fazer com isso depende de
+   * saber o que mais vem no `key`. Deduzir pela documentação já custou caro
+   * neste projeto.
+   *
+   * Devolve só a chave e o tipo, NUNCA o conteúdo da mensagem: o que
+   * interessa aqui são os campos de endereçamento, e conversa de paciente não
+   * tem por que passar por uma rota de diagnóstico.
+   */
+  debugKeySample?(limit: number): Promise<unknown[]>;
 }
 
 // ============================================================================
