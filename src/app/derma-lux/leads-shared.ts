@@ -122,6 +122,49 @@ export function truncate(s: string, max: number): string {
   return s.slice(0, max - 1).trimEnd() + "…";
 }
 
+/**
+ * Teto para as colunas extras da planilha.
+ *
+ * Elas chegam à IA porque costumam carregar o que mais importa — um "telefone
+ * não tem WhatsApp" muda completamente o que faz sentido sugerir. Mas planilha
+ * é terreno livre: alguém pode importar trinta colunas de lixo, e isso viraria
+ * custo de token e ruído para o modelo.
+ */
+const MAX_EXTRA_FIELDS = 12;
+const MAX_EXTRA_VALUE_CHARS = 200;
+
+/**
+ * Normaliza `extra` num par ordenado de chave/valor.
+ *
+ * Mora aqui, e não junto do pipeline de IA, porque a tela do lead também usa —
+ * e ela é client component: importar de lá arrastaria o SDK da Anthropic e o
+ * `node:crypto` para o bundle do navegador.
+ *
+ * A ordem alfabética é deliberada: o hash de cache da análise é calculado em
+ * cima disto, e a ordem de iteração de um objeto vindo do banco não é
+ * garantida — sem ordenar, o mesmo lead geraria hashes diferentes e pagaria
+ * análise de novo à toa.
+ */
+export function extraFields(
+  extra: Record<string, unknown> | null | undefined,
+): [string, string][] {
+  if (!extra || typeof extra !== "object") return [];
+
+  return Object.entries(extra)
+    .map(([chave, valor]): [string, string] => {
+      const texto =
+        valor == null
+          ? ""
+          : typeof valor === "string"
+            ? valor
+            : JSON.stringify(valor);
+      return [chave.trim(), texto.trim().slice(0, MAX_EXTRA_VALUE_CHARS)];
+    })
+    .filter(([chave, valor]) => chave !== "" && valor !== "")
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(0, MAX_EXTRA_FIELDS);
+}
+
 /** "há 3 dias", "hoje", "ontem" — para a lista da caixa de entrada. */
 export function relativeDays(iso: string | null): string {
   const dias = daysSince(iso);

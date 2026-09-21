@@ -3,7 +3,11 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lead, LeadRental, WaMessage } from "@/app/derma-lux/leads-types";
-import { daysSince, leadDisplayName } from "@/app/derma-lux/leads-shared";
+import {
+  daysSince,
+  extraFields,
+  leadDisplayName,
+} from "@/app/derma-lux/leads-shared";
 import { DRAFT_MODEL, TRIAGE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd } from "./cost";
 import { PROMPT_VERSION, buildSystemPrompt, type EquipmentInfo } from "./prompt";
@@ -19,6 +23,7 @@ import {
 /** Janela de conversa enviada à IA. */
 const MAX_MESSAGES = 60;
 const MAX_TRANSCRIPT_CHARS = 12_000;
+
 
 export type AnalysisInput = {
   lead: Lead;
@@ -156,13 +161,24 @@ function buildContext(input: AnalysisInput): string {
     ? buildTranscript(messages)
     : "(Nenhuma conversa registrada. Este lead veio da planilha de clientes.)";
 
+  // Colunas que vieram da planilha e não têm campo próprio. Costumam trazer
+  // justamente o que decide a abordagem: status do último contato, se o
+  // número tem WhatsApp, o Instagram da clínica.
+  const extras = extraFields(lead.extra);
+  const blocoExtras =
+    extras.length > 0
+      ? `\n\n<ficha_da_planilha>
+${extras.map(([chave, valor]) => `${chave}: ${valor}`).join("\n")}
+</ficha_da_planilha>`
+      : "";
+
   return `<contato>
 ${contato}
 </contato>
 
 <historico_lux_derma>
 ${historico}
-</historico_lux_derma>
+</historico_lux_derma>${blocoExtras}
 
 <conversa>
 ${transcricao}
@@ -182,6 +198,10 @@ export function contentHash(input: AnalysisInput): string {
     input.lead.status,
     input.lead.specialty ?? "",
     input.lead.clinic_name ?? "",
+    // Sem isto, corrigir um extra não invalidaria a análise vigente.
+    extraFields(input.lead.extra)
+      .map(([c, v]) => `${c}=${v}`)
+      .join(";"),
     input.rentals
       .map((r) => r.id)
       .sort()
