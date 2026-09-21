@@ -516,15 +516,45 @@ export function createEvolutionProvider(): WhatsAppProvider {
 
       // Só endereçamento. `message` fica de fora de propósito: é lá que mora a
       // conversa, e diagnóstico não precisa dela.
-      return registros.slice(0, limit).map((r) => ({
+      const chaves = registros.slice(0, limit).map((r) => ({
         key: r.key,
         messageType: r.messageType,
         pushName: r.pushName,
         source: r.source,
-        // Campos de nível superior que possam carregar JID, sem o conteúdo.
         participant: r.participant,
         contextInfoTem: r.contextInfo ? Object.keys(r.contextInfo as object) : null,
       }));
+
+      // As outras duas fontes que poderiam ligar LID a telefone. Só os campos
+      // de identificação — nada de conteúdo.
+      const pegar = async (rota: string) => {
+        try {
+          const d = await call<unknown>(`/chat/${rota}/${cfg.instance}`, {
+            method: "POST",
+            body: {},
+          });
+          const lista = Array.isArray(d)
+            ? d
+            : ((d as Record<string, unknown>)?.[rota] as unknown[]) ?? [];
+          return (lista as Record<string, unknown>[])
+            .slice(0, limit)
+            .map((c) => ({
+              campos: Object.keys(c),
+              remoteJid: c.remoteJid,
+              id: c.id,
+              pushName: c.pushName,
+              name: c.name,
+            }));
+        } catch (err) {
+          return { erro: err instanceof Error ? err.message.slice(0, 200) : "falha" };
+        }
+      };
+
+      return [
+        { fonte: "findMessages", amostra: chaves },
+        { fonte: "findContacts", amostra: await pegar("findContacts") },
+        { fonte: "findChats", amostra: await pegar("findChats") },
+      ];
     },
 
     async connectionStatus(): Promise<WaConnection> {
