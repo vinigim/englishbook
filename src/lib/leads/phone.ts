@@ -12,8 +12,8 @@ import {
  *
  * Retorna `null` quando o número não é válido/discável.
  *
- * (Copiado de whatsapp-prospector/src/lib/phone.ts — aquele app está no
- * "exclude" do tsconfig da raiz, então não dá para importar de lá.)
+ * (Veio do app whatsapp-prospector, que existia neste repositório e foi
+ * removido depois que o Radar de Leads absorveu o que ele tinha de útil.)
  */
 export function normalizePhone(
   raw: string,

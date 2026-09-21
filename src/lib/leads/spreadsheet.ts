@@ -8,8 +8,8 @@ import type { ContactRow, DetectedColumn, ParseResult } from "./sheet-types";
  *
  * Assume que a primeira linha da planilha é o cabeçalho.
  *
- * (Copiado de whatsapp-prospector/src/lib/spreadsheet.ts — aquele app está no
- * "exclude" do tsconfig da raiz, então não dá para importar de lá.)
+ * (Veio do app whatsapp-prospector, que existia neste repositório e foi
+ * removido depois que o Radar de Leads absorveu o que ele tinha de útil.)
  */
 export function parseSpreadsheet(buffer: ArrayBuffer): ParseResult {
   const workbook = readWorkbook(buffer);

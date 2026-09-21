@@ -13,7 +13,7 @@ export const maxDuration = 300;
  * Importa o histórico das conversas que já existem no WhatsApp.
  *
  * Responde em NDJSON (uma linha por chat processado) para a tela mostrar
- * andamento, no mesmo padrão de whatsapp-prospector/src/app/api/send/route.ts.
+ * andamento.
  *
  * É retomável e idempotente: o progresso fica em wa_sync_state e a constraint
  * unique (provider, provider_message_id) garante que rodar de novo não

@@ -116,14 +116,18 @@ estágio, se o lead falou por último sem ser respondido, e há quanto tempo.
 As tabelas do derma-lux (`rentals`, `equipment`, `blocks`) usam
 `to authenticated using (true)` — qualquer usuário logado lê tudo.
 
-**As tabelas de leads não podem fazer isso.** Este projeto do Supabase é
-compartilhado com o EnglishBook, que tem cadastro público em `/signup`. Copiar
-aquele padrão significaria que qualquer pessoa que criasse uma conta leria as
-conversas inteiras da empresa — inclusive dados de paciente, que são dado
-sensível de saúde (LGPD, art. 11).
+**As tabelas de leads não fazem isso.** Estas conversas contêm dado sensível de
+saúde (LGPD, art. 11), e o critério aqui é mais estrito por dois motivos:
 
-Por isso o acesso é por allowlist (`lux_staff`). Vale considerar aplicar o
-mesmo em `rentals` depois.
+1. Este projeto do Supabase carrega **contas antigas do EnglishBook**, o app que
+   existia neste repositório antes. Elas continuam conseguindo autenticar. O
+   cadastro público foi removido junto com aquele app, mas quem já tinha conta
+   continua tendo.
+2. Mesmo entre logins legítimos da empresa, faz sentido que acesso à carteira de
+   clientes seja uma decisão explícita, não um efeito colateral de ter login.
+
+Por isso o acesso é por allowlist (`lux_staff`), e cada pessoa entra nela à mão.
+Vale considerar estender o mesmo a `rentals`, `equipment` e `blocks` depois.
 
 ## Deduplicação por telefone
 
@@ -180,16 +184,17 @@ select version, temperature, recommended_action, model, cost_usd
 select sum(cost_usd) from public.wa_lead_analyses;
 ```
 
-O teste de RLS que mais importa: entre com uma conta de **aluno** do
-EnglishBook e tente `supabase.from("wa_messages").select("*")` no navegador.
-Tem que voltar vazio.
+O teste de RLS que mais importa: entre com uma conta que **não** esteja em
+`lux_staff` — por exemplo uma das contas antigas do EnglishBook — e tente
+`supabase.from("wa_messages").select("*")` no navegador. Tem que voltar vazio.
 
 ## O que ficou para depois
 
 - Enviar pelo painel (`wa_outbound.channel = 'api'` + `provider.sendText`).
 - Follow-up automático: o campo `snoozed_until` e um cron já estão previstos,
   mas **`vercel.json` não existe neste repo**, então hoje nenhum cron roda em
-  produção — nem os três do EnglishBook. Criar o arquivo liga todos de uma vez,
-  e o plano Hobby aceita no máximo 2.
+  produção. O arquivo foi apagado quando os crons do EnglishBook bloqueavam o
+  deploy no plano Hobby; com aquele app removido, os 2 slots do Hobby estão
+  livres.
 - Conciliar automaticamente `rentals.wa_lead_id`; hoje há um `update`
   comentado no fim da migração para rodar depois do primeiro backfill.

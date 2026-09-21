@@ -1,10 +1,11 @@
 /**
  * Tipos da importação de planilha.
  *
- * Base copiada de whatsapp-prospector/src/lib/types.ts (aquele app está no
- * "exclude" do tsconfig da raiz, então não dá para importar de lá), acrescida
- * dos papéis que fazem sentido no domínio da Lux Derma: especialidade e cidade
- * costumam vir na planilha de médicos e alimentam direto o contexto da IA.
+ * Base veio do app whatsapp-prospector, que existia neste repositório e foi
+ * removido depois que o Radar de Leads absorveu o que ele tinha de útil.
+ * Acrescentei os papéis que fazem sentido no domínio da Lux Derma:
+ * especialidade e cidade costumam vir na planilha de médicos e alimentam
+ * direto o contexto da IA.
  */
 export type ColumnRole =
   | "name"
