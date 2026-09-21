@@ -109,36 +109,84 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
     }
   }
 
+  /**
+   * Máximo de rodadas encadeadas numa análise.
+   *
+   * A fila tem centenas de leads e cada rodada do servidor para em 45s, então
+   * um clique precisa de várias. O teto existe só para um servidor que devolva
+   * `restantes` sem avançar não virar laço infinito.
+   */
+  const MAX_RODADAS_ANALISE = 40;
+
+  /**
+   * Analisa a fila de pendentes, encadeando rodadas.
+   *
+   * A rota é naturalmente retomável: cada chamada busca os leads com
+   * `needs_analysis` no momento, sem estado a carregar entre elas. Por isso
+   * aqui o encadeamento funciona — diferente do backfill, cuja paginação
+   * recomeçaria do zero a cada rodada.
+   */
   async function analisar() {
     setOcupado("analise");
     setErro(null);
     setStatus("Analisando…");
     try {
-      const res = await fetch("/api/leads/analyze", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ limit: 25 }),
-      });
-      const json = await res.json();
+      let rodada = 0;
+      let analisados = 0;
+      let reaproveitados = 0;
+      let falhas = 0;
+      let custo = 0;
+      let restantes = 0;
 
-      if (!res.ok) {
-        setErro(json.message ?? "Falha ao analisar.");
-        setStatus(null);
-        return;
+      for (;;) {
+        rodada += 1;
+        const res = await fetch("/api/leads/analyze", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ limit: 25 }),
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setErro(json.message ?? json.error ?? "Falha ao analisar.");
+          setStatus(null);
+          return;
+        }
+
+        const antes = restantes;
+        analisados += Number(json.analisados) || 0;
+        reaproveitados += Number(json.reaproveitados) || 0;
+        falhas += Number(json.falhas) || 0;
+        custo += Number(json.custoUsd) || 0;
+        restantes = Number(json.restantes) || 0;
+
+        const partes = [
+          `${analisados} analisado(s)`,
+          reaproveitados > 0
+            ? `${reaproveitados} sem mudança (não custou nada)`
+            : null,
+          falhas > 0 ? `${falhas} falha(s)` : null,
+          custo > 0 ? `US$ ${custo.toFixed(4)}` : null,
+        ].filter(Boolean);
+
+        // Sem fila, sem avanço, ou teto atingido: para. "Sem avanço" cobre o
+        // caso de o servidor devolver sempre o mesmo `restantes`, que faria
+        // as rodadas repetirem o mesmo lote para sempre.
+        const semAvanco = rodada > 1 && restantes >= antes && antes > 0;
+        if (restantes === 0 || semAvanco || rodada >= MAX_RODADAS_ANALISE) {
+          if (restantes > 0) {
+            partes.push(`${restantes} ainda na fila — clique de novo`);
+          }
+          setStatus(partes.join(" · "));
+          router.refresh();
+          return;
+        }
+
+        setStatus(`${partes.join(" · ")} · ${restantes} na fila…`);
+        // A fila encolhe conforme os leads são analisados, então a tela pode
+        // acompanhar em vez de esperar o fim de tudo.
+        router.refresh();
       }
-
-      const partes = [
-        `${json.analisados} analisado(s)`,
-        json.reaproveitados > 0
-          ? `${json.reaproveitados} sem mudança (não custou nada)`
-          : null,
-        json.falhas > 0 ? `${json.falhas} falha(s)` : null,
-        json.restantes > 0 ? `${json.restantes} na fila` : null,
-        json.custoUsd > 0 ? `US$ ${json.custoUsd.toFixed(4)}` : null,
-      ].filter(Boolean);
-
-      setStatus(partes.join(" · "));
-      router.refresh();
     } catch {
       setErro("Falha de rede ao analisar.");
       setStatus(null);

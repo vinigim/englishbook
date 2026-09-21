@@ -18,7 +18,20 @@ export const maxDuration = 300;
  * estável valer: só a primeira paga o bloco de ~1,5k tokens por inteiro.
  */
 
-const LIMITE_MS = 250_000;
+/**
+ * Teto de tempo por rodada.
+ *
+ * Tem que ser MENOR que o corte de execução da plataforma, não igual ao
+ * `maxDuration` declarado acima. O plano Hobby da Vercel derruba a função
+ * muito antes dos 300s, e como esta rota acumula a resposta até o fim, ser
+ * cortada significa perder o relato inteiro — o navegador recebe uma conexão
+ * abortada e mostra "Falha de rede ao analisar", mesmo com as análises já
+ * gravadas no banco.
+ *
+ * 45s deixa margem folgada. A rota devolve `restantes`, e o cliente encadeia a
+ * rodada seguinte: a fila anda igual, só que relatada.
+ */
+const LIMITE_MS = 45_000;
 
 const bodySchema = z.object({
   limit: z.number().int().positive().max(100).optional(),
