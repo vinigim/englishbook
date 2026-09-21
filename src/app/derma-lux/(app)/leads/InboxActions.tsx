@@ -144,9 +144,17 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
               `${chats} conversa(s) · última: ${evento.nome ?? evento.telefone}`,
             );
           } else if (evento.tipo === "fim") {
-            setStatus(
-              `${evento.chatsProcessados} conversa(s) · ${evento.mensagensGravadas} mensagem(ns) nova(s) · ${evento.leadsNovos} lead(s) novo(s)`,
-            );
+            const partes = [
+              `${evento.chatsProcessados} conversa(s)`,
+              `${evento.mensagensGravadas} mensagem(ns) nova(s)`,
+              `${evento.leadsNovos} lead(s) novo(s)`,
+              // Conversa que o WhatsApp só identifica por LID não vira lead.
+              // Dizer o número é melhor que deixar o total não fechar.
+              Number(evento.semTelefone) > 0
+                ? `${evento.semTelefone} sem telefone identificável`
+                : null,
+            ].filter(Boolean);
+            setStatus(partes.join(" · "));
           } else if (evento.tipo === "parcial") {
             setStatus(String(evento.mensagem));
           } else if (evento.tipo === "erro" && !evento.telefone) {
@@ -190,7 +198,7 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
 
         <Button
           size="sm"
-          variant="ghost"
+          variant="secondary"
           onClick={testarConexao}
           loading={ocupado === "teste"}
           disabled={ocupado !== null}

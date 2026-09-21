@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { waPhoneKey } from "@/lib/leads/phone";
+import { waJidPhone, waPhoneKey } from "@/lib/leads/phone";
 import type { NormalizedMessage } from "./provider";
 
 /**
@@ -21,6 +21,13 @@ export type IngestResult = {
   leadsAtualizados: number;
   mensagensGravadas: number;
   ignoradas: number;
+  /**
+   * Mensagens descartadas porque o interlocutor não tem telefone discável —
+   * na prática, conversas que só existem como LID. Contadas à parte de
+   * `ignoradas` (grupos) para que o backfill possa dizer quantas conversas
+   * ficaram de fora, em vez de o dono descobrir pelo total que não fecha.
+   */
+  telefoneInvalido: number;
 };
 
 type ExistingLead = {
@@ -39,6 +46,7 @@ const vazio: IngestResult = {
   leadsAtualizados: 0,
   mensagensGravadas: 0,
   ignoradas: 0,
+  telefoneInvalido: 0,
 };
 
 /** Maior de duas datas ISO, tolerando nulos. */
@@ -93,7 +101,20 @@ export async function ingestMessages(
   const grupos = new Map<string, Grupo>();
 
   for (const msg of relevantes) {
-    const phoneKey = waPhoneKey(msg.phoneE164);
+    // Rede de segurança, com o mesmo libphonenumber da importação de planilha.
+    //
+    // Um JID que não conhecemos — LID sem telefone ao lado, formato novo de
+    // alguma versão futura — sai daqui como uma sequência de dígitos que
+    // PARECE telefone. Sem validar, cada um desses vira um lead fantasma que
+    // nunca se funde com o contato certo. É exatamente o que aconteceu na
+    // primeira sincronização real, e é barato impedir.
+    const phoneE164 = waJidPhone(msg.phoneE164);
+    if (!phoneE164) {
+      resultado.telefoneInvalido += 1;
+      continue;
+    }
+
+    const phoneKey = waPhoneKey(phoneE164);
     if (!phoneKey) {
       resultado.ignoradas += 1;
       continue;
@@ -103,7 +124,7 @@ export async function ingestMessages(
     if (!g) {
       g = {
         phoneKey,
-        phoneE164: msg.phoneE164,
+        phoneE164,
         chatId: msg.chatId,
         pushName: null,
         primeira: null,
@@ -131,7 +152,7 @@ export async function ingestMessages(
 
     // O E.164 mais completo vence: se o WhatsApp mandou sem o 9º dígito mas a
     // planilha tinha com, queremos guardar a forma discável.
-    if (msg.phoneE164.length > g.phoneE164.length) g.phoneE164 = msg.phoneE164;
+    if (phoneE164.length > g.phoneE164.length) g.phoneE164 = phoneE164;
   }
 
   const chaves = [...grupos.keys()];

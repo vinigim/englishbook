@@ -77,6 +77,24 @@ export function waPhoneKey(phoneE164: string): string {
 }
 
 /**
+ * Valida um telefone que veio de um JID do WhatsApp.
+ *
+ * JID é SEMPRE E.164 sem o "+" ("5535988887777", "351912345678"), nunca um
+ * número local. Por isso aqui não se pode usar o padrão BR do `normalizePhone`:
+ * ele interpretaria `12125551234` (EUA) como número brasileiro e devolveria
+ * `5512125551234` — um número inventado, que nunca chega em ninguém. Rejeitar
+ * já seria ruim; corromper em silêncio é pior.
+ *
+ * Devolve `null` quando os dígitos não formam telefone discável — o caso de um
+ * LID, que é identificador interno e não número.
+ */
+export function waJidPhone(digits: string): string | null {
+  const limpo = String(digits ?? "").replace(/\D/g, "");
+  if (!limpo) return null;
+  return normalizePhone(`+${limpo}`);
+}
+
+/**
  * Converte qualquer telefone cru direto para a dupla usada no banco.
  * Retorna `null` se o número não for discável.
  */

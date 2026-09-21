@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import {
   isGroupJid,
+  isLidJid,
   jidToPhone,
   toIsoDate,
   type NormalizedMessage,
@@ -151,12 +152,41 @@ function extractContent(message: EvolutionMessageContent): Extracted {
 }
 
 export type EvolutionRawMessage = {
-  key?: { id?: string; remoteJid?: string; fromMe?: boolean };
+  key?: {
+    id?: string;
+    remoteJid?: string;
+    /**
+     * O JID alternativo. Quando `remoteJid` é um LID, é aqui que vem o JID de
+     * telefone de verdade — e vice-versa. A própria Evolution faz essa troca
+     * ao receber mensagem nova (whatsapp.baileys.service.ts), mas NÃO nos
+     * registros de chat gravados pela sincronização de histórico, que é de
+     * onde o backfill lê.
+     */
+    remoteJidAlt?: string;
+    fromMe?: boolean;
+  };
   pushName?: string;
   message?: EvolutionMessageContent;
   messageTimestamp?: number | string;
   messageType?: string;
 };
+
+/**
+ * Qual JID identifica o interlocutor.
+ *
+ * Devolve `null` quando só há LID: melhor não ter lead do que ter um lead com
+ * identidade inventada, que nunca se funde com o contato certo.
+ */
+export function jidDeIdentidade(key: {
+  remoteJid?: string;
+  remoteJidAlt?: string;
+}): string | null {
+  const { remoteJid, remoteJidAlt } = key;
+  if (!remoteJid) return null;
+  if (!isLidJid(remoteJid)) return remoteJid;
+  if (remoteJidAlt && !isLidJid(remoteJidAlt)) return remoteJidAlt;
+  return null;
+}
 
 /**
  * Exportada para que o adaptador de fixtures use exatamente o mesmo parser.
@@ -169,7 +199,12 @@ export function normalizeOne(
   const remoteJid = raw?.key?.remoteJid;
   if (!id || !remoteJid) return null;
 
-  const phoneE164 = jidToPhone(remoteJid);
+  // O chat continua sendo endereçado pelo `remoteJid` original — é por ele que
+  // findMessages busca. Só a IDENTIDADE do lead precisa do telefone real.
+  const jidIdentidade = jidDeIdentidade(raw.key ?? {});
+  if (!jidIdentidade) return null;
+
+  const phoneE164 = jidToPhone(jidIdentidade);
   if (!phoneE164) return null;
 
   const extracted = extractContent(raw.message);
@@ -293,8 +328,10 @@ export function createEvolutionProvider(): WhatsAppProvider {
         .map((c): WaChat | null => {
           const jid = c.remoteJid ?? c.id;
           if (!jid) return null;
-          const phoneE164 = jidToPhone(jid);
-          if (!phoneE164) return null;
+          // Chat endereçado por LID não tem telefone aqui. Não inventamos um:
+          // o histórico ainda é buscável pelo `chatId`, e cada mensagem traz o
+          // `remoteJidAlt` de onde sai a identidade de verdade.
+          const phoneE164 = isLidJid(jid) ? null : jidToPhone(jid) || null;
           const ts = c.lastMessage?.messageTimestamp ?? c.updatedAt;
           return {
             chatId: jid,
