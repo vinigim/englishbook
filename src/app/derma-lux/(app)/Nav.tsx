@@ -5,8 +5,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { dlLogout } from "../auth-actions";
 
+// A ordem importa no celular: o nav rola na horizontal, então as duas telas de
+// uso diário ficam na frente. Antes "Leads" era o último item, atrás de um
+// rótulo longo, e só dava para alcançar arrastando de lado.
 const LINKS = [
   { href: "/derma-lux", label: "Agenda" },
+  { href: "/derma-lux/leads", label: "Leads" },
   { href: "/derma-lux/disponibilidade", label: "Disponibilidade Locação" },
   {
     href: "/derma-lux/disponibilidade-clinica",

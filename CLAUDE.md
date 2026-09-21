@@ -8,100 +8,131 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm install          # install dependencies
 npm run dev          # start dev server at localhost:3000
 npm run build        # production build (type-check + compile)
-npm run lint         # ESLint via next lint
 ```
 
-There is no test suite. Type correctness is the primary static safety net — `npm run build` catches type errors.
-
-For local Stripe webhook testing:
-```bash
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-# use the whsec_... CLI secret as STRIPE_WEBHOOK_SECRET in .env.local
-```
-
-Cron routes can be called manually in dev without auth (no `CRON_SECRET` required locally):
-```bash
-curl http://localhost:3000/api/cron/release-holds
-```
+There is no test suite, and **`npm run lint` has no config** (no `.eslintrc*` exists, so
+`next lint` drops into interactive setup). **`npm run build` is the only static safety
+net** — run it after every change.
 
 ## Architecture
 
-**EnglishBook** is a Next.js 15 App Router platform where students (`aluno`) book English lessons from teachers (`professor`) and pay via Stripe.
+**Lux Derma** is a Next.js 15 App Router app for a Brazilian company that rents medical
+lasers to doctors and aesthetic clinics. It has two areas, both behind the same login:
 
-### Route structure
+| Path | What |
+|---|---|
+| `/derma-lux` | Rental agenda: equipment, rentals, availability, schedule blocks |
+| `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI |
 
-| Path prefix | Who | What |
-|---|---|---|
-| `/(auth)/` | Public | Login, signup, forgot-password |
-| `/aluno/` | Students | Dashboard, booking, history, preferences |
-| `/professor/` | Teachers | Dashboard, availability slots, agenda, profile |
-| `/agendamento/` | Post-Stripe | Success and cancelled landing pages |
-| `/api/checkout` | Server | Creates hold + Stripe Checkout Session |
-| `/api/webhooks/stripe` | Stripe | Receives events, idempotency, confirms/cancels bookings |
-| `/api/cron/*` | Vercel Cron | Automated maintenance tasks |
-| `/auth/callback` | Supabase | Email confirmation / OAuth code exchange |
+`/` redirects to `/derma-lux` (`next.config.mjs`). UI language is pt-BR throughout.
 
-### Two-role system
+> The repo began as **EnglishBook**, an unrelated English-lesson booking platform. That
+> app was removed. Its tables still exist in Supabase but nothing reads them — see
+> `supabase/migrations/0001_initial_schema.sql` for the details and the one live
+> leftover (the `handle_new_user()` trigger).
 
-Every user has a `profiles` row with `role: "aluno" | "professor"`. On signup the DB trigger `handle_new_user()` automatically creates either a `students` or `teachers` row.
+### Auth
 
-Use `requireUser(role?)` from `src/lib/auth.ts` at the top of every protected Server Component page — it fetches the session, loads the profile, and redirects if the role doesn't match.
+Plain "any authenticated user" — there are no roles. `src/app/derma-lux/(app)/layout.tsx`
+calls `supabase.auth.getUser()` and redirects to `/derma-lux/login` when absent. Server
+Actions repeat the check via a local `requireSupabase()` helper.
+
+`src/middleware.ts` → `updateSession()` only refreshes the session cookie. It guards
+nothing, but must keep running or sessions expire mid-use. Its matcher excludes
+`api/webhooks` and `api/whatsapp`, which authenticate themselves.
+
+Accounts are created from the Supabase dashboard, not from the app. Password recovery is
+also triggered there; `/auth/callback` exchanges the emailed code for a session.
 
 ### Supabase client selection
 
-Four clients exist — always pick the right one:
-
 | Import | Use when |
 |---|---|
-| `src/lib/supabase/server.ts` | Server Components, Server Actions, Route Handlers that need auth context |
+| `src/lib/supabase/server.ts` | Server Components, Server Actions, Route Handlers |
 | `src/lib/supabase/client.ts` | Client Components (`"use client"`) |
-| `src/lib/supabase/admin.ts` | API routes / webhooks that need to bypass RLS (uses `SERVICE_ROLE_KEY`) |
-| `src/lib/supabase/middleware.ts` | Only used in `src/middleware.ts` for session refresh |
+| `src/lib/supabase/admin.ts` | Route Handlers that must bypass RLS (`SERVICE_ROLE_KEY`) |
+| `src/lib/supabase/middleware.ts` | Only `src/middleware.ts` |
 
 Never import `admin.ts` from client-side code.
 
-### Atomic booking flow (the critical path)
+⚠️ `config.ts` has the project URL and anon key **hardcoded as fallbacks**, but
+`admin.ts` reads `process.env.NEXT_PUBLIC_SUPABASE_URL!` directly. If that env var is
+unset, the browser/server clients silently work and only the admin paths break — at
+runtime, never at build.
 
-The slot reservation is race-condition-proof because it runs entirely in Postgres:
+### Radar de Leads
 
-1. Student POSTs `slot_id` to `/api/checkout`
-2. API calls `hold_slot(slot_id, student_id, 15)` — Postgres function that uses `FOR UPDATE` to lock the slot row, validates availability, sets `status = 'pending'`, creates a `bookings` row with `status = 'pending_payment'`, returns `booking_id`
-3. API creates a Stripe Checkout Session with `metadata.booking_id` and a 30-minute expiry
-4. Stripe webhook `checkout.session.completed` → `confirm_booking(booking_id)` → slot `booked`, booking `confirmed`
-5. Cron `release-holds` (every 5 min) calls `release_expired_holds()` to free slots whose 15-min hold expired
+Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 
-The three Postgres RPCs that mutate state are `hold_slot`, `confirm_booking`, and `cancel_booking` — all `security definer` functions in `0001_initial_schema.sql`.
+1. **Ingest** — `/api/whatsapp/webhook` (new messages) and `/api/whatsapp/backfill`
+   (history, NDJSON, resumable). Both funnel through `src/lib/whatsapp/ingest.ts`.
+2. **Provider adapter** — `src/lib/whatsapp/provider.ts` is the interface;
+   `evolution.ts` talks to a self-hosted Evolution API; `mock.ts` replays fixtures
+   through the *same parser*, so tests exercise production code.
+3. **Analyze** — `src/lib/ai/lead-analysis.ts`. Haiku triages every lead, Sonnet drafts
+   the message only for hot/warm leads or on demand.
+4. **Suggest** — the lead page shows the draft with a copy button and a `wa.me` link.
 
-### Webhook idempotency
+Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
+button calls it: bulk sending through an unofficial provider is what gets numbers
+banned, so messages go out through the owner's own WhatsApp.
 
-Before processing any Stripe event, the webhook handler inserts `event.id` into `stripe_webhook_events` (PK = event id). Duplicate key error `23505` → return 200 immediately. On handler failure, the event row is deleted so Stripe can retry.
+### Two caching layers in the AI pipeline (this is the owner's money)
 
-### Cron jobs
+- **Content hash** — `contentHash()` hashes the transcript + lead data + `PROMPT_VERSION`.
+  A matching row in `wa_lead_analyses` is reused with no API call. Bumping
+  `PROMPT_VERSION` in `src/lib/ai/prompt.ts` invalidates everything on purpose.
+- **Prompt cache** — the stable system block carries `cache_control` and precedes the
+  volatile context, so in a batch only the first analysis pays for it. Keep the
+  equipment catalog sorted deterministically or the prefix breaks.
 
-All three cron routes authenticate via `validateCronRequest()` from `src/lib/cron.ts`, which checks `Authorization: Bearer <CRON_SECRET>`. In dev without `CRON_SECRET` set, auth is skipped.
+Every analysis records model, tokens and `cost_usd`. Prices live in `src/lib/ai/cost.ts`.
 
-| Route | Schedule | Purpose |
-|---|---|---|
-| `/api/cron/release-holds` | Every 5 min | Free expired holds, cancel orphaned `pending_payment` bookings, email affected students |
-| `/api/cron/complete-past-bookings` | Hourly | Mark `confirmed` bookings past `scheduled_end_at` as `completed` |
-| `/api/cron/daily-availability-email` | 11:00 UTC (08:00 BRT) | Send available-slots digest to students with opt-in |
+### Database
 
-### Email
+Migrations are numbered `NNNN_snake_case.sql` and **applied by hand in the Supabase SQL
+Editor** — there is no Supabase CLI setup and no `config.toml`.
 
-Emails are sent via Resend (`src/lib/email/`). Sending functions in `send.ts` never throw — errors are caught and logged so a failing email never aborts a webhook or cron. Each email has a template file under `src/lib/email/templates/` that returns `{ subject, html, text }`.
+`0004`–`0009` are the agenda. `0010` is the Radar. `0001`–`0003` are dead EnglishBook
+schema kept as documentation.
+
+Style (follow `0004` and `0010`): `create table if not exists public.x`,
+`gen_random_uuid()`, `text + check (...)` instead of new enums, `drop policy if exists`
+before `create policy`, realtime registration inside a
+`do $$ ... exception when duplicate_object then null` block, Portuguese comments with
+`-- ===` banners. Everything must be safe to re-run.
+
+**RLS differs between the two areas, on purpose:**
+
+- Agenda tables (`rentals`, `equipment`, `blocks`) use `for all to authenticated using (true)`.
+- Lead tables use an allowlist — `exists (select 1 from lux_staff where user_id = auth.uid())`.
+  They hold WhatsApp conversations that can contain patient data (LGPD art. 11), and the
+  Supabase project is shared with legacy accounts. New rows in `lux_staff` are inserted
+  manually.
 
 ### Key conventions
 
-- All timestamps stored as `timestamptz` in UTC; display conversion happens at render time (default timezone `America/Sao_Paulo`)
-- Prices are always in **cents** (`price_cents: integer`, currency `BRL`)
-- Zod is used for request body validation in API routes
-- `src/lib/utils.ts` contains `cn()` (clsx + tailwind-merge) for conditional class names
-- `src/components/ui/` contains the design system primitives (Button, Card, Input, Badge, Container) — prefer these over raw HTML elements
-- Route Handlers that need the raw request body (Stripe webhook) must set `export const runtime = "nodejs"` and `export const dynamic = "force-dynamic"`
+- Timestamps are `timestamptz` in UTC; display converts at render time (`America/Sao_Paulo`)
+- Agenda prices are `numeric(10,2)` in BRL (note: **not** cents)
+- Zod validates every Route Handler body and Server Action input
+- Server Actions return `ActionResult = { ok: boolean; error?: string }`, use
+  `parsed.error.issues[0]?.message`, and end with `revalidatePath()`
+- Route Handlers: `export const runtime = "nodejs"`, `export const dynamic = "force-dynamic"`,
+  errors as `NextResponse.json({ error: "snake_case" }, { status })`, logs prefixed `[route-name]`
+- `src/components/ui/` holds Button, Card, Badge, Alert, Input, Container — prefer these.
+  There is no Table, Select, Textarea, Modal or Tabs; modals are hand-rolled per feature
+  (see `RentalModal.tsx`). `Alert` lives inside `Badge.tsx`.
+- `src/lib/utils.ts` has only `cn()`. Formatting helpers are per-area: `shared.ts` for the
+  agenda, `leads-shared.ts` for the Radar.
+- Server Actions are capped at 2 MB (`next.config.mjs`), so file uploads must go through a
+  Route Handler with `formData()`
 
-### Known intentional gaps
+### Known gaps
 
-- No UI for students to cancel a paid booking (done manually by support)
-- No "set new password" page (forgot-password flow sends the link, but `/reset-password` page was not built)
-- No teacher notifications when a booking is made (could be added in the webhook handler)
-- No admin dashboard
+- **No `vercel.json`, so no cron runs in production.** It was deleted when the
+  EnglishBook crons blocked a Hobby-plan deploy. Creating it is a prerequisite for
+  automatic follow-up; Hobby allows 2 crons at daily granularity.
+- No password-reset page — recovery is triggered from the Supabase dashboard
+- `rentals.wa_lead_id` is not auto-reconciled; a commented `update` sits at the end of
+  migration `0010` to run after the first backfill
+- No way to send a WhatsApp message from the panel (deliberate, see above)

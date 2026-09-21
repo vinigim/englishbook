@@ -1,67 +1,72 @@
-# Lux Derma — versão Next.js (deploy a partir deste repositório)
+# Lux Derma — agenda de aluguéis
 
-Esta é a versão do Lux Derma integrada ao app Next.js, para você **publicar direto
-na Vercel** a partir deste repositório. Ela roda em `/derma-lux`, com:
+Área principal do app, em `/derma-lux`:
 
-- **Login** (e-mail/senha) via Supabase Auth — rota `/derma-lux/login`
-- **Agenda** (próximas obrigações) — rota `/derma-lux`
-- **Disponibilidade** (horários livres/ocupados) — rota `/derma-lux/disponibilidade`
-- **Equipamentos** — rota `/derma-lux/equipamentos`
+- **Login** (e-mail/senha) via Supabase Auth — `/derma-lux/login`
+- **Agenda** (próximas obrigações) — `/derma-lux`
+- **Disponibilidade Locação** — `/derma-lux/disponibilidade`
+- **Disponibilidade Clínica Dra Gabriella** — `/derma-lux/disponibilidade-clinica`
+- **Equipamentos** — `/derma-lux/equipamentos`
 - **Sincronização em tempo real** entre todos os aparelhos e usuários da empresa
 
-> Existe também uma versão estática, sem build, na pasta `/derma-lux` da raiz do repositório
-> (abre direto no navegador). Esta aqui é a versão para deploy no mesmo domínio do app.
+O Radar de Leads do WhatsApp fica em `/derma-lux/leads` e tem documentação própria em
+[`LEADS.md`](LEADS.md).
 
 ## Estrutura
 
 ```
 src/app/derma-lux/
-  types.ts            Tipos (Equipment, Rental)
-  shared.ts           Utilidades puras (datas, conflito, formatação)
+  types.ts            Tipos (Equipment, Rental, Block)
+  shared.ts           Utilidades puras (datas, conflito, formatação, link wa.me)
   data.ts             Busca de dados (Server Component)
-  actions.ts          Server Actions (CRUD de aluguéis e equipamentos)
+  actions.ts          Server Actions (CRUD de aluguéis, equipamentos e fechamentos)
   auth-actions.ts     Login / logout
   login/              Tela de login
   (app)/              Área autenticada (layout com guarda de sessão)
-    page.tsx          Agenda
-    disponibilidade/  Disponibilidade
-    equipamentos/     Equipamentos
-supabase/migrations/0004_derma_lux.sql   Tabelas equipment e rentals + RLS + realtime
+    page.tsx                    Agenda
+    disponibilidade/            Disponibilidade da locação
+    disponibilidade-clinica/    Disponibilidade da clínica
+    equipamentos/               Equipamentos
+    leads/                      Radar de Leads (ver LEADS.md)
 ```
 
-Os dados ficam nas tabelas `equipment` e `rentals` (as mesmas da versão estática original).
+Os dados ficam em `equipment`, `rentals` e `blocks`.
+
+| Migração | O que traz |
+|---|---|
+| `0004_derma_lux.sql` | Tabelas `equipment` e `rentals` + RLS + realtime |
+| `0005`–`0007` | Campos extras do aluguel: especialidade, ponteiras, esterilização, frete, técnica especializada |
+| `0008`–`0009` | Fechamentos de agenda (`blocks`) com motivo |
 
 ## Configuração (uma vez)
 
-1. **Supabase**: crie um projeto grátis em https://supabase.com (ou reutilize o mesmo do
-   EnglishBook).
-2. **Banco**: no **SQL Editor**, cole e rode o arquivo
-   `supabase/migrations/0004_derma_lux.sql`.
-3. **Variáveis de ambiente** (as mesmas do EnglishBook — veja `.env.example`):
+1. **Banco**: no **SQL Editor** do Supabase, rode `0004` a `0009` em ordem.
+2. **Variáveis de ambiente** (veja `.env.example`):
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
    ```
-   No deploy da Vercel, adicione-as em **Project Settings → Environment Variables**.
-4. **Logins da equipe**: em **Authentication → Users → Add user**, crie e-mail/senha para
-   você e para cada funcionário (marque *Auto Confirm User*). Todos veem a mesma agenda.
+   Na Vercel, em **Project Settings → Environment Variables**.
+3. **Logins da equipe**: em **Authentication → Users → Add user**, crie e-mail e senha
+   para você e para cada funcionário (marque *Auto Confirm User*). Todos veem a mesma
+   agenda. Não existe cadastro público no app.
 
 ## Rodar localmente
 
 ```bash
 npm install
 npm run dev
-# acesse http://localhost:3000/derma-lux
+# http://localhost:3000  (a raiz já redireciona para /derma-lux)
 ```
-
-## Publicar na Vercel
-
-1. Conecte este repositório na Vercel (https://vercel.com → Add New → Project).
-2. Configure as variáveis de ambiente acima.
-3. Deploy. Acesse `https://SEU-APP.vercel.app/derma-lux` no celular e no computador.
 
 ## Segurança
 
-As tabelas usam **RLS**: só usuários autenticados (logados) acessam os dados. A chave
-`anon` é pública por natureza; quem protege os dados é o login + as políticas do
-`0004_derma_lux.sql`.
+As tabelas da agenda usam RLS `to authenticated using (true)`: qualquer usuário logado
+lê e escreve tudo. Como os logins são criados só por você no painel do Supabase, na
+prática isso equivale a "a equipe inteira".
+
+Uma ressalva: este projeto do Supabase ainda tem contas antigas do EnglishBook, o app
+que existia neste repositório antes. Elas continuam conseguindo autenticar e, por
+consequência, enxergam a agenda. Se isso incomodar, dá para estender a allowlist
+`lux_staff` — criada na migração `0010` e já usada pelas tabelas de leads — também para
+`rentals`, `equipment` e `blocks`.

@@ -1,169 +1,68 @@
-# EnglishBook
+# Lux Derma
 
-Plataforma web onde alunos agendam aulas de inglês com professores. Pagamento via cartão efetiva o agendamento.
+App interno da Lux Derma — aluguel de lasers para médicos e clínicas.
 
-**Stack:** Next.js 15 (App Router) · Supabase (Postgres + Auth + RLS) · Stripe · Resend · Tailwind · Vercel.
+Duas áreas, atrás do mesmo login:
 
----
+- **Agenda** (`/derma-lux`) — equipamentos, aluguéis, disponibilidade e fechamentos,
+  com sincronização em tempo real entre aparelhos.
+- **Radar de Leads** (`/derma-lux/leads`) — lê as conversas do WhatsApp da empresa,
+  agrupa por lead, cruza com o histórico de aluguéis e sugere que tipo de mensagem
+  mandar para cada um, com rascunho pronto.
 
-## Setup local
+Next.js 15 (App Router) + Supabase + Claude API. Deploy na Vercel.
+
+## Rodar localmente
 
 ```bash
 npm install
-cp .env.example .env.local
-# preencha as variáveis em .env.local
-npm run dev
+cp .env.example .env.local   # preencha as chaves do Supabase
+npm run dev                  # http://localhost:3000
 ```
 
-### Variáveis de ambiente
+`npm run build` é a única verificação estática do projeto: não há suíte de testes e o
+`npm run lint` não tem configuração. Rode o build antes de cada commit.
 
-Copie `.env.example` para `.env.local` e preencha:
+Em desenvolvimento, `WHATSAPP_PROVIDER=mock` usa as conversas de exemplo em
+`src/lib/whatsapp/fixtures/` — nenhum número real é tocado.
 
-- **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- **Stripe**: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
-- **Resend**: `RESEND_API_KEY`, `EMAIL_FROM` (ex: `"EnglishBook <no-reply@seudominio.com>"`)
-- **App**: `NEXT_PUBLIC_APP_URL`, `CRON_SECRET` (string aleatória grande)
+## Banco de dados
 
----
+As migrações ficam em `supabase/migrations/` e são aplicadas **à mão no SQL Editor do
+Supabase**, em ordem. O projeto não usa a CLI do Supabase.
 
-## Supabase
+| Arquivo | O que é |
+|---|---|
+| `0001`–`0003` | Legado do EnglishBook. **Não rode em banco novo** — veja o aviso no topo do `0001`. |
+| `0004`–`0009` | Agenda: equipamentos, aluguéis, campos extras, fechamentos |
+| `0010` | Radar de Leads |
 
-### Primeiro deploy
+## Colocar o Radar de Leads no ar
 
-No SQL Editor do Supabase, rode as migrations **em ordem**:
+Passo a passo completo em [`src/app/derma-lux/LEADS.md`](src/app/derma-lux/LEADS.md),
+incluindo o risco de banimento do número e as notas de LGPD. Resumo:
 
-1. `supabase/migrations/0001_initial_schema.sql` — schema inicial completo (tabelas, RLS, funções atômicas)
-2. `supabase/migrations/0002_view_security_invoker.sql` — aplica `security_invoker` na view `student_monthly_lessons`
-3. `supabase/migrations/0003_complete_past_bookings.sql` — função SQL que marca bookings passados como `completed`
+1. Rodar `supabase/migrations/0010_whatsapp_leads.sql`.
+2. Liberar o seu acesso — sem isso o painel abre vazio:
+   ```sql
+   insert into public.lux_staff (user_id, email)
+   select id, email from auth.users where email = 'SEU-EMAIL-DO-LOGIN';
+   ```
+3. Importar a planilha de clientes em `/derma-lux/leads/importar`. Já funciona sem
+   WhatsApp nenhum.
+4. Preencher `ANTHROPIC_API_KEY` para ligar as sugestões (~US$ 2/mês para 300 leads).
+5. Conectar o WhatsApp: subir a Evolution API numa VPS, ler o QR com um chip dedicado
+   ao comercial, preencher as variáveis `EVOLUTION_*` e apontar o webhook para
+   `https://<dominio>/api/whatsapp/webhook?s=<WHATSAPP_WEBHOOK_SECRET>`.
 
-### Auth
+## Contas
 
-Em Authentication → URL Configuration:
-- **Site URL**: `https://seu-dominio.com`
-- **Redirect URLs**: adicione `https://seu-dominio.com/auth/callback`
+Usuários são criados pelo painel do Supabase (Authentication → Users), não pelo app —
+não existe cadastro público. A recuperação de senha também parte de lá; o app só recebe
+o link de volta em `/auth/callback`.
 
----
+## Histórico
 
-## Stripe
-
-### Produtos
-
-Não usamos Products do Stripe — cada Checkout Session é criada com `price_data` inline a partir do preço do professor.
-
-### Webhook
-
-No Stripe Dashboard → Developers → Webhooks, criar endpoint:
-
-- **URL**: `https://seu-dominio.com/api/webhooks/stripe`
-- **Eventos**:
-  - `checkout.session.completed`
-  - `checkout.session.expired`
-  - `checkout.session.async_payment_succeeded`
-  - `checkout.session.async_payment_failed`
-  - `payment_intent.payment_failed`
-
-Copie o signing secret (`whsec_...`) para `STRIPE_WEBHOOK_SECRET`.
-
-### Teste local
-
-```bash
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-```
-
-Use o secret do CLI como `STRIPE_WEBHOOK_SECRET` em desenvolvimento.
-Cartão de teste: `4242 4242 4242 4242`, qualquer CVC/data futura.
-
----
-
-## Resend
-
-1. Crie a conta e verifique um domínio em resend.com
-2. Gere uma API key em Settings → API Keys
-3. Configure `EMAIL_FROM` usando um endereço do domínio verificado
-
----
-
-## Vercel — Deploy
-
-### Crons
-
-O arquivo `vercel.json` configura três crons automaticamente no deploy:
-
-| Rota | Schedule | Função |
-|---|---|---|
-| `/api/cron/release-holds` | `*/5 * * * *` | A cada 5 min — libera slots presos em `pending` cujo hold expirou + manda e-mail |
-| `/api/cron/complete-past-bookings` | `0 * * * *` | Hora em hora — marca bookings `confirmed` cujo `scheduled_end_at` já passou como `completed` |
-| `/api/cron/daily-availability-email` | `0 11 * * *` | 11:00 UTC = 8:00 BRT — envia digest diário para alunos com opt-in |
-
-Todos os crons exigem header `Authorization: Bearer <CRON_SECRET>`. A Vercel faz isso automaticamente quando `CRON_SECRET` está configurado nas env vars do projeto.
-
-### Teste manual dos crons
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://seu-dominio.com/api/cron/release-holds
-```
-
----
-
-## Arquitetura do agendamento
-
-O coração do sistema é o fluxo atômico de reserva:
-
-1. Aluno clica em um slot disponível → `POST /api/checkout`
-2. Backend chama `hold_slot(slot_id, student_id)` — função Postgres que **com `FOR UPDATE`** trava a linha, valida, muda slot para `pending` e cria booking `pending_payment`. Race conditions impossíveis: dois alunos simultâneos → só um vence
-3. Backend cria Stripe Checkout Session com `metadata.booking_id` e redireciona
-4. Stripe envia webhook `checkout.session.completed` → `confirm_booking(booking_id)` move slot para `booked` e booking para `confirmed`
-5. Cron `release-holds` roda a cada 5 min e libera slots cujo hold (15min) expirou
-
-### Idempotência de webhooks
-
-Toda chamada de webhook insere `event.id` em `stripe_webhook_events` antes de processar. Tentativas repetidas do Stripe (duplicate key 23505) → retorna 200 sem reprocessar.
-
-### Transição `confirmed → completed`
-
-Cron `complete-past-bookings` roda hora em hora e atualiza bookings cuja aula já terminou. A função SQL `complete_past_bookings()` faz um único UPDATE atômico.
-
----
-
-## Estrutura
-
-```
-src/
-├── app/
-│   ├── (auth)/            # login, signup, forgot-password
-│   ├── agendamento/       # success/cancel páginas pós-Stripe
-│   ├── aluno/             # área do aluno (dashboard, agendar, histórico, preferências)
-│   ├── professor/         # área do professor (dashboard, disponibilidade, agenda, perfil)
-│   ├── api/
-│   │   ├── checkout/      # POST — cria hold + Checkout Session
-│   │   ├── cron/          # 3 rotas de cron (auth via Bearer)
-│   │   └── webhooks/
-│   │       └── stripe/    # recebe eventos, valida assinatura, idempotência
-│   └── auth/callback/     # troca code por session (confirmação de email, OAuth)
-├── components/
-│   ├── AppNav.tsx         # nav da área logada
-│   ├── PublicNav.tsx      # nav pública
-│   └── ui/                # Button, Card, Input, Badge, Container
-└── lib/
-    ├── auth.ts            # requireUser(role) helper
-    ├── cron.ts            # validação Bearer
-    ├── email/             # Resend client + templates
-    ├── slots.ts           # agrupar por dia
-    ├── bookings.ts        # agrupar por mês
-    ├── supabase/          # clients (browser, server, admin, middleware)
-    ├── stripe.ts
-    ├── types.ts
-    └── utils.ts
-```
-
----
-
-## O que **não** está neste projeto (por decisão de escopo)
-
-- Cancelamento de aula paga pelo aluno pela UI — feito só pelo suporte
-- Reset de senha (endpoint `/reset-password`) — fluxo de "esqueci senha" manda o link, mas a página de definir nova senha não foi criada
-- Lembrete de aula próxima (1h antes, por ex.) — pode ser adicionado como novo cron
-- Dashboard de admin / suporte
-- Notificações para o professor quando uma aula é agendada — pode ser adicionado no webhook
-
----
+O repositório começou como **EnglishBook**, uma plataforma de aulas de inglês sem
+relação com este negócio. Aquele app foi removido; as tabelas dele continuam paradas no
+Supabase, sem nada lendo ou escrevendo.

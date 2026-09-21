@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EnglishBook — Aulas de inglês sob medida",
+  title: "Lux Derma — Aluguel de lasers",
   description:
-    "Agende aulas de inglês com professores selecionados. Escolha o horário, pague online e comece hoje.",
+    "Agenda de aluguel de lasers para médicos e clínicas, e o radar de leads do WhatsApp.",
 };
 
 export default function RootLayout({

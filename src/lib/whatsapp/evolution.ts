@@ -1,0 +1,367 @@
+import { timingSafeEqual } from "node:crypto";
+import {
+  isGroupJid,
+  jidToPhone,
+  toIsoDate,
+  type NormalizedMessage,
+  type WaChat,
+  type WaConnection,
+  type WaMessageType,
+  type WebhookRequest,
+  type WhatsAppProvider,
+} from "./provider";
+
+/**
+ * Adaptador da Evolution API (self-hosted, conexão por QR Code).
+ *
+ * A Evolution roda num servidor sempre ligado (a Vercel é serverless e não
+ * sustenta o socket do WhatsApp), e o app fala com ela por REST.
+ *
+ * Documentação dos endpoints muda entre versões; o que este arquivo usa:
+ *   POST /message/sendText/{instance}
+ *   POST /chat/findMessages/{instance}
+ *   POST /chat/findChats/{instance}
+ *   GET  /instance/connectionState/{instance}
+ */
+
+type EvolutionConfig = {
+  baseUrl: string;
+  apiKey: string;
+  instance: string;
+  webhookSecret: string;
+};
+
+function readConfig(): EvolutionConfig {
+  const baseUrl = process.env.EVOLUTION_API_URL ?? "";
+  const apiKey = process.env.EVOLUTION_API_KEY ?? "";
+  const instance = process.env.EVOLUTION_INSTANCE ?? "";
+  const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET ?? "";
+
+  if (!baseUrl || !apiKey || !instance) {
+    throw new Error(
+      "Evolution API não configurada: faltam EVOLUTION_API_URL, EVOLUTION_API_KEY ou EVOLUTION_INSTANCE.",
+    );
+  }
+
+  return {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    apiKey,
+    instance,
+    webhookSecret,
+  };
+}
+
+/** Comparação em tempo constante, tolerante a tamanhos diferentes. */
+function secretsMatch(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+// ============================================================================
+//  Extração do conteúdo (o formato do Baileys, que a Evolution repassa)
+// ============================================================================
+
+type EvolutionMessageContent = Record<string, unknown> | null | undefined;
+
+type Extracted = {
+  type: WaMessageType;
+  body: string | null;
+  caption: string | null;
+  mediaUrl: string | null;
+  mediaMime: string | null;
+};
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() !== "" ? v : null;
+}
+
+function obj(v: unknown): Record<string, unknown> | null {
+  return v !== null && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+
+function extractContent(message: EvolutionMessageContent): Extracted {
+  const empty: Extracted = {
+    type: "other",
+    body: null,
+    caption: null,
+    mediaUrl: null,
+    mediaMime: null,
+  };
+  if (!message) return empty;
+
+  // Mensagens encaminhadas/efêmeras vêm embrulhadas numa camada extra.
+  const unwrapped =
+    obj(obj(message.ephemeralMessage)?.message) ??
+    obj(obj(message.viewOnceMessage)?.message) ??
+    obj(obj(message.viewOnceMessageV2)?.message) ??
+    message;
+
+  const conversation = str(unwrapped.conversation);
+  if (conversation) {
+    return { ...empty, type: "text", body: conversation };
+  }
+
+  const extended = obj(unwrapped.extendedTextMessage);
+  if (extended) {
+    return { ...empty, type: "text", body: str(extended.text) };
+  }
+
+  const media: [string, WaMessageType][] = [
+    ["imageMessage", "image"],
+    ["audioMessage", "audio"],
+    ["videoMessage", "video"],
+    ["documentMessage", "document"],
+    ["stickerMessage", "sticker"],
+  ];
+
+  for (const [key, type] of media) {
+    const node = obj(unwrapped[key]);
+    if (!node) continue;
+    return {
+      type,
+      // Para documento, o nome do arquivo é a informação útil.
+      body: type === "document" ? str(node.fileName) : null,
+      caption: str(node.caption),
+      mediaUrl: str(node.url) ?? str(node.directPath),
+      mediaMime: str(node.mimetype),
+    };
+  }
+
+  const location = obj(unwrapped.locationMessage);
+  if (location) {
+    const name = str(location.name) ?? str(location.address);
+    return { ...empty, type: "location", body: name };
+  }
+
+  const contact =
+    obj(unwrapped.contactMessage) ?? obj(unwrapped.contactsArrayMessage);
+  if (contact) {
+    return { ...empty, type: "contact", body: str(contact.displayName) };
+  }
+
+  const reaction = obj(unwrapped.reactionMessage);
+  if (reaction) {
+    return { ...empty, type: "other", body: str(reaction.text) };
+  }
+
+  return empty;
+}
+
+export type EvolutionRawMessage = {
+  key?: { id?: string; remoteJid?: string; fromMe?: boolean };
+  pushName?: string;
+  message?: EvolutionMessageContent;
+  messageTimestamp?: number | string;
+  messageType?: string;
+};
+
+/**
+ * Exportada para que o adaptador de fixtures use exatamente o mesmo parser.
+ * Assim, testar com fixture testa o código que roda em produção.
+ */
+export function normalizeOne(
+  raw: EvolutionRawMessage,
+): NormalizedMessage | null {
+  const id = raw?.key?.id;
+  const remoteJid = raw?.key?.remoteJid;
+  if (!id || !remoteJid) return null;
+
+  const phoneE164 = jidToPhone(remoteJid);
+  if (!phoneE164) return null;
+
+  const extracted = extractContent(raw.message);
+
+  return {
+    providerMessageId: id,
+    chatId: remoteJid,
+    phoneE164,
+    direction: raw.key?.fromMe ? "out" : "in",
+    type: extracted.type,
+    body: extracted.body,
+    caption: extracted.caption,
+    mediaUrl: extracted.mediaUrl,
+    mediaMime: extracted.mediaMime,
+    pushName: str(raw.pushName),
+    isGroup: isGroupJid(remoteJid),
+    sentAt: toIsoDate(raw.messageTimestamp),
+    raw,
+  };
+}
+
+/** O campo `data` pode vir como objeto único ou como array, conforme a versão. */
+export function asArray(data: unknown): EvolutionRawMessage[] {
+  if (Array.isArray(data)) return data as EvolutionRawMessage[];
+  if (data && typeof data === "object") return [data as EvolutionRawMessage];
+  return [];
+}
+
+// ============================================================================
+//  Adaptador
+// ============================================================================
+
+export function createEvolutionProvider(): WhatsAppProvider {
+  // A config é lida a cada chamada, não no topo do módulo: assim uma variável
+  // de ambiente faltando não derruba o `npm run build`.
+  async function call<T>(
+    path: string,
+    init?: { method?: string; body?: unknown },
+  ): Promise<T> {
+    const cfg = readConfig();
+    const res = await fetch(`${cfg.baseUrl}${path}`, {
+      method: init?.method ?? "GET",
+      headers: {
+        apikey: cfg.apiKey,
+        "content-type": "application/json",
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined,
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const texto = await res.text().catch(() => "");
+      throw new Error(
+        `Evolution API ${res.status} em ${path}: ${texto.slice(0, 300)}`,
+      );
+    }
+    return (await res.json()) as T;
+  }
+
+  return {
+    id: "evolution",
+
+    verifyWebhook({ url, headers }: WebhookRequest): boolean {
+      const cfg = readConfig();
+      if (!cfg.webhookSecret) return false;
+
+      // Aceita o segredo no header ou na query: a tela de configuração de
+      // webhook da Evolution nem sempre permite header customizado.
+      const fornecido =
+        headers.get("x-webhook-token") ?? url.searchParams.get("s") ?? "";
+
+      return secretsMatch(fornecido, cfg.webhookSecret);
+    },
+
+    eventId(payload: unknown): string | null {
+      const p = obj(payload);
+      if (!p) return null;
+
+      const evento = str(p.event);
+      // Só mensagens interessam. Status de entrega, presença e afins são ruído.
+      if (evento && !evento.startsWith("messages.")) return null;
+
+      const mensagens = asArray(p.data);
+      const ids = mensagens
+        .map((m) => m?.key?.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (ids.length === 0) return null;
+      // Lote de mensagens: um id composto identifica o lote inteiro.
+      return ids.length === 1 ? ids[0] : `batch:${ids.join(",").slice(0, 200)}`;
+    },
+
+    normalizeInbound(payload: unknown): NormalizedMessage[] {
+      const p = obj(payload);
+      if (!p) return [];
+      return asArray(p.data)
+        .map(normalizeOne)
+        .filter((m): m is NormalizedMessage => m !== null);
+    },
+
+    async listChats(opts): Promise<WaChat[]> {
+      const cfg = readConfig();
+      type RawChat = {
+        id?: string;
+        remoteJid?: string;
+        name?: string;
+        pushName?: string;
+        updatedAt?: string | number;
+        lastMessage?: { messageTimestamp?: number | string };
+      };
+
+      const data = await call<RawChat[] | { chats?: RawChat[] }>(
+        `/chat/findChats/${cfg.instance}`,
+        { method: "POST", body: {} },
+      );
+
+      const lista = Array.isArray(data) ? data : (data.chats ?? []);
+      const limite = opts?.limit ?? lista.length;
+
+      return lista
+        .map((c): WaChat | null => {
+          const jid = c.remoteJid ?? c.id;
+          if (!jid) return null;
+          const phoneE164 = jidToPhone(jid);
+          if (!phoneE164) return null;
+          const ts = c.lastMessage?.messageTimestamp ?? c.updatedAt;
+          return {
+            chatId: jid,
+            phoneE164,
+            name: c.name ?? c.pushName ?? null,
+            isGroup: isGroupJid(jid),
+            lastMessageAt: ts != null ? toIsoDate(ts) : null,
+          };
+        })
+        .filter((c): c is WaChat => c !== null)
+        .slice(0, limite);
+    },
+
+    async fetchChatHistory(chatId, opts): Promise<NormalizedMessage[]> {
+      const cfg = readConfig();
+      const limit = opts?.limit ?? 100;
+
+      type Resposta =
+        | EvolutionRawMessage[]
+        | { messages?: { records?: EvolutionRawMessage[] } | EvolutionRawMessage[] };
+
+      const data = await call<Resposta>(`/chat/findMessages/${cfg.instance}`, {
+        method: "POST",
+        body: {
+          where: { key: { remoteJid: chatId } },
+          limit,
+          ...(opts?.before ? { page: 1, before: opts.before } : {}),
+        },
+      });
+
+      let registros: EvolutionRawMessage[] = [];
+      if (Array.isArray(data)) {
+        registros = data;
+      } else if (Array.isArray(data.messages)) {
+        registros = data.messages;
+      } else if (data.messages?.records) {
+        registros = data.messages.records;
+      }
+
+      return registros
+        .map(normalizeOne)
+        .filter((m): m is NormalizedMessage => m !== null);
+    },
+
+    async sendText(phoneE164, text) {
+      const cfg = readConfig();
+      const data = await call<{ key?: { id?: string } }>(
+        `/message/sendText/${cfg.instance}`,
+        { method: "POST", body: { number: phoneE164, text } },
+      );
+      return { providerMessageId: data?.key?.id ?? "" };
+    },
+
+    async connectionStatus(): Promise<WaConnection> {
+      const cfg = readConfig();
+      try {
+        const data = await call<{ instance?: { state?: string } }>(
+          `/instance/connectionState/${cfg.instance}`,
+        );
+        const state = data?.instance?.state ?? "desconhecido";
+        return { connected: state === "open", label: state };
+      } catch (err) {
+        return {
+          connected: false,
+          label: err instanceof Error ? err.message : "erro",
+        };
+      }
+    },
+  };
+}

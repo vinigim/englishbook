@@ -1,5 +1,22 @@
 -- ============================================================================
--- ENGLISHBOOK - SCHEMA INICIAL
+-- ENGLISHBOOK - SCHEMA INICIAL  [LEGADO — NÃO RODE EM BANCO NOVO]
+-- ============================================================================
+-- O EnglishBook foi removido deste repositório. Nenhuma linha de código lê ou
+-- escreve nas tabelas criadas aqui (profiles, students, teachers,
+-- availability_slots, bookings, payments, stripe_webhook_events).
+--
+-- Este arquivo, junto com 0002 e 0003, foi mantido de propósito: as tabelas
+-- CONTINUAM existindo no Supabase, e estes arquivos são o único registro do
+-- que está lá. Apagá-los deixaria o banco com estrutura sem documentação.
+--
+-- Uma coisa aqui ainda está ativa: o gatilho handle_new_user(), que dispara a
+-- cada usuário novo no Supabase Auth e cria uma linha em profiles + students.
+-- Para a equipe da Lux Derma isso é inofensivo (cria uma linha inútil e o
+-- login funciona normalmente), mas se um dia você dropar as tabelas, o gatilho
+-- precisa cair NO MESMO COMANDO — senão criar qualquer login novo passa a
+-- falhar.
+--
+-- O que a Lux Derma usa de verdade: 0004 em diante.
 -- ============================================================================
 -- Rode este arquivo no SQL Editor do Supabase (uma vez).
 -- Ele cria as tabelas, índices, triggers e políticas RLS.
