@@ -39,6 +39,7 @@ type ExistingLead = {
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   source: string;
+  needs_analysis: boolean;
 };
 
 const vazio: IngestResult = {
@@ -162,7 +163,7 @@ export async function ingestMessages(
   const { data: existentesData, error: selectErr } = await admin
     .from("wa_leads")
     .select(
-      "id, phone_key, display_name, first_seen_at, last_message_at, last_inbound_at, last_outbound_at, source",
+      "id, phone_key, display_name, first_seen_at, last_message_at, last_inbound_at, last_outbound_at, source, needs_analysis",
     )
     .in("phone_key", chaves);
 
@@ -198,7 +199,14 @@ export async function ingestMessages(
       ),
       // Só mensagem RECEBIDA torna a análise obsoleta. Uma resposta nossa não
       // muda o que precisamos decidir sobre o lead.
-      ...(g.temEntrada ? { needs_analysis: true } : {}),
+      //
+      // O campo é escrito SEMPRE, nunca por spread condicional. Num upsert em
+      // lote, o PostgREST monta um único INSERT com a união das colunas de
+      // todos os objetos e preenche com NULL quem não trouxe a chave — o
+      // default da coluna não se aplica. Com needs_analysis sendo NOT NULL,
+      // um lote misturando lead com e sem mensagem recebida estourava a
+      // constraint. Foi o que quebrou a recuperação de 3.995 mensagens.
+      needs_analysis: g.temEntrada ? true : (prev?.needs_analysis ?? true),
     };
   });
 
