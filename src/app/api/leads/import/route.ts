@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { parseSpreadsheet } from "@/lib/leads/spreadsheet";
 import { looksLikeCompanyName } from "@/lib/leads/columns";
 import { toLeadPhone } from "@/lib/leads/phone";
@@ -216,7 +216,15 @@ async function handleCommit(request: NextRequest) {
     return NextResponse.json(report);
   }
 
-  const admin = createAdminClient();
+  const adminResult = tryCreateAdminClient();
+  if (!adminResult.ok) {
+    console.error("[leads-import] SUPABASE_SERVICE_ROLE_KEY ausente");
+    return NextResponse.json(
+      { error: "admin_not_configured", message: adminResult.message },
+      { status: 500 },
+    );
+  }
+  const admin = adminResult.admin;
   const keys = [...candidates.keys()];
 
   // 2) Busca o que já existe, para fazer o merge sem sobrescrever.
