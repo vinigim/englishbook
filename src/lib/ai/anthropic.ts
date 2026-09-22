@@ -39,5 +39,10 @@ export function isAiConfigured(): boolean {
 export const TRIAGE_MODEL =
   process.env.LEAD_TRIAGE_MODEL ?? "claude-haiku-4-5";
 
+/**
+ * Padrão da redação. A tela do lead pode escolher outro por clique — ver
+ * `DRAFT_MODELS` em ./models.ts —, mas a análise em lote sempre usa este, para
+ * não existir jeito de a fatura crescer sem alguém ter decidido.
+ */
 export const DRAFT_MODEL =
   process.env.LEAD_DRAFT_MODEL ?? "claude-sonnet-5";

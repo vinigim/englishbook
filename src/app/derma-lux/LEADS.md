@@ -106,10 +106,25 @@ Dois níveis, para não gastar à toa:
 | | Modelo | Quando roda |
 |---|---|---|
 | **Triagem** | Haiku 4.5 | Em todos os leads pendentes |
-| **Redação** | Sonnet 5 | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
+| **Redação** | Sonnet 5 (escolhível) | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
 
 A triagem classifica estágio, temperatura, intenção, objeções e equipamento de
 interesse. A redação escolhe a ação e escreve a mensagem.
+
+**Quem escreve dá para escolher por clique.** Na ficha do lead, um seletor
+oferece Haiku 4.5, Sonnet 5 e Opus 5 (`src/lib/ai/models.ts`), cada um com a
+estimativa em dólares de uma reanálise — calculada sobre o que as últimas 200
+análises de fato gastaram, não sobre preço de tabela.
+
+A escolha **vale só para aquele clique** e não é gravada em lugar nenhum: o
+botão de analisar em lote continua no padrão, então não existe jeito de a
+fatura crescer por uma opção esquecida ligada. A triagem nunca muda — ela roda
+em todo mundo e custa quase nada.
+
+O valor vem do navegador, então é validado contra a lista antes de virar o
+`model` de uma chamada paga. Modelo fora de `cost.ts` é recusado: sem preço, a
+análise gravaria custo zero, e número errado num relatório de fatura é pior que
+número ausente.
 
 **Cache por hash.** Antes de chamar a API, o sistema calcula um hash da
 conversa + dados do lead + versão do prompt. Se já existe análise com aquele

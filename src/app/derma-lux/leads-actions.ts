@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAiConfigured } from "@/lib/ai/anthropic";
 import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
+import { isDraftModel } from "@/lib/ai/models";
 import {
   EFFECTIVE_TEMPERATURES,
   LEAD_STATUSES,
@@ -50,7 +51,12 @@ export type ReanalyzeResult = ActionResult & {
 
 export async function reanalyzeLead(
   id: string,
-  opts: { force?: boolean; gerarRascunho?: boolean } = {},
+  opts: {
+    force?: boolean;
+    gerarRascunho?: boolean;
+    /** Quem escreve a mensagem NESTA chamada. Nulo = o padrão. */
+    draftModel?: string;
+  } = {},
 ): Promise<ReanalyzeResult> {
   const supabase = await requireSupabase();
   if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
@@ -73,9 +79,17 @@ export async function reanalyzeLead(
 
     if (!input) return { ok: false, error: "Lead não encontrado." };
 
+    // Validado contra a lista, e não repassado cru: este valor vem do
+    // navegador e vira o `model` de uma chamada paga.
+    const draftModel =
+      opts.draftModel && isDraftModel(opts.draftModel)
+        ? opts.draftModel
+        : undefined;
+
     const resultado = await analyzeLead(admin, input, {
       force: opts.force ?? true,
       forceDraft: opts.gerarRascunho ?? true,
+      draftModel,
     });
 
     revalidateLead(id);
