@@ -9,6 +9,9 @@ import {
   ACTION_LABEL,
   EFFECTIVE_TEMPERATURES,
   isConfirmada,
+  LEAD_STATUSES,
+  LEAD_STATUS_LABEL,
+  type LeadStatus,
   OBJECTION_LABEL,
   STAGE_LABEL,
   TEMPERATURE_LABEL,
@@ -22,11 +25,13 @@ import {
   formatPhoneBR,
   leadDisplayName,
   relativeDays,
+  situacaoEfetiva,
   temperaturaEfetiva,
 } from "../../../leads-shared";
 import {
   registerDraftCopied,
   reanalyzeLead,
+  updateLeadStatus,
   updateLeadTemperature,
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
@@ -63,6 +68,10 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const [erro, setErro] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const temperatura = temperaturaEfetiva(lead, analysis);
+  // As locações já vêm ordenadas da mais recente para a mais antiga, então a
+  // primeira é a última que aconteceu — é só disso que a derivação precisa.
+  const agenda = rentals.length > 0 ? { ultima: rentals[0].date } : null;
+  const situacao = situacaoEfetiva(lead, agenda);
   const [rascunho, setRascunho] = useState(analysis?.draft_message ?? "");
 
   /**
@@ -71,6 +80,30 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
    * Não mexe na análise: o que o modelo concluiu continua gravado e visível,
    * para a divergência ficar à vista em vez de sumir.
    */
+  /**
+   * Marca a situação à mão, ou devolve o lead para a derivação da agenda.
+   *
+   * Nulo não significa "novo": significa "deduza do fato". Quem alugou há
+   * pouco volta a ser cliente sozinho.
+   */
+  function marcarSituacao(valor: LeadStatus | null) {
+    setErro(null);
+    setStatus(null);
+    startTransition(async () => {
+      const r = await updateLeadStatus(lead.id, valor);
+      if (!r.ok) {
+        setErro(r.error ?? "Não consegui salvar a situação.");
+        return;
+      }
+      setStatus(
+        valor === null
+          ? "Voltou a seguir a agenda."
+          : `Marcado como ${LEAD_STATUS_LABEL[valor]}.`,
+      );
+      router.refresh();
+    });
+  }
+
   function marcarTemperatura(valor: EffectiveTemperature | null) {
     setErro(null);
     setStatus(null);
@@ -264,6 +297,60 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
+            </div>
+
+            {/* -------------------------------------- situação à mão */}
+            <div className="mb-4 pb-4 border-b border-line">
+              <p className="text-xs uppercase tracking-wide text-muted mb-2">
+                Situação
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {LEAD_STATUSES.map((v) => {
+                  const ativo = situacao === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={pendente}
+                      onClick={() => marcarSituacao(ativo ? null : v)}
+                      className={cn(
+                        "px-2.5 py-1 text-xs border transition-colors disabled:opacity-50",
+                        ativo
+                          ? "bg-ink text-paper border-ink"
+                          : "bg-paper text-ink border-line hover:border-ink",
+                      )}
+                    >
+                      {LEAD_STATUS_LABEL[v]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* O que a agenda sabe. Antes da conciliação da 0014 isto era
+                  sempre vazio, inclusive para clientes antigos. */}
+              {agenda ? (
+                <p className="text-xs text-muted mt-2">
+                  {rentals.length} locação(ões) na agenda · última{" "}
+                  {relativeDays(rentals[0].date)}
+                  {lead.status ? null : " · situação derivada daí"}
+                </p>
+              ) : (
+                <p className="text-xs text-muted mt-2">
+                  Nenhuma locação na agenda.
+                </p>
+              )}
+
+              {lead.status ? (
+                <button
+                  type="button"
+                  disabled={pendente}
+                  onClick={() => marcarSituacao(null)}
+                  className="text-xs text-muted underline mt-2 disabled:opacity-50"
+                >
+                  Voltar a seguir a agenda
+                </button>
+              ) : null}
             </div>
 
             {/* ------------------------------------ temperatura à mão */}

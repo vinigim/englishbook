@@ -1,8 +1,15 @@
 import type {
   EffectiveTemperature,
   FunnelStage,
+  LeadStatus,
 } from "@/lib/leads/taxonomy";
-import type { Lead, LeadAnalysis, MessageType, WaMessage } from "./leads-types";
+import type {
+  Lead,
+  LeadAnalysis,
+  LeadRentals,
+  MessageType,
+  WaMessage,
+} from "./leads-types";
 
 /**
  * Prioridade é calculada aqui, em TypeScript puro — não pela IA.
@@ -21,6 +28,39 @@ const TEMPERATURE_WEIGHT: Record<EffectiveTemperature, number> = {
   quente_confirmado: 4,
   frio_confirmado: 0,
 };
+
+/**
+ * Quantos meses sem alugar antes de um cliente deixar de ser "ativo".
+ *
+ * Escolhido pelo dono: a carteira dele aluga com frequência, então três meses
+ * de silêncio já é sinal de esfriamento, não sazonalidade.
+ */
+export const MESES_CLIENTE_ATIVO = 3;
+
+/**
+ * A situação que a tela usa.
+ *
+ * O rótulo do dono prevalece; sem ele, deriva da agenda — que é o fato, não
+ * uma opinião. Um cliente que alugou é cliente, e ninguém precisa manter isso
+ * à mão em centenas de leads.
+ *
+ * A ordem importa: locação recente ganha de locação antiga, que ganha de
+ * conversa, que ganha de nada.
+ */
+export function situacaoEfetiva(
+  lead: Pick<Lead, "status" | "last_message_at">,
+  rentals: Pick<LeadRentals, "ultima"> | null,
+): LeadStatus {
+  if (lead.status) return lead.status;
+
+  if (rentals?.ultima) {
+    const corte = new Date();
+    corte.setMonth(corte.getMonth() - MESES_CLIENTE_ATIVO);
+    return new Date(rentals.ultima) >= corte ? "cliente" : "inativo";
+  }
+
+  return lead.last_message_at ? "em_conversa" : "novo";
+}
 
 /**
  * A temperatura que a tela usa.

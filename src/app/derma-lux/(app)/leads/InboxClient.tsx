@@ -11,11 +11,13 @@ import {
   STAGE_LABEL,
   TEMPERATURE_LABEL,
   type EffectiveTemperature,
+  type LeadStatus,
 } from "@/lib/leads/taxonomy";
 import {
   leadDisplayName,
   messagePreview,
   relativeDays,
+  situacaoEfetiva,
   temperaturaEfetiva,
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
@@ -50,6 +52,24 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "sem_analise", label: "Sem análise" },
 ];
 
+/**
+ * Situação é uma dimensão INDEPENDENTE da temperatura.
+ *
+ * Por isso duas linhas de filtro em vez de uma fila só: com 13 chips exclusivos
+ * a barra viraria rolagem infinita no celular, e — mais importante — não daria
+ * para pedir "cliente ativo E quente", que é a pergunta que interessa.
+ */
+type FiltroSituacao = "todas" | LeadStatus;
+
+const FILTROS_SITUACAO: { id: FiltroSituacao; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "cliente", label: "Cliente ativo" },
+  { id: "inativo", label: "Cliente inativo" },
+  { id: "em_conversa", label: "Em conversa" },
+  { id: "novo", label: "Novo" },
+  { id: "descartado", label: "Descartado" },
+];
+
 function aguardandoResposta(row: LeadInboxRow): boolean {
   const { last_inbound_at, last_outbound_at } = row.lead;
   if (!last_inbound_at) return false;
@@ -59,12 +79,21 @@ function aguardandoResposta(row: LeadInboxRow): boolean {
 
 export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [situacao, setSituacao] = useState<FiltroSituacao>("todas");
   const [busca, setBusca] = useState("");
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
     return rows.filter((row) => {
+      // As duas linhas se COMBINAM: interseção, não união.
+      if (
+        situacao !== "todas" &&
+        situacaoEfetiva(row.lead, row.rentals) !== situacao
+      ) {
+        return false;
+      }
+
       if (filtro === "sem_analise" && row.analysis) return false;
       if (filtro === "aguardando_resposta" && !aguardandoResposta(row)) {
         return false;
@@ -96,7 +125,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         .toLowerCase();
       return alvo.includes(termo);
     });
-  }, [rows, filtro, busca]);
+  }, [rows, filtro, situacao, busca]);
 
   const contagem = useMemo(() => {
     const c: Record<Filtro, number> = {
@@ -117,6 +146,19 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (!row.analysis) c.sem_analise += 1;
       if (aguardandoResposta(row)) c.aguardando_resposta += 1;
     }
+    return c;
+  }, [rows]);
+
+  const contagemSituacao = useMemo(() => {
+    const c: Record<FiltroSituacao, number> = {
+      todas: rows.length,
+      novo: 0,
+      em_conversa: 0,
+      cliente: 0,
+      inativo: 0,
+      descartado: 0,
+    };
+    for (const row of rows) c[situacaoEfetiva(row.lead, row.rentals)] += 1;
     return c;
   }, [rows]);
 
@@ -142,6 +184,27 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
             >
               {f.label}
               <span className="ml-1.5 opacity-60">{contagem[f.id]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Segunda linha: situação. Dimensão independente da temperatura —
+            combinar as duas é o que permite "cliente ativo e quente". */}
+        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+          {FILTROS_SITUACAO.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSituacao(f.id)}
+              className={cn(
+                "shrink-0 px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-colors",
+                situacao === f.id
+                  ? "bg-ink text-paper border-ink"
+                  : "bg-paper text-ink border-line hover:border-ink",
+              )}
+            >
+              {f.label}
+              <span className="ml-1.5 opacity-60">{contagemSituacao[f.id]}</span>
             </button>
           ))}
         </div>

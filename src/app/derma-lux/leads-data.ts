@@ -6,12 +6,15 @@ import type {
   LeadDetail,
   LeadInboxRow,
   LeadRental,
+  LeadRentals,
   WaMessage,
 } from "./leads-types";
 
 /** Colunas da análise que a lista precisa (evita trazer raw_output à toa). */
 const ANALYSIS_COLS =
   "id, lead_id, version, content_hash, prompt_version, stage, temperature, intent, summary, objections, equipment_interest, equip_id, specialty, days_since_last_contact, is_existing_customer, recommended_action, draft_message, rationale, confidence, priority_score, model, input_tokens, output_tokens, cache_read_tokens, cost_usd, created_at";
+
+const RENTALS_COLS = "lead_id, total, ultima, primeira, total_brl";
 
 const MESSAGE_COLS =
   "id, lead_id, provider, provider_message_id, chat_id, direction, message_type, body, caption, media_url, media_mime, sent_at";
@@ -92,12 +95,16 @@ export async function getLeadsInbox(
   const leads = leadsData as Lead[];
   const ids = leads.map((l) => l.id);
 
-  const [analyses, messages] = await Promise.all([
+  const [analyses, messages, rentals] = await Promise.all([
     emLotes<LeadAnalysis>(ids, (lote) =>
       supabase.from("wa_latest_analyses").select(ANALYSIS_COLS).in("lead_id", lote),
     ),
     emLotes<WaMessage>(ids, (lote) =>
       supabase.from("wa_latest_messages").select(MESSAGE_COLS).in("lead_id", lote),
+    ),
+    // A agenda é quem diz se o lead já foi cliente (view da 0014).
+    emLotes<LeadRentals>(ids, (lote) =>
+      supabase.from("wa_lead_rentals").select(RENTALS_COLS).in("lead_id", lote),
     ),
   ]);
 
@@ -108,11 +115,15 @@ export async function getLeadsInbox(
   const latestMessage = new Map<string, WaMessage>();
   for (const m of messages) latestMessage.set(m.lead_id, m);
 
+  const porLead = new Map<string, LeadRentals>();
+  for (const r of rentals) porLead.set(r.lead_id, r);
+
   const rows: LeadInboxRow[] = leads.map((lead) => {
     const analysis = latestAnalysis.get(lead.id) ?? null;
     const msg = latestMessage.get(lead.id) ?? null;
     return {
       lead,
+      rentals: porLead.get(lead.id) ?? null,
       analysis,
       lastMessage: msg
         ? {
