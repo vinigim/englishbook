@@ -178,6 +178,45 @@ export async function updateLeadTemperature(
   return { ok: true };
 }
 
+/**
+ * Marca (ou desmarca) que a mensagem saiu pelo direct do Instagram.
+ *
+ * É a única saída que o sistema não consegue enxergar sozinho: o que sai pelo
+ * WhatsApp volta na sincronização e atualiza `last_outbound_at`; o Instagram
+ * não volta nunca. Sem esta marcação, um lead que já recebeu mensagem fica
+ * idêntico a um que nunca recebeu.
+ *
+ * Desmarcar apaga a data em vez de guardar um histórico: isto é o desfazer de
+ * um toque errado, não um registro de auditoria.
+ *
+ * Marca `needs_analysis` porque muda o quadro que a IA lê — "mandei e não
+ * respondeu" pede coisa diferente de "nunca falei com essa pessoa".
+ */
+export async function marcarInstagramEnviado(
+  id: string,
+  enviado: boolean,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({
+      instagram_sent_at: enviado ? new Date().toISOString() : null,
+      needs_analysis: true,
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
 const detailsSchema = z.object({
   clinic_name: z.string().trim().max(200).nullish(),
   specialty: z.string().trim().max(120).nullish(),

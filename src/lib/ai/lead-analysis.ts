@@ -6,6 +6,7 @@ import type { Lead, LeadRental, WaMessage } from "@/app/derma-lux/leads-types";
 import {
   daysSince,
   extraFields,
+  instagramDoLead,
   leadDisplayName,
   parseSheetDate,
   relativeDays,
@@ -121,6 +122,7 @@ function buildContext(input: AnalysisInput): string {
   const diasDesdeEntrada = daysSince(lead.last_inbound_at);
 
   const extras = extraFields(lead.extra);
+  const instagram = instagramDoLead(lead);
 
   // Lead vindo da planilha não tem mensagem, então `last_message_at` é nulo e
   // o modelo ficaria sem qualquer noção de tempo. A data anotada na planilha é
@@ -142,6 +144,22 @@ function buildContext(input: AnalysisInput): string {
     lead.clinic_name ? `Clínica: ${lead.clinic_name}` : null,
     lead.specialty ? `Especialidade: ${lead.specialty}` : null,
     lead.city ? `Cidade: ${lead.city}${lead.uf ? `/${lead.uf}` : ""}` : null,
+    // Sem isto o modelo conclui "não há como falar com esse contato" em lead
+    // cujo telefone é fixo — e às vezes é a própria planilha que diz que o
+    // número não tem WhatsApp. Aconteceu: ele descartou uma clínica que tinha
+    // Instagram, porque o Instagram tinha acabado de ganhar campo próprio e
+    // parado de chegar aqui junto com as outras colunas da planilha.
+    instagram
+      ? `Instagram: @${instagram} — canal alternativo, aberto mesmo quando o telefone não tem WhatsApp.`
+      : null,
+    // Envio pelo direct não volta em sincronização nenhuma, então esta marca
+    // do dono é a ÚNICA forma de o modelo saber que já houve abordagem. Sem
+    // ela, um lead que recebeu mensagem semana passada é lido como alguém com
+    // quem nunca se falou — e a sugestão volta a ser "faça o primeiro
+    // contato", que é justamente o erro.
+    lead.instagram_sent_at
+      ? `JÁ FOI ABORDADO pelo direct do Instagram há ${daysSince(lead.instagram_sent_at)} dia(s), e não respondeu por ali. Isso não aparece na transcrição do WhatsApp porque o Instagram não sincroniza.`
+      : null,
     `Origem do cadastro: ${lead.source}`,
     diasSemContato != null
       ? `Dias desde a última mensagem (qualquer lado): ${diasSemContato}`
@@ -227,6 +245,16 @@ export function contentHash(input: AnalysisInput): string {
     extraFields(input.lead.extra)
       .map(([c, v]) => `${c}=${v}`)
       .join(";"),
+    // O Instagram entra no hash SÓ quando existe, e não como campo fixo.
+    //
+    // Um campo fixo a mais mudaria o hash de todo mundo e mandaria as 379
+    // análises para a fila de novo. Assim, só as ~138 que passaram a ter um
+    // canal a mais no contexto é que ficam desatualizadas — que são exatamente
+    // as que o modelo leria diferente.
+    ...(input.lead.instagram ? [`ig=${input.lead.instagram}`] : []),
+    ...(input.lead.instagram_sent_at
+      ? [`igenv=${input.lead.instagram_sent_at}`]
+      : []),
     input.rentals
       .map((r) => r.id)
       .sort()

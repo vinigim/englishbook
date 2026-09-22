@@ -34,6 +34,7 @@ import {
   temperaturaEfetiva,
 } from "../../../leads-shared";
 import {
+  marcarInstagramEnviado,
   registerDraftCopied,
   reanalyzeLead,
   updateLeadStatus,
@@ -216,6 +217,34 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
     // Sem await: segurar aqui adiaria a navegação, e a cópia precisa
     // acontecer dentro do gesto do toque para o navegador permitir.
     void copiar();
+  }
+
+  /**
+   * Registra que a mensagem saiu pelo direct.
+   *
+   * O clique em "Abrir no Instagram" NÃO marca sozinho de propósito: abrir não
+   * é enviar, e um lead marcado por engano é pior do que um não marcado — ele
+   * sai da fila sem nunca ter recebido nada.
+   */
+  function marcarEnviado(enviado: boolean) {
+    executar("mensagem", async () => {
+      const r = await marcarInstagramEnviado(lead.id, enviado);
+      if (!r.ok) {
+        return {
+          onde: "mensagem",
+          tipo: "erro",
+          texto: r.error ?? "Não consegui salvar a marcação.",
+        };
+      }
+      router.refresh();
+      return {
+        onde: "mensagem",
+        tipo: "info",
+        texto: enviado
+          ? "Marcado como enviado pelo Instagram."
+          : "Marcação removida.",
+      };
+    });
   }
 
   function analisar(gerarRascunho: boolean, onde: Onde) {
@@ -620,6 +649,47 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
                 </a>
               ) : null}
             </div>
+
+            {/* A marcação de envio fica em linha própria: ela não é uma saída
+                para outro app como as de cima, é o registro de que já saiu. */}
+            {instagram ? (
+              <div className="mt-3 pt-3 border-t border-line">
+                {lead.instagram_sent_at ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="success" className="whitespace-nowrap">
+                      ✓ enviado pelo Instagram
+                    </Badge>
+                    <span className="text-xs text-muted">
+                      {relativeDays(lead.instagram_sent_at)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={pendente}
+                      onClick={() => marcarEnviado(false)}
+                      className="text-xs text-muted underline disabled:opacity-50"
+                    >
+                      desmarcar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={pendente}
+                      onClick={() => marcarEnviado(true)}
+                    >
+                      Já enviei pelo Instagram
+                    </Button>
+                    <p className="text-xs text-muted mt-1.5">
+                      O que sai pelo WhatsApp volta na sincronização e o painel
+                      percebe sozinho. O Instagram não volta nunca — essa marca
+                      é a única forma de o sistema saber.
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : null}
 
             {aviso("mensagem")}
 
