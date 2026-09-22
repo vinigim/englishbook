@@ -63,6 +63,17 @@ const MEDIA_LABEL: Record<string, string> = {
   other: "anexo",
 };
 
+/**
+ * Onde o retorno de uma ação aparece.
+ *
+ * Os botões desta tela ficam a mais de uma tela de rolagem do topo. Enquanto o
+ * aviso era renderizado lá em cima, no celular o clique parecia não fazer nada:
+ * a resposta existia — inclusive "a IA não escreveu mensagem" —, só que fora
+ * da vista. Agora cada aviso nasce ao lado do botão que o provocou.
+ */
+type Onde = "analise" | "mensagem";
+type Feedback = { onde: Onde; tipo: "erro" | "info"; texto: string };
+
 export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const { lead, messages, analysis, rentals } = detail;
   // Mesma normalização que alimenta a IA, para a tela mostrar exatamente o que
@@ -70,8 +81,7 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
   const extras = extraFields(lead.extra);
   const router = useRouter();
   const [pendente, startTransition] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const temperatura = temperaturaEfetiva(lead, analysis);
   // As locações já vêm ordenadas da mais recente para a mais antiga, então a
   // primeira é a última que aconteceu — é só disso que a derivação precisa.
@@ -91,39 +101,88 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
    * Nulo não significa "novo": significa "deduza do fato". Quem alugou há
    * pouco volta a ser cliente sozinho.
    */
-  function marcarSituacao(valor: LeadStatus | null) {
-    setErro(null);
-    setStatus(null);
+  /**
+   * Roda uma ação e SEMPRE deixa um retorno na tela, ao lado do botão clicado.
+   *
+   * O try/catch não é decorativo. Sem ele, uma Server Action que estoura — a
+   * função da Vercel cortada por tempo no meio de uma redação, a rede caindo no
+   * meio — rejeitava dentro do `startTransition` sem ninguém escutando: o
+   * spinner sumia, nada mudava na tela, e não havia como distinguir isso de um
+   * botão quebrado.
+   */
+  function executar(onde: Onde, acao: () => Promise<Feedback | null>) {
+    setFeedback(null);
     startTransition(async () => {
+      try {
+        const f = await acao();
+        if (f) setFeedback(f);
+      } catch (err) {
+        setFeedback({
+          onde,
+          tipo: "erro",
+          texto:
+            err instanceof Error && err.message
+              ? `Falhou: ${err.message}`
+              : "A resposta não chegou. Se a IA estava escrevendo, pode ter passado do tempo limite do servidor — tente de novo.",
+        });
+      }
+    });
+  }
+
+  /** O aviso da última ação, renderizado só no cartão que a disparou. */
+  function aviso(onde: Onde) {
+    if (!feedback || feedback.onde !== onde) return null;
+    return (
+      <Alert
+        variant={feedback.tipo === "erro" ? "danger" : "info"}
+        className="mt-3"
+      >
+        {feedback.texto}
+      </Alert>
+    );
+  }
+
+  function marcarSituacao(valor: LeadStatus | null) {
+    executar("analise", async () => {
       const r = await updateLeadStatus(lead.id, valor);
       if (!r.ok) {
-        setErro(r.error ?? "Não consegui salvar a situação.");
-        return;
+        return {
+          onde: "analise",
+          tipo: "erro",
+          texto: r.error ?? "Não consegui salvar a situação.",
+        };
       }
-      setStatus(
-        valor === null
-          ? "Voltou a seguir a agenda."
-          : `Marcado como ${LEAD_STATUS_LABEL[valor]}.`,
-      );
       router.refresh();
+      return {
+        onde: "analise",
+        tipo: "info",
+        texto:
+          valor === null
+            ? "Voltou a seguir a agenda."
+            : `Marcado como ${LEAD_STATUS_LABEL[valor]}.`,
+      };
     });
   }
 
   function marcarTemperatura(valor: EffectiveTemperature | null) {
-    setErro(null);
-    setStatus(null);
-    startTransition(async () => {
+    executar("analise", async () => {
       const r = await updateLeadTemperature(lead.id, valor);
       if (!r.ok) {
-        setErro(r.error ?? "Não consegui salvar a temperatura.");
-        return;
+        return {
+          onde: "analise",
+          tipo: "erro",
+          texto: r.error ?? "Não consegui salvar a temperatura.",
+        };
       }
-      setStatus(
-        valor === null
-          ? "Voltou a seguir a leitura da IA."
-          : `Marcado como ${TEMPERATURE_LABEL[valor]}.`,
-      );
       router.refresh();
+      return {
+        onde: "analise",
+        tipo: "info",
+        texto:
+          valor === null
+            ? "Voltou a seguir a leitura da IA."
+            : `Marcado como ${TEMPERATURE_LABEL[valor]}.`,
+      };
     });
   }
   const [copiado, setCopiado] = useState(false);
@@ -159,30 +218,29 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
     void copiar();
   }
 
-  function analisar(gerarRascunho: boolean) {
-    setErro(null);
-    setStatus(null);
-    startTransition(async () => {
+  function analisar(gerarRascunho: boolean, onde: Onde) {
+    executar(onde, async () => {
       const r = await reanalyzeLead(lead.id, { force: true, gerarRascunho });
 
       if (!r.ok) {
-        setErro(r.error ?? "Falha na análise.");
-        return;
+        return { onde, tipo: "erro", texto: r.error ?? "Falha na análise." };
       }
+
+      router.refresh();
 
       // Sem isto, uma recusa da IA é indistinguível de um botão quebrado:
       // o spinner some e nada muda na tela.
       if (r.gerouRascunho) {
-        setStatus("Mensagem gerada abaixo.");
-      } else if (r.acao) {
-        setStatus(
-          `A IA reavaliou e manteve "${ACTION_LABEL[r.acao]}" — não escreveu mensagem.`,
-        );
-      } else {
-        setStatus("Análise concluída.");
+        return { onde, tipo: "info", texto: "Mensagem gerada abaixo." };
       }
-
-      router.refresh();
+      if (r.acao) {
+        return {
+          onde,
+          tipo: "info",
+          texto: `A IA reavaliou e manteve "${ACTION_LABEL[r.acao]}" — não escreveu mensagem.`,
+        };
+      }
+      return { onde, tipo: "info", texto: "Análise concluída." };
     });
   }
 
@@ -196,20 +254,17 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
         void registerDraftCopied(lead.id, analysis.id, rascunho);
       }
     } catch {
-      setErro("O navegador bloqueou a cópia. Selecione o texto e copie à mão.");
+      setFeedback({
+        onde: "mensagem",
+        tipo: "erro",
+        texto:
+          "O navegador bloqueou a cópia. Selecione o texto e copie à mão.",
+      });
     }
   }
 
   return (
     <div className="space-y-4">
-      {erro ? (
-        <Alert variant="danger" title="Deu problema">
-          {erro}
-        </Alert>
-      ) : null}
-
-      {status ? <Alert variant="info">{status}</Alert> : null}
-
       {/* ---------------------------------------------------- identificação */}
       <Card variant="bordered">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -322,11 +377,13 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
                 size="sm"
                 variant="ghost"
                 loading={pendente}
-                onClick={() => analisar(true)}
+                onClick={() => analisar(true, "analise")}
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
             </div>
+
+            {aviso("analise")}
 
             {/* -------------------------------------- situação à mão */}
             <div className="mb-4 pb-4 border-b border-line">
@@ -516,7 +573,7 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
                   size="sm"
                   variant="secondary"
                   loading={pendente}
-                  onClick={() => analisar(true)}
+                  onClick={() => analisar(true, "mensagem")}
                 >
                   Gerar mensagem assim mesmo
                 </Button>
@@ -563,6 +620,8 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
                 </a>
               ) : null}
             </div>
+
+            {aviso("mensagem")}
 
             <p className="text-xs text-muted mt-3">
               A mensagem sai pelo seu WhatsApp, não pelo sistema. Revise antes
