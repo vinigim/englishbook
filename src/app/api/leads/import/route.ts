@@ -289,15 +289,24 @@ async function handleCommit(request: NextRequest) {
   // extras entram inteiras em `extra`, sem perder dado.
   //
   // ⚠️ TODA linha deste array precisa ter EXATAMENTE o mesmo conjunto de
-  // chaves. O upsert em lote do PostgREST monta um único INSERT com a UNIÃO
-  // das colunas de todos os objetos, e preenche NULL onde a chave falta — a
-  // linha omitida não é "preservada", é apagada.
+  // chaves. Omitir um campo NÃO preserva o valor que está no banco — de dois
+  // jeitos diferentes, dependendo de quantos objetos o omitem:
   //
-  // Omitir um campo para preservar o valor do banco funcionava enquanto toda
-  // importação era homogênea (ou só lead novo, ou só lead existente). A
-  // primeira planilha mista derrubou tudo: bastou UM lead novo trazer
-  // `phone_e164` para todo lead antigo do lote receber NULL num campo not
-  // null. O `first_seen_at` fazia o mesmo sem estourar, porque é nulável —
+  //   - omitido por TODOS: a coluna simplesmente não entra no INSERT, a tupla
+  //     assume o default dela (NULL), e o `not null` dispara na inserção
+  //     especulativa, antes de o ON CONFLICT DO UPDATE ser considerado;
+  //   - omitido por ALGUNS: o PostgREST monta o INSERT com a UNIÃO das colunas
+  //     de todos os objetos, e quem não trouxe a chave recebe NULL explícito.
+  //     Foi assim que o `needs_analysis` quebrou uma vez.
+  //
+  // Foi o primeiro caso que derrubou a importação da planilha de prospecção:
+  // os 379 leads já existiam todos, nenhum objeto trazia `phone_e164`, e a
+  // coluna sumiu do INSERT. Ou seja, a omissão nunca preservou nada — só não
+  // tinha estourado antes porque as importações anteriores traziam leads
+  // novos, e eram eles que colocavam a coluna no INSERT para os antigos
+  // pegarem carona.
+  //
+  // O `first_seen_at` tinha o mesmo defeito sem estourar, porque é nulável:
   // apagava em silêncio a data de primeiro contato.
   //
   // Por isso preservar é RELER e reenviar igual, nunca omitir.
