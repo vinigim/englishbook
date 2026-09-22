@@ -133,6 +133,4 @@ before `create policy`, realtime registration inside a
   EnglishBook crons blocked a Hobby-plan deploy. Creating it is a prerequisite for
   automatic follow-up; Hobby allows 2 crons at daily granularity.
 - No password-reset page — recovery is triggered from the Supabase dashboard
-- `rentals.wa_lead_id` is not auto-reconciled; a commented `update` sits at the end of
-  migration `0010` to run after the first backfill
 - No way to send a WhatsApp message from the panel (deliberate, see above)
