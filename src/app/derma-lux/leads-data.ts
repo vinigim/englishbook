@@ -238,6 +238,61 @@ export async function countPendingAnalysis(): Promise<number> {
   return count ?? 0;
 }
 
+/**
+ * Perfil médio de tokens de uma análise que gerou mensagem.
+ *
+ * Serve para o seletor de modelo mostrar um preço em dólares, e não em dólares
+ * por milhão de tokens — que não ajuda ninguém a decidir nada.
+ *
+ * A média sai das análises que REALMENTE escreveram rascunho: uma triagem seca
+ * gasta uma fração disso, e misturar as duas daria um número otimista demais.
+ *
+ * Os tokens gravados somam triagem + redação, e a estimativa cobra tudo pelo
+ * preço do modelo escolhido. Isso superestima — na prática a triagem continua
+ * no Haiku —, e é o lado certo para errar num número que decide gasto.
+ *
+ * Devolve `null` quando ainda não há histórico; aí a tela mostra só o preço
+ * por milhão, sem inventar média.
+ */
+export async function getDraftTokenProfile(): Promise<{
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+} | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("wa_lead_analyses")
+    .select("input_tokens, output_tokens, cache_read_tokens")
+    .not("draft_message", "is", null)
+    .order("created_at", { ascending: false })
+    // As últimas 200 bastam para uma média, e acompanham mudanças de prompt em
+    // vez de arrastar para sempre o custo das primeiras análises.
+    .limit(200);
+
+  const linhas = (data ?? []) as {
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cache_read_tokens: number | null;
+  }[];
+
+  if (linhas.length === 0) return null;
+
+  const soma = linhas.reduce(
+    (acc, r) => ({
+      inputTokens: acc.inputTokens + (r.input_tokens ?? 0),
+      outputTokens: acc.outputTokens + (r.output_tokens ?? 0),
+      cacheReadTokens: acc.cacheReadTokens + (r.cache_read_tokens ?? 0),
+    }),
+    { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
+  );
+
+  return {
+    inputTokens: Math.round(soma.inputTokens / linhas.length),
+    outputTokens: Math.round(soma.outputTokens / linhas.length),
+    cacheReadTokens: Math.round(soma.cacheReadTokens / linhas.length),
+  };
+}
+
 /** Gasto acumulado com a IA, para o dono não ser surpreendido pela fatura. */
 export async function getAnalysisSpend(): Promise<{
   total: number;

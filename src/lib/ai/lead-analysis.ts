@@ -13,7 +13,7 @@ import {
   sheetContactDate,
 } from "@/app/derma-lux/leads-shared";
 import { DRAFT_MODEL, TRIAGE_MODEL, getAnthropic } from "./anthropic";
-import { estimateCostUsd } from "./cost";
+import { estimateCostUsd, knownModel } from "./cost";
 import { PROMPT_VERSION, buildSystemPrompt, type EquipmentInfo } from "./prompt";
 import {
   DRAFT_JSON_SCHEMA,
@@ -317,6 +317,7 @@ async function runDraft(
   system: Anthropic.TextBlockParam[],
   context: string,
   triage: TriageOutput,
+  model: string,
 ): Promise<{ output: DraftOutput; usage: Usage }> {
   const client = getAnthropic();
 
@@ -329,7 +330,7 @@ async function runDraft(
 - Já é cliente: ${triage.is_existing_customer ? "sim" : "não"}`;
 
   const message = await client.messages.parse({
-    model: DRAFT_MODEL,
+    model,
     max_tokens: 4000,
     system,
     thinking: { type: "adaptive" },
@@ -364,6 +365,14 @@ export type AnalyzeOptions = {
   force?: boolean;
   /** Gera o rascunho mesmo num lead frio (o botão "Gerar mensagem"). */
   forceDraft?: boolean;
+  /**
+   * Quem escreve a mensagem nesta chamada.
+   *
+   * Existe para o dono poder pagar por um modelo melhor no lead que merece,
+   * sem trocar o padrão de todo mundo. Vale por clique: o lote nunca recebe
+   * isto, então nenhuma escolha esquecida ligada vira fatura surpresa.
+   */
+  draftModel?: string;
 };
 
 export type AnalyzeOutcome =
@@ -424,9 +433,17 @@ export async function analyzeLead(
     triagem.output.temperature === "quente" ||
     triagem.output.temperature === "morno";
 
+  // Modelo desconhecido não entra: o preço dele não está em cost.ts, e a
+  // análise gravaria custo zero — número errado num relatório de fatura é pior
+  // do que número ausente.
+  const modeloRedacao =
+    options.draftModel && knownModel(options.draftModel)
+      ? options.draftModel
+      : DRAFT_MODEL;
+
   let redacao: { output: DraftOutput; usage: Usage } | null = null;
   if (valeRascunho) {
-    redacao = await runDraft(system, context, triagem.output);
+    redacao = await runDraft(system, context, triagem.output, modeloRedacao);
   }
 
   const custo =
@@ -436,7 +453,7 @@ export async function analyzeLead(
       cacheReadTokens: triagem.usage.cacheRead,
     }) +
     (redacao
-      ? estimateCostUsd(DRAFT_MODEL, {
+      ? estimateCostUsd(modeloRedacao, {
           inputTokens: redacao.usage.input,
           outputTokens: redacao.usage.output,
           cacheReadTokens: redacao.usage.cacheRead,
@@ -474,7 +491,7 @@ export async function analyzeLead(
     rationale: redacao?.output.rationale ?? null,
     confidence: redacao?.output.confidence ?? triagem.output.confidence,
     // O modelo gravado é o que produziu a recomendação final.
-    model: redacao ? DRAFT_MODEL : TRIAGE_MODEL,
+    model: redacao ? modeloRedacao : TRIAGE_MODEL,
     input_tokens: triagem.usage.input + (redacao?.usage.input ?? 0),
     output_tokens: triagem.usage.output + (redacao?.usage.output ?? 0),
     cache_read_tokens:

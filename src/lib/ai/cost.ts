@@ -49,3 +49,13 @@ export function estimateCostUsd(model: string, usage: TokenUsage): number {
 export function knownModel(model: string): boolean {
   return model in PRECOS;
 }
+
+/**
+ * Preço de tabela, para a tela poder mostrar de onde sai a estimativa.
+ *
+ * Este módulo não importa o SDK da Anthropic, então pode ser lido por client
+ * component sem arrastar nada para o bundle do navegador.
+ */
+export function precoDoModelo(model: string): Preco | null {
+  return PRECOS[model] ?? null;
+}

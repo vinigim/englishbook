@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLeadDetail } from "../../../leads-data";
+import { getDraftTokenProfile, getLeadDetail } from "../../../leads-data";
 import { leadDisplayName } from "../../../leads-shared";
 import { LeadDetailClient } from "./LeadDetailClient";
 
@@ -12,7 +12,13 @@ export default async function LeadPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const detail = await getLeadDetail(id);
+  // Em paralelo: o perfil de tokens não depende do lead, e serve só para o
+  // seletor de modelo mostrar preço em dólares em vez de em dólares por
+  // milhão de tokens.
+  const [detail, tokenProfile] = await Promise.all([
+    getLeadDetail(id),
+    getDraftTokenProfile(),
+  ]);
   if (!detail) notFound();
 
   return (
@@ -29,7 +35,7 @@ export default async function LeadPage({
         </h1>
       </div>
 
-      <LeadDetailClient detail={detail} />
+      <LeadDetailClient detail={detail} tokenProfile={tokenProfile} />
     </div>
   );
 }

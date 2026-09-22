@@ -18,6 +18,13 @@ import {
   type EffectiveTemperature,
   type Objection,
 } from "@/lib/leads/taxonomy";
+import { estimateCostUsd, type TokenUsage } from "@/lib/ai/cost";
+import {
+  DRAFT_MODELS,
+  DRAFT_MODEL_LABEL,
+  DRAFT_MODEL_NOTE,
+  type DraftModel,
+} from "@/lib/ai/models";
 import {
   instagramDirectUrl,
   instagramProfileUrl,
@@ -75,8 +82,21 @@ const MEDIA_LABEL: Record<string, string> = {
 type Onde = "analise" | "mensagem";
 type Feedback = { onde: Onde; tipo: "erro" | "info"; texto: string };
 
-export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
+/** O padrão da redação. Igual ao do servidor — aqui é só o valor inicial. */
+const MODELO_PADRAO: DraftModel = "claude-sonnet-5";
+
+export function LeadDetailClient({
+  detail,
+  tokenProfile,
+}: {
+  detail: LeadDetail;
+  /** Média de tokens de uma análise com rascunho. Nulo = sem histórico ainda. */
+  tokenProfile: TokenUsage | null;
+}) {
   const { lead, messages, analysis, rentals } = detail;
+  // A escolha vale por clique e não é gravada em lugar nenhum: assim não
+  // existe jeito de ela ficar esquecida ligada no modelo caro.
+  const [modelo, setModelo] = useState<DraftModel>(MODELO_PADRAO);
   // Mesma normalização que alimenta a IA, para a tela mostrar exatamente o que
   // o modelo leu — nem mais, nem menos.
   const extras = extraFields(lead.extra);
@@ -128,6 +148,21 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
         });
       }
     });
+  }
+
+  /**
+   * Quanto uma reanálise com rascunho deve custar neste modelo.
+   *
+   * Em dólares, e não em dólares por milhão de tokens: ninguém decide nada com
+   * o preço de tabela. Sem histórico ainda, cai para o preço por milhão em vez
+   * de inventar uma média.
+   */
+  function custoEstimado(m: DraftModel): string {
+    if (!tokenProfile) return "preço ainda sem histórico";
+    const usd = estimateCostUsd(m, tokenProfile);
+    // Meio centavo virando "US$ 0,01" esconde a diferença de 5x entre os
+    // modelos, que é justamente o que a escolha precisa mostrar.
+    return `~US$ ${usd.toFixed(4)}`;
   }
 
   /** O aviso da última ação, renderizado só no cartão que a disparou. */
@@ -249,7 +284,11 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
 
   function analisar(gerarRascunho: boolean, onde: Onde) {
     executar(onde, async () => {
-      const r = await reanalyzeLead(lead.id, { force: true, gerarRascunho });
+      const r = await reanalyzeLead(lead.id, {
+        force: true,
+        gerarRascunho,
+        draftModel: modelo,
+      });
 
       if (!r.ok) {
         return { onde, tipo: "erro", texto: r.error ?? "Falha na análise." };
@@ -410,6 +449,36 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
+            </div>
+
+            {/* ------------------------------------ quem escreve */}
+            <div className="mb-4 pb-4 border-b border-line">
+              <label className="block">
+                <span className="block text-xs uppercase tracking-wide text-muted mb-2">
+                  Quem escreve a mensagem
+                </span>
+                <select
+                  value={modelo}
+                  disabled={pendente}
+                  onChange={(e) => setModelo(e.target.value as DraftModel)}
+                  className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none disabled:opacity-50"
+                >
+                  {DRAFT_MODELS.map((m) => (
+                    <option key={m} value={m}>
+                      {DRAFT_MODEL_LABEL[m]} — {custoEstimado(m)} ·{" "}
+                      {DRAFT_MODEL_NOTE[m]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <p className="text-xs text-muted mt-1.5">
+                {tokenProfile
+                  ? "Estimativa por cima, calculada em cima do que as suas últimas análises de fato gastaram. A triagem continua no Haiku — só a redação muda."
+                  : "Ainda não há histórico para estimar o custo. Os preços aparecem depois da primeira mensagem gerada."}{" "}
+                Vale só para este clique; o botão de analisar em lote continua
+                no padrão.
+              </p>
             </div>
 
             {aviso("analise")}
