@@ -35,6 +35,13 @@ export type Lead = {
   uf: string | null;
   /** Só o handle, sem @ e sem link — vem da planilha (0015). */
   instagram: string | null;
+  /**
+   * Quando o dono marcou que mandou mensagem pelo direct (0016).
+   *
+   * Manual porque envio pelo Instagram não volta em sincronização nenhuma —
+   * ao contrário do WhatsApp, que atualiza `last_outbound_at` sozinho.
+   */
+  instagram_sent_at: string | null;
   lead_kind: LeadKind;
   source: LeadSource;
   /** Marcado pelo dono. Prevalece sobre a derivação da agenda. Nulo = derivar. */

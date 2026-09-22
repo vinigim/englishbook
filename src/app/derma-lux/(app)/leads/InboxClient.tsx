@@ -301,6 +301,15 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
               esperando resposta
             </Badge>
           ) : null}
+
+          {/* Sem isto a marcação só existiria dentro da ficha, e saber a quem
+              já mandei exigiria abrir os 138 leads com Instagram um por um —
+              que é justamente o trabalho que ela deveria poupar. */}
+          {lead.instagram_sent_at ? (
+            <Badge variant="success" className="whitespace-nowrap">
+              ✓ Instagram
+            </Badge>
+          ) : null}
         </div>
 
         <p className="text-sm text-muted mt-1.5 truncate">

@@ -176,6 +176,22 @@ clique copia o rascunho para a área de transferência no mesmo gesto.
 Leads importados antes da 0015 não precisam de reimportação: quando a coluna
 está vazia, a tela procura o Instagram entre as colunas extras.
 
+### "Já enviei pelo Instagram" é manual, e tem que ser
+
+Mensagem que sai pelo WhatsApp **volta** na sincronização: o `last_outbound_at`
+do lead se atualiza sozinho e o painel sabe. Pelo direct não volta nada, nunca.
+
+Por isso `wa_leads.instagram_sent_at` (migração 0016) é preenchido por um botão
+na ficha, e não por um evento. É data e não booleano porque "mandei há três
+meses e não respondeu" é outra situação que "mandei ontem".
+
+O clique em "Abrir no Instagram" **não** marca sozinho: abrir não é enviar, e um
+lead marcado por engano some da fila sem nunca ter recebido nada.
+
+A marca entra no contexto da IA junto com o handle — sem ela o modelo lê um lead
+já abordado como alguém com quem nunca se falou, e volta a sugerir primeiro
+contato.
+
 ## Privacidade
 
 - **Mídia não é baixada.** Guardamos url e mimetype; o binário nunca entra no
