@@ -117,6 +117,10 @@ type ExistingLead = {
   instagram: string | null;
   source: string;
   extra: Record<string, unknown> | null;
+  // Estes dois não são usados no merge: são lidos só para poderem ser
+  // reenviados iguais. Ver o aviso sobre lote misto na montagem do payload.
+  phone_e164: string;
+  first_seen_at: string | null;
 };
 
 async function handleCommit(request: NextRequest) {
@@ -264,7 +268,7 @@ async function handleCommit(request: NextRequest) {
     const { data, error } = await admin
       .from("wa_leads")
       .select(
-        "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra",
+        "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra, phone_e164, first_seen_at",
       )
       .in("phone_key", chunk);
 
@@ -283,13 +287,27 @@ async function handleCommit(request: NextRequest) {
   // da planilha vai para `sheet_name`, não por cima de `display_name`; os
   // demais campos só são preenchidos quando estão nulos no banco. Colunas
   // extras entram inteiras em `extra`, sem perder dado.
+  //
+  // ⚠️ TODA linha deste array precisa ter EXATAMENTE o mesmo conjunto de
+  // chaves. O upsert em lote do PostgREST monta um único INSERT com a UNIÃO
+  // das colunas de todos os objetos, e preenche NULL onde a chave falta — a
+  // linha omitida não é "preservada", é apagada.
+  //
+  // Omitir um campo para preservar o valor do banco funcionava enquanto toda
+  // importação era homogênea (ou só lead novo, ou só lead existente). A
+  // primeira planilha mista derrubou tudo: bastou UM lead novo trazer
+  // `phone_e164` para todo lead antigo do lote receber NULL num campo not
+  // null. O `first_seen_at` fazia o mesmo sem estourar, porque é nulável —
+  // apagava em silêncio a data de primeiro contato.
+  //
+  // Por isso preservar é RELER e reenviar igual, nunca omitir.
   const payload = [...candidates.values()].map((c) => {
     const prev = existing.get(c.phoneKey);
     const nome = c.name ?? c.company;
 
     return {
       phone_key: c.phoneKey,
-      phone_e164: prev ? undefined : c.phoneE164,
+      phone_e164: prev?.phone_e164 ?? c.phoneE164,
       sheet_name: prev?.sheet_name ?? nome ?? null,
       clinic_name: prev?.clinic_name ?? c.company ?? null,
       specialty: prev?.specialty ?? c.specialty ?? null,
@@ -311,20 +329,13 @@ async function handleCommit(request: NextRequest) {
         ...c.extra,
         ...(c.email ? { email: c.email } : {}),
       },
-      // Lead novo já nasce querendo análise; lead existente não é remarcado
-      // só por ter sido enriquecido pela planilha.
-      ...(prev ? {} : { first_seen_at: new Date().toISOString() }),
+      // `prev ? prev.x : agora` e não `??`: lead antigo cuja data é nula
+      // continua nula, em vez de ganhar a de hoje e parecer recém-conhecido.
+      first_seen_at: prev ? prev.first_seen_at : new Date().toISOString(),
     };
   });
 
-  // `phone_e164` é NOT NULL: para leads novos vai o valor; para existentes
-  // omitimos o campo do payload (undefined some no JSON) e o banco preserva
-  // o que já estava lá.
-  const cleaned = payload.map((p) =>
-    Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)),
-  );
-
-  for (const chunk of chunked(cleaned, BATCH_SIZE)) {
+  for (const chunk of chunked(payload, BATCH_SIZE)) {
     const { error } = await admin
       .from("wa_leads")
       .upsert(chunk, { onConflict: "phone_key" });
