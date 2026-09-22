@@ -14,6 +14,7 @@ export type ColumnRole =
   | "email"
   | "specialty"
   | "city"
+  | "instagram"
   | "custom";
 
 /** Uma linha da planilha: cabeçalho -> valor, tudo como texto já aparado. */

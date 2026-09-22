@@ -53,7 +53,11 @@ diferente aqui".
 
 Dá para usar o painel imediatamente, só com a sua planilha de clientes:
 `/derma-lux/leads/importar`. Ela detecta sozinha as colunas de telefone, nome,
-clínica, especialidade e cidade, e mostra o que entendeu antes de gravar.
+clínica, especialidade, cidade e Instagram, e mostra o que entendeu antes de
+gravar.
+
+Qualquer outra coluna é guardada inteira em `extra` e aparece na ficha do lead
+— nada da planilha é descartado.
 
 Em desenvolvimento, `WHATSAPP_PROVIDER=mock` usa as conversas de exemplo em
 `src/lib/whatsapp/fixtures/` — nenhum número real é tocado.
@@ -153,6 +157,25 @@ viraria dois leads com a conversa dividida ao meio.
 `waPhoneKey()` em `src/lib/leads/phone.ts` normaliza isso, e o `unique` do
 banco é nessa chave.
 
+## Instagram
+
+A planilha de prospecção traz o Instagram escrito de todo jeito: `@fulana`,
+`fulana`, `instagram.com/fulana`, o link inteiro com o `?igshid=` que o app
+cola junto. `toInstagramHandle()` em `src/lib/leads/instagram.ts` reduz tudo ao
+handle, e só o handle é guardado (`wa_leads.instagram`, migração 0015) — o link
+do direct é montado na hora.
+
+O que não dá para afirmar que é um perfil (`não tem`, `-`, o link de um post,
+um endereço de site) vira `null` e **volta para `extra`**, em vez de sumir: a
+ficha continua mostrando o valor como a planilha escreveu.
+
+O botão "Abrir no Instagram" usa `ig.me/m/<handle>`, o equivalente do `wa.me`.
+A diferença é que ele **não aceita o texto da mensagem na URL** — por isso o
+clique copia o rascunho para a área de transferência no mesmo gesto.
+
+Leads importados antes da 0015 não precisam de reimportação: quando a coluna
+está vazia, a tela procura o Instagram entre as colunas extras.
+
 ## Privacidade
 
 - **Mídia não é baixada.** Guardamos url e mimetype; o binário nunca entra no
@@ -210,5 +233,6 @@ O teste de RLS que mais importa: entre com uma conta que **não** esteja em
   produção. O arquivo foi apagado quando os crons do EnglishBook bloqueavam o
   deploy no plano Hobby; com aquele app removido, os 2 slots do Hobby estão
   livres.
-- Conciliar automaticamente `rentals.wa_lead_id`; hoje há um `update`
-  comentado no fim da migração para rodar depois do primeiro backfill.
+- ~~Conciliar automaticamente `rentals.wa_lead_id`~~ — feito na 0014: a
+  conciliação virou a função `conciliar_rentals()`, chamada ao fim de cada
+  backfill.

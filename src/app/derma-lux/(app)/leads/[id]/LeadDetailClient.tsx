@@ -18,11 +18,16 @@ import {
   type EffectiveTemperature,
   type Objection,
 } from "@/lib/leads/taxonomy";
+import {
+  instagramDirectUrl,
+  instagramProfileUrl,
+} from "@/lib/leads/instagram";
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
   extraFields,
   formatPhoneBR,
+  instagramDoLead,
   leadDisplayName,
   relativeDays,
   situacaoEfetiva,
@@ -142,6 +147,18 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
         ? `https://wa.me/${numero}`
         : null;
 
+  // O ig.me não aceita texto na URL como o wa.me. Então o rascunho vai pela
+  // área de transferência, copiado no mesmo toque que abre o direct — é o que
+  // mais perto chega de "abrir já com a mensagem pronta".
+  const instagram = instagramDoLead(lead);
+
+  function aoAbrirInstagram() {
+    if (!rascunho.trim()) return;
+    // Sem await: segurar aqui adiaria a navegação, e a cópia precisa
+    // acontecer dentro do gesto do toque para o navegador permitir.
+    void copiar();
+  }
+
   function analisar(gerarRascunho: boolean) {
     setErro(null);
     setStatus(null);
@@ -199,6 +216,18 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
           <div className="text-sm text-ink space-y-0.5">
             <p className="font-medium">{formatPhoneBR(lead.phone_e164)}</p>
             {lead.clinic_name ? <p>{lead.clinic_name}</p> : null}
+            {instagram ? (
+              <p>
+                <a
+                  href={instagramProfileUrl(instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  @{instagram}
+                </a>
+              </p>
+            ) : null}
             <p className="text-muted">
               {[lead.specialty, lead.city].filter(Boolean).join(" · ") ||
                 "Especialidade e cidade não informadas"}
@@ -521,12 +550,40 @@ export function LeadDetailClient({ detail }: { detail: LeadDetail }) {
                   Abrir no WhatsApp
                 </a>
               ) : null}
+
+              {instagram ? (
+                <a
+                  href={instagramDirectUrl(instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={aoAbrirInstagram}
+                  className="px-4 py-2 text-sm font-medium border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+                >
+                  Abrir no Instagram
+                </a>
+              ) : null}
             </div>
 
             <p className="text-xs text-muted mt-3">
               A mensagem sai pelo seu WhatsApp, não pelo sistema. Revise antes
               de enviar — a IA erra.
             </p>
+
+            {instagram ? (
+              <p className="text-xs text-muted mt-1">
+                No Instagram o texto não viaja no link: ele é copiado no mesmo
+                toque, é só colar no direct de{" "}
+                <a
+                  href={instagramProfileUrl(instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  @{instagram}
+                </a>
+                .
+              </p>
+            ) : null}
           </Card>
         </div>
       </div>

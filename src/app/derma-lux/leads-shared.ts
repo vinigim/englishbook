@@ -1,3 +1,4 @@
+import { toInstagramHandle } from "@/lib/leads/instagram";
 import type {
   EffectiveTemperature,
   FunnelStage,
@@ -135,6 +136,36 @@ export function leadDisplayName(lead: Lead): string {
     lead.clinic_name ||
     formatPhoneBR(lead.phone_e164)
   );
+}
+
+/**
+ * O Instagram do lead, como handle pronto para virar link.
+ *
+ * Duas fontes, nesta ordem:
+ *
+ *   1. a coluna `instagram`, que a importação preenche desde a 0015;
+ *   2. as colunas extras — porque quem já subiu uma planilha com Instagram
+ *      antes da 0015 teve aquilo guardado em `extra` como qualquer outra
+ *      coluna solta, e obrigá-lo a reimportar para ganhar o botão seria
+ *      esconder um dado que já está no banco.
+ *
+ * A segunda fonte herda o teto de `extraFields`: passando de doze colunas
+ * extras, as que sobram não são lidas. Quem cair nesse caso resolve marcando a
+ * coluna como "Instagram" na próxima importação.
+ */
+export function instagramDoLead(
+  lead: Pick<Lead, "instagram" | "extra">,
+): string | null {
+  const daColuna = toInstagramHandle(lead.instagram);
+  if (daColuna) return daColuna;
+
+  for (const [chave, valor] of extraFields(lead.extra)) {
+    if (!/instagram|insta|^ig$/i.test(semAcento(chave).toLowerCase())) continue;
+    const handle = toInstagramHandle(valor);
+    if (handle) return handle;
+  }
+
+  return null;
 }
 
 /** "5535988887777" -> "+55 35 98888-7777" (formatação leve, sem dependência). */

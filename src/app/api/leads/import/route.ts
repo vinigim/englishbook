@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { parseSpreadsheet } from "@/lib/leads/spreadsheet";
 import { looksLikeCompanyName } from "@/lib/leads/columns";
+import { toInstagramHandle } from "@/lib/leads/instagram";
 import { toLeadPhone } from "@/lib/leads/phone";
 import type {
   ColumnMapping,
@@ -96,6 +97,7 @@ const ROLES: [ColumnRole, ...ColumnRole[]] = [
   "email",
   "specialty",
   "city",
+  "instagram",
   "custom",
 ];
 
@@ -112,6 +114,7 @@ type ExistingLead = {
   clinic_name: string | null;
   specialty: string | null;
   city: string | null;
+  instagram: string | null;
   source: string;
   extra: Record<string, unknown> | null;
 };
@@ -165,6 +168,7 @@ async function handleCommit(request: NextRequest) {
     specialty: string | null;
     city: string | null;
     email: string | null;
+    instagram: string | null;
     extra: Record<string, string>;
   };
 
@@ -197,6 +201,20 @@ async function handleCommit(request: NextRequest) {
       if (v) extra[header] = v;
     }
 
+    // O Instagram é guardado só como handle, para o link do direct sempre
+    // montar. O que não dá para afirmar que é um perfil — "não tem", um link
+    // de outro site — volta para `extra` em vez de sumir: dado estranho à
+    // vista é melhor do que dado descartado em silêncio.
+    const instagramHeaders = byRole.get("instagram") ?? [];
+    const instagramHeader = instagramHeaders.find((h) => row[h]?.trim());
+    const instagramBruto = instagramHeader
+      ? row[instagramHeader].trim()
+      : null;
+    const instagram = toInstagramHandle(instagramBruto);
+    if (instagramHeader && instagramBruto && !instagram) {
+      extra[instagramHeader] = instagramBruto;
+    }
+
     const candidate: Candidate = {
       phoneKey: phone.phoneKey,
       phoneE164: phone.phoneE164,
@@ -205,6 +223,7 @@ async function handleCommit(request: NextRequest) {
       specialty: firstValue(row, byRole.get("specialty") ?? []),
       city: firstValue(row, byRole.get("city") ?? []),
       email: firstValue(row, byRole.get("email") ?? []),
+      instagram,
       extra,
     };
 
@@ -233,7 +252,7 @@ async function handleCommit(request: NextRequest) {
     const { data, error } = await admin
       .from("wa_leads")
       .select(
-        "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, source, extra",
+        "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra",
       )
       .in("phone_key", chunk);
 
@@ -263,6 +282,11 @@ async function handleCommit(request: NextRequest) {
       clinic_name: prev?.clinic_name ?? c.company ?? null,
       specialty: prev?.specialty ?? c.specialty ?? null,
       city: prev?.city ?? c.city ?? null,
+      // Único campo em que a planilha MANDA, e de propósito: ela é a única
+      // fonte de Instagram que existe — o WhatsApp não informa isso. Corrigir
+      // um handle errado na planilha tem que corrigir no painel também. Se a
+      // coluna vier vazia, o que já estava gravado é preservado.
+      instagram: c.instagram ?? prev?.instagram ?? null,
       lead_kind:
         nome && looksLikeCompanyName(nome) ? "clinica" : "desconhecido",
       source: prev

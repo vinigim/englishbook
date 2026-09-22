@@ -33,6 +33,8 @@ export type Lead = {
   specialty: string | null;
   city: string | null;
   uf: string | null;
+  /** Só o handle, sem @ e sem link — vem da planilha (0015). */
+  instagram: string | null;
   lead_kind: LeadKind;
   source: LeadSource;
   /** Marcado pelo dono. Prevalece sobre a derivação da agenda. Nulo = derivar. */

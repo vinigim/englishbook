@@ -38,6 +38,7 @@ const SUBSTRING_ALIASES: Record<Role, string[]> = {
   ],
   specialty: ["especialidade", "especialidades", "area de atuacao", "atuacao"],
   city: ["cidade", "municipio", "localidade"],
+  instagram: ["instagram", "insta", "perfil do instagram"],
 };
 
 // Aliases ambíguos/curtos — só casam se o cabeçalho for EXATAMENTE isso.
@@ -50,12 +51,18 @@ const EXACT_ALIASES: Record<Role, string[]> = {
   company: [],
   specialty: ["area"],
   city: ["uf", "estado"],
+  instagram: ["ig", "arroba", "rede social", "redes sociais"],
 };
 
 // Ordem importa: papéis mais específicos primeiro, "name" por último, porque
 // "nome" aparece dentro de muitos cabeçalhos compostos.
+//
+// `phone` vem antes de `instagram` de propósito: num cabeçalho misto como
+// "WhatsApp / Instagram" o telefone tem que ganhar, porque é ele que
+// identifica o lead — sem telefone a linha inteira é descartada.
 const ROLE_ORDER: Role[] = [
   "phone",
+  "instagram",
   "email",
   "specialty",
   "city",

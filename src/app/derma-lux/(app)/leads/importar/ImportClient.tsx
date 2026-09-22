@@ -19,6 +19,7 @@ const ROLE_OPTIONS: { value: ColumnRole; label: string }[] = [
   { value: "specialty", label: "Especialidade" },
   { value: "city", label: "Cidade" },
   { value: "email", label: "E-mail" },
+  { value: "instagram", label: "Instagram" },
   { value: "custom", label: "Guardar como extra" },
 ];
 
