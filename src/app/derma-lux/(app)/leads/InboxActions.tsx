@@ -275,6 +275,11 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
               Number(evento.descartadasOutras) > 0
                 ? `${evento.descartadasOutras} não reconhecida(s)`
                 : null,
+              // A conciliação roda sozinha no fim: dizer quantos aluguéis
+              // encontraram dono evita o dono achar que nada aconteceu.
+              Number(evento.conciliados) > 0
+                ? `${evento.conciliados} locação(ões) ligada(s) a leads`
+                : null,
               Number(evento.semTelefone) > 0
                 ? `${evento.semTelefone} sem telefone identificável`
                 : null,

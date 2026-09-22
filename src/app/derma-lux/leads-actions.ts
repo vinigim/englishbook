@@ -103,11 +103,18 @@ export async function reanalyzeLead(
 //  Edição manual do lead
 // ============================================================================
 
-const statusSchema = z.enum(LEAD_STATUSES);
+/**
+ * Marca a situação à mão, ou devolve o lead para a derivação da agenda.
+ *
+ * `null` limpa o rótulo — e limpar NÃO significa "novo": significa "deduza do
+ * fato". Quem alugou há pouco volta a ser cliente sozinho, sem ninguém manter
+ * isso à mão em centenas de leads.
+ */
+const statusSchema = z.enum(LEAD_STATUSES).nullable();
 
 export async function updateLeadStatus(
   id: string,
-  status: string,
+  status: string | null,
 ): Promise<ActionResult> {
   const supabase = await requireSupabase();
   if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
@@ -117,7 +124,7 @@ export async function updateLeadStatus(
   }
 
   const parsed = statusSchema.safeParse(status);
-  if (!parsed.success) return { ok: false, error: "Status inválido." };
+  if (!parsed.success) return { ok: false, error: "Situação inválida." };
 
   const { error } = await supabase
     .from("wa_leads")

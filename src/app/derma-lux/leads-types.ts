@@ -35,7 +35,8 @@ export type Lead = {
   uf: string | null;
   lead_kind: LeadKind;
   source: LeadSource;
-  status: LeadStatus;
+  /** Marcado pelo dono. Prevalece sobre a derivação da agenda. Nulo = derivar. */
+  status: LeadStatus | null;
   is_group: boolean;
   notes: string | null;
   extra: Record<string, unknown>;
@@ -97,10 +98,21 @@ export type LeadAnalysis = {
 };
 
 /** Uma linha da caixa de entrada: o lead + a análise mais recente dele. */
+/** Agregado de locações por lead, vindo da view wa_lead_rentals (0014). */
+export type LeadRentals = {
+  lead_id: string;
+  total: number;
+  ultima: string | null;
+  primeira: string | null;
+  total_brl: number | null;
+};
+
 export type LeadInboxRow = {
   lead: Lead;
   analysis: LeadAnalysis | null;
   lastMessage: Pick<WaMessage, "body" | "direction" | "message_type" | "sent_at"> | null;
+  /** Agregado da agenda. Nulo quando o lead nunca alugou. */
+  rentals: LeadRentals | null;
   priority: number;
 };
 

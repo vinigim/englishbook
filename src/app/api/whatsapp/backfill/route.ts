@@ -267,8 +267,28 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // ------------------------------------------ conciliar a agenda
+        //
+        // Leads novos acabaram de entrar, e é agora que o vínculo com os
+        // aluguéis envelhece. Fazer aqui evita mais um botão que ninguém
+        // lembra de apertar — foi o que aconteceu com a limpeza e com o
+        // teste de conexão.
+        //
+        // Idempotente: só toca em aluguel com wa_lead_id nulo.
+        let conciliados = 0;
+        try {
+          const { data, error } = await admin.rpc("conciliar_rentals");
+          if (error) throw new Error(error.message);
+          conciliados = Number(data) || 0;
+        } catch (err) {
+          // Conciliação é um extra: falhar aqui não pode invalidar um
+          // backfill que já gravou tudo.
+          console.error("[wa-backfill] falha ao conciliar agenda:", err);
+        }
+
         linha({
           tipo: "fim",
+          conciliados,
           paginas: pagina,
           brutasTotal,
           recuperadas,
