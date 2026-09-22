@@ -202,17 +202,29 @@ async function handleCommit(request: NextRequest) {
     }
 
     // O Instagram é guardado só como handle, para o link do direct sempre
-    // montar. O que não dá para afirmar que é um perfil — "não tem", um link
-    // de outro site — volta para `extra` em vez de sumir: dado estranho à
-    // vista é melhor do que dado descartado em silêncio.
+    // montar.
+    //
+    // Mais de uma coluna pode ter o papel — uma planilha real trouxe
+    // "Site/Instagram", da época em que os dois iam no mesmo campo, e
+    // "Instagram" depois. Por isso vence o primeiro valor que VIRA um perfil,
+    // e não o primeiro cabeçalho que tem qualquer coisa escrita: senão um site
+    // na coluna antiga cala o perfil que está na nova.
+    //
+    // O que não vira perfil — um site, um "Não encontrado" — volta para
+    // `extra`, porque endereço de clínica é canal de contato, não lixo. Só o
+    // que repete um handle já escolhido é descartado.
     const instagramHeaders = byRole.get("instagram") ?? [];
-    const instagramHeader = instagramHeaders.find((h) => row[h]?.trim());
-    const instagramBruto = instagramHeader
-      ? row[instagramHeader].trim()
-      : null;
-    const instagram = toInstagramHandle(instagramBruto);
-    if (instagramHeader && instagramBruto && !instagram) {
-      extra[instagramHeader] = instagramBruto;
+    let instagram: string | null = null;
+    for (const header of instagramHeaders) {
+      const bruto = row[header]?.trim();
+      if (!bruto) continue;
+
+      const handle = toInstagramHandle(bruto);
+      if (handle) {
+        instagram ??= handle;
+      } else {
+        extra[header] = bruto;
+      }
     }
 
     const candidate: Candidate = {
