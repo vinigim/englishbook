@@ -214,6 +214,12 @@ export async function updateLeadTemperature(
  *
  * Marca `needs_analysis` porque muda o quadro que a IA lê — "mandei e não
  * respondeu" pede coisa diferente de "nunca falei com essa pessoa".
+ *
+ * Marcar também põe o lead como frio confirmado, a pedido do dono: a
+ * abordagem pelo direct já foi feita, e o lead sai de "Devo responder". Por
+ * cima de qualquer temperatura manual anterior, inclusive quente confirmado.
+ * Desmarcar NÃO volta a temperatura: não há como saber o que havia antes, e
+ * apagar a marcação poderia desfazer uma escolha que o dono fez à mão.
  */
 export async function marcarInstagramEnviado(
   id: string,
@@ -231,6 +237,7 @@ export async function marcarInstagramEnviado(
     .update({
       instagram_sent_at: enviado ? new Date().toISOString() : null,
       needs_analysis: true,
+      ...(enviado ? { temperature_manual: "frio_confirmado" as const } : {}),
     })
     .eq("id", id);
 
