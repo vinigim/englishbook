@@ -249,6 +249,21 @@ const MEDIA_LABEL: Record<MessageType, string> = {
 };
 
 /**
+ * Reação (👍, 🙏…) a uma mensagem.
+ *
+ * O parser grava a reação como "other" com o emoji em `body` — ela é o único
+ * "other" que carrega texto. Sem essa distinção, um 🙏 aparecia como "anexo"
+ * na tela e como "[anexo]" para a IA, que passava a falar de um arquivo que
+ * nunca existiu. Não ganhou tipo próprio para não exigir migração do check de
+ * `message_type` antes de o código novo entrar.
+ */
+export function ehReacao(
+  msg: Pick<WaMessage, "body" | "message_type">,
+): boolean {
+  return msg.message_type === "other" && Boolean(msg.body?.trim());
+}
+
+/**
  * Texto curto de uma mensagem para a lista. Mídia nunca é baixada nem embutida:
  * vira rótulo. Isso vale tanto para a tela quanto para o que mandamos à IA.
  */
@@ -257,6 +272,7 @@ export function messagePreview(
   maxLen = 120,
 ): string {
   if (!msg) return "";
+  if (ehReacao(msg)) return `reagiu com ${msg.body!.trim()}`;
   const texto = msg.body || msg.caption || "";
   if (msg.message_type !== "text") {
     const rotulo = MEDIA_LABEL[msg.message_type] || "anexo";
@@ -400,4 +416,36 @@ export function relativeDays(iso: string | null): string {
   if (dias < 30) return `há ${dias} dias`;
   const meses = Math.floor(dias / 30);
   return meses === 1 ? "há 1 mês" : `há ${meses} meses`;
+}
+
+/**
+ * Troca "bom dia" / "boa tarde" / "boa noite" pela saudação da hora atual.
+ *
+ * A IA escreve o rascunho num horário e o dono envia em outro — um "boa tarde"
+ * gerado à tarde e mandado na manhã seguinte obrigava a editar a mensagem. A
+ * troca acontece na tela, então vale também para rascunhos já gravados, sem
+ * reanalisar (e pagar de novo) nenhum lead. A hora é a de São Paulo, não a do
+ * servidor, para a renderização no servidor e no navegador darem o mesmo texto.
+ */
+export function ajustarSaudacao(texto: string, agora: Date = new Date()): string {
+  const hora = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hourCycle: "h23",
+      timeZone: "America/Sao_Paulo",
+    }).format(agora),
+  );
+  const certa =
+    hora >= 5 && hora < 12 ? "bom dia" : hora >= 12 && hora < 18 ? "boa tarde" : "boa noite";
+
+  // "Tenha uma boa noite" é despedida, não saudação — e trocar viraria
+  // "tenha uma bom dia". Com artigo ou adjetivo antes, fica como está.
+  const saudacao =
+    /(?<!(?:^|[^\p{L}])(?:um|uma|ótimo|ótima|excelente|belo|bela)\s+)\b(bom dia|boa tarde|boa noite)\b/giu;
+
+  return texto.replace(saudacao, (achada) =>
+    achada[0] === achada[0].toUpperCase()
+      ? certa[0].toUpperCase() + certa.slice(1)
+      : certa,
+  );
 }

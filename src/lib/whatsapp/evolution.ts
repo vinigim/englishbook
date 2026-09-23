@@ -146,6 +146,8 @@ function extractContent(message: EvolutionMessageContent): Extracted {
     return { ...empty, type: "contact", body: str(contact.displayName) };
   }
 
+  // Reação fica como "other" com o emoji em body: é o único "other" com texto,
+  // e é assim que `ehReacao()` a reconhece na tela e na transcrição da IA.
   const reaction = obj(unwrapped.reactionMessage);
   if (reaction) {
     return { ...empty, type: "other", body: str(reaction.text) };

@@ -32,6 +32,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
+  ajustarSaudacao,
+  ehReacao,
   estadoContato,
   extraFields,
   formatPhoneBR,
@@ -109,7 +111,11 @@ export function LeadDetailClient({
   // primeira é a última que aconteceu — é só disso que a derivação precisa.
   const agenda = rentals.length > 0 ? { ultima: rentals[0].date } : null;
   const situacao = situacaoEfetiva(lead, agenda);
-  const [rascunho, setRascunho] = useState(analysis?.draft_message ?? "");
+  // A saudação é ajustada à hora de agora: o rascunho pode ter sido escrito de
+  // tarde e ser enviado de manhã.
+  const [rascunho, setRascunho] = useState(() =>
+    ajustarSaudacao(analysis?.draft_message ?? ""),
+  );
 
   /**
    * Marca a temperatura à mão, ou devolve o lead para a leitura da IA.
@@ -232,7 +238,7 @@ export function LeadDetailClient({
   const [analiseVista, setAnaliseVista] = useState(analysis?.id ?? null);
   if ((analysis?.id ?? null) !== analiseVista) {
     setAnaliseVista(analysis?.id ?? null);
-    setRascunho(analysis?.draft_message ?? "");
+    setRascunho(ajustarSaudacao(analysis?.draft_message ?? ""));
   }
 
   const numero = toWhatsAppNumber(lead.phone_e164);
@@ -817,8 +823,11 @@ export function LeadDetailClient({
 function MessageBubble({ msg }: { msg: WaMessage }) {
   const daEmpresa = msg.direction === "out";
   const texto = msg.body ?? msg.caption ?? "";
-  const rotulo =
-    msg.message_type !== "text" ? (MEDIA_LABEL[msg.message_type] ?? "anexo") : null;
+  const rotulo = ehReacao(msg)
+    ? "reação"
+    : msg.message_type !== "text"
+      ? (MEDIA_LABEL[msg.message_type] ?? "anexo")
+      : null;
 
   return (
     <li className={cn("flex", daEmpresa ? "justify-end" : "justify-start")}>

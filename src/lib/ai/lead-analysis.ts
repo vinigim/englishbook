@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lead, LeadRental, WaMessage } from "@/app/derma-lux/leads-types";
 import {
   daysSince,
+  ehReacao,
   estadoContato,
   extraFields,
   instagramDoLead,
@@ -94,7 +95,10 @@ export function buildTranscript(messages: WaMessage[]): string {
     const quando = m.sent_at.slice(0, 10);
 
     let texto = m.body ?? "";
-    if (m.message_type !== "text") {
+    if (ehReacao(m)) {
+      // Sem isto a reação virava "[anexo] 🙏" e a IA falava de um arquivo.
+      texto = `[reagiu com ${texto.trim()} a uma mensagem anterior]`;
+    } else if (m.message_type !== "text") {
       const rotulo = MEDIA_LABEL[m.message_type] ?? "[anexo]";
       const legenda = m.caption ?? m.body ?? "";
       texto = legenda ? `${rotulo} ${legenda}` : rotulo;
