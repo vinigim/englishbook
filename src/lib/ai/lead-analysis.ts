@@ -16,6 +16,7 @@ import {
 } from "@/app/derma-lux/leads-shared";
 import { DRAFT_MODEL, TRIAGE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd, knownModel } from "./cost";
+import { precosForaDaTabela } from "@/lib/leads/tabela-precos";
 import { PROMPT_VERSION, buildSystemPrompt, type EquipmentInfo } from "./prompt";
 import {
   DRAFT_JSON_SCHEMA,
@@ -324,6 +325,21 @@ async function runTriage(
 }
 
 /**
+ * Põe na frente da justificativa um aviso quando o rascunho cita valor que não
+ * está na tabela. A justificativa aparece logo acima da mensagem na tela, então
+ * é onde o dono lê antes de copiar.
+ */
+function comAvisoDePreco(
+  rascunho: string | null,
+  justificativa: string | null,
+): string | null {
+  const fora = rascunho ? precosForaDaTabela(rascunho) : [];
+  if (fora.length === 0) return justificativa;
+  const aviso = `⚠️ Valor fora da tabela: ${fora.map((v) => `R$ ${v}`).join(", ")} — confira antes de enviar.`;
+  return justificativa ? `${aviso} ${justificativa}` : aviso;
+}
+
+/**
  * Anexado quando o dono toca em "Gerar mensagem assim mesmo".
  *
  * Sem isto o botão não fazia nada em lead "aguardar" ou "descartar": o modelo
@@ -528,7 +544,10 @@ export async function analyzeLead(
     is_existing_customer: triagem.output.is_existing_customer,
     recommended_action: redacao?.output.recommended_action ?? null,
     draft_message: redacao?.output.draft_message ?? null,
-    rationale: redacao?.output.rationale ?? null,
+    rationale: comAvisoDePreco(
+      redacao?.output.draft_message ?? null,
+      redacao?.output.rationale ?? null,
+    ),
     confidence: redacao?.output.confidence ?? triagem.output.confidence,
     // O modelo gravado é o que produziu a recomendação final.
     model: redacao ? modeloRedacao : TRIAGE_MODEL,

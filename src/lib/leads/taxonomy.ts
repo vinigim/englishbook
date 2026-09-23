@@ -67,7 +67,8 @@ export const ACTION_CRITERIA: Record<RecommendedAction, string> = {
   primeiro_contato: "Nunca houve conversa comercial de verdade com este contato.",
   qualificacao:
     "Faltam dados básicos: especialidade, cidade, volume de pacientes ou qual procedimento pretende fazer.",
-  resposta_preco: "Ele perguntou valor e ainda não recebeu resposta.",
+  resposta_preco:
+    "Pediu valor, orçamento ou \"as informações\" da locação e ainda não recebeu a tabela.",
   envio_proposta: "Já está qualificado e é hora de mandar o orçamento fechado.",
   objecao_preco: "Disse que está caro, pediu desconto ou comparou com concorrente.",
   objecao_confianca:
