@@ -3,6 +3,7 @@ import {
   isGroupJid,
   isLidJid,
   jidToPhone,
+  type DiagnosticoTelefone,
   type LidMapResult,
   type MessagePage,
   type PendingLidMessage,
@@ -607,6 +608,10 @@ export function createEvolutionProvider(): WhatsAppProvider {
       return { providerMessageId: data?.key?.id ?? "" };
     },
 
+    async diagnosticarTelefone(phoneE164) {
+      return diagnosticar(phoneE164, call, readConfig().instance);
+    },
+
     async fetchLidMap(): Promise<LidMapResult> {
       const cfg = readConfig();
       const d = await call<unknown>(`/chat/findContacts/${cfg.instance}`, {
@@ -764,4 +769,162 @@ export function createEvolutionProvider(): WhatsAppProvider {
       }
     },
   };
+}
+
+// ============================================================================
+//  Diagnóstico de um telefone
+// ============================================================================
+
+/** Teto de tempo da varredura: a rota tem 60s e precisa responder antes. */
+const DIAG_LIMITE_MS = 40_000;
+const DIAG_PAGINA = 200;
+const DIAG_AMOSTRA = 10;
+
+/** O número como veio e a outra forma dele (com/sem o 9º dígito). */
+function variantesDoNumero(phoneE164: string): string[] {
+  const d = String(phoneE164 ?? "").replace(/\D/g, "");
+  const out = new Set<string>([d]);
+  if (d.startsWith("55") && d.length === 13 && d[4] === "9") {
+    out.add(d.slice(0, 4) + d.slice(5));
+  }
+  if (d.startsWith("55") && d.length === 12) {
+    out.add(d.slice(0, 4) + "9" + d.slice(4));
+  }
+  return Array.from(out);
+}
+
+/** Todo "123…@lid" (ou campo `lid` só com dígitos) em qualquer profundidade. */
+function coletarLids(valor: unknown, acc: Set<string>, chave = ""): void {
+  if (typeof valor === "string") {
+    if (/^\d+@lid$/.test(valor)) acc.add(valor);
+    else if (/lid/i.test(chave) && /^\d{6,}$/.test(valor)) acc.add(`${valor}@lid`);
+    return;
+  }
+  if (Array.isArray(valor)) {
+    for (const v of valor) coletarLids(v, acc, chave);
+    return;
+  }
+  const o = obj(valor);
+  if (o) for (const [k, v] of Object.entries(o)) coletarLids(v, acc, k);
+}
+
+function listaDe(d: unknown, rota: string): Record<string, unknown>[] {
+  if (Array.isArray(d)) return d as Record<string, unknown>[];
+  const o = obj(d);
+  // A Evolution muda o envelope conforme a rota e a versão: a lista pode vir
+  // na chave da rota, em `records` ou em `messages.records`.
+  const candidatos = [o?.[rota], o?.records, obj(o?.messages)?.records, o?.messages];
+  const lista = candidatos.find(Array.isArray);
+  return (lista as Record<string, unknown>[] | undefined) ?? [];
+}
+
+function erroDe(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Pergunta à Evolution, por três caminhos, o que ela sabe de um número.
+ *
+ * A varredura de mensagens não usa o filtro `where` do findMessages: na v2.3
+ * ele é ignorado e devolve as mais recentes da instância (ver
+ * fetchMessagesPage). Então lê página a página e filtra aqui.
+ */
+export async function diagnosticar(
+  phoneE164: string,
+  call: <T>(path: string, init?: { method?: string; body?: unknown }) => Promise<T>,
+  instancia: string,
+): Promise<DiagnosticoTelefone> {
+  const variantes = variantesDoNumero(phoneE164);
+  const jids = new Set(variantes.map((v) => `${v}@s.whatsapp.net`));
+  const lids = new Set<string>();
+
+  // 1. "Esse número tem WhatsApp?" — em versões novas vem com o LID junto.
+  let numeros: DiagnosticoTelefone["numeros"];
+  try {
+    const resposta = await call<unknown>(`/chat/whatsappNumbers/${instancia}`, {
+      method: "POST",
+      body: { numbers: variantes },
+    });
+    coletarLids(resposta, lids);
+    numeros = { ok: true, resposta };
+  } catch (err) {
+    numeros = { ok: false, erro: erroDe(err) };
+  }
+
+  // 2. A agenda de contatos da instância, filtrada aqui mesmo.
+  let contatos: DiagnosticoTelefone["contatos"];
+  try {
+    const d = await call<unknown>(`/chat/findContacts/${instancia}`, {
+      method: "POST",
+      body: { where: { remoteJid: Array.from(jids)[0] } },
+    });
+    const todos = listaDe(d, "findContacts");
+    const encontrados = todos.filter((c) => {
+      const texto = JSON.stringify(c);
+      return variantes.some((v) => texto.includes(v));
+    });
+    coletarLids(encontrados, lids);
+    contatos = {
+      ok: true,
+      totalRecebidos: todos.length,
+      // Sem foto: é URL assinada e não ajuda no diagnóstico.
+      encontrados: encontrados.map(({ profilePicUrl: _foto, ...resto }) => resto),
+    };
+  } catch (err) {
+    contatos = { ok: false, erro: erroDe(err) };
+  }
+
+  // 3. O histórico, página a página.
+  const mensagens: DiagnosticoTelefone["mensagens"] = {
+    ok: true,
+    paginasLidas: 0,
+    mensagensLidas: 0,
+    chegouAoFim: false,
+    pelotelefone: 0,
+    peloLid: 0,
+    amostra: [],
+  };
+  const inicio = Date.now();
+  try {
+    for (let page = 1; Date.now() - inicio < DIAG_LIMITE_MS; page++) {
+      const d = await call<unknown>(`/chat/findMessages/${instancia}`, {
+        method: "POST",
+        body: { page, offset: DIAG_PAGINA },
+      });
+      const registros = listaDe(d, "messages");
+      mensagens.paginasLidas += 1;
+      mensagens.mensagensLidas += registros.length;
+
+      for (const r of registros) {
+        const key = obj(r.key) ?? {};
+        const rj = str(key.remoteJid);
+        const alt = str(key.remoteJidAlt);
+        const porTelefone = (rj && jids.has(rj)) || (alt && jids.has(alt));
+        const porLid = (rj && lids.has(rj)) || (alt && lids.has(alt));
+        if (!porTelefone && !porLid) continue;
+        if (porTelefone) mensagens.pelotelefone += 1;
+        else mensagens.peloLid += 1;
+        if (mensagens.amostra.length < DIAG_AMOSTRA) {
+          mensagens.amostra.push({
+            id: str(key.id),
+            fromMe: typeof key.fromMe === "boolean" ? key.fromMe : null,
+            remoteJid: rj,
+            remoteJidAlt: alt,
+            tipo: str(r.messageType),
+            data: r.messageTimestamp != null ? toIsoDate(r.messageTimestamp) : null,
+          });
+        }
+      }
+
+      if (registros.length < DIAG_PAGINA) {
+        mensagens.chegouAoFim = true;
+        break;
+      }
+    }
+  } catch (err) {
+    mensagens.ok = false;
+    mensagens.erro = erroDe(err);
+  }
+
+  return { variantes, numeros, contatos, lids: Array.from(lids), mensagens };
 }
