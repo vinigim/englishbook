@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -11,6 +13,14 @@ export type LeadOpcao = {
   detalhe: string;
   /** Tudo que dá para digitar para achar o lead, já em minúsculas. */
   busca: string;
+};
+
+export type VinculoFeito = {
+  lid: string;
+  criadoEm: string;
+  leadId: string | null;
+  leadNome: string;
+  leadDetalhe: string;
 };
 
 type Conversa = {
@@ -38,7 +48,13 @@ function quando(iso: string | null): string {
   return iso ? DATA.format(new Date(iso)) : "—";
 }
 
-export function NaoIdentificadasClient({ leads }: { leads: LeadOpcao[] }) {
+export function NaoIdentificadasClient({
+  leads,
+  vinculos,
+}: {
+  leads: LeadOpcao[];
+  vinculos: VinculoFeito[];
+}) {
   const [carregando, setCarregando] = useState(false);
   const [lista, setLista] = useState<Lista | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -63,6 +79,8 @@ export function NaoIdentificadasClient({ leads }: { leads: LeadOpcao[] }) {
 
   return (
     <div>
+      <VinculosFeitos vinculos={vinculos} />
+
       <Button onClick={procurar} loading={carregando}>
         {lista ? "Procurar de novo" : "Procurar conversas"}
       </Button>
@@ -250,5 +268,96 @@ function ConversaItem({
         {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}
       </div>
     </li>
+  );
+}
+
+/**
+ * Os vínculos já feitos, do mais recente para o mais antigo.
+ *
+ * Existe porque escolher o lead errado é fácil — há duas "Dermacor" na
+ * planilha — e antes não havia como voltar atrás.
+ */
+function VinculosFeitos({ vinculos }: { vinculos: VinculoFeito[] }) {
+  const router = useRouter();
+  const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  if (vinculos.length === 0 && !aviso) return null;
+
+  async function desfazer(v: VinculoFeito) {
+    const ok = window.confirm(
+      `Desfazer o vínculo com ${v.leadNome}? As mensagens desta conversa saem da tela dele, e a conversa volta para a lista para ser vinculada de novo.`,
+    );
+    if (!ok) return;
+    setDesfazendo(v.lid);
+    setAviso(null);
+    try {
+      const res = await fetch("/api/whatsapp/nao-identificadas", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lid: v.lid }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAviso(json?.message ?? json?.error ?? `Erro ${res.status}`);
+      } else {
+        setAviso(
+          `Vínculo com ${v.leadNome} desfeito — ${json?.removidas ?? 0} mensagem(ns) saíram da tela dele. Procure as conversas de novo para vincular ao lead certo.`,
+        );
+        router.refresh();
+      }
+    } catch {
+      setAviso("A resposta não chegou. Tente de novo.");
+    } finally {
+      setDesfazendo(null);
+    }
+  }
+
+  return (
+    <div className="mb-8">
+      <h2 className="font-display text-xl text-ink tracking-tight mb-2">
+        Vínculos já feitos
+      </h2>
+      {aviso ? (
+        <Alert variant="info" className="mb-3">
+          {aviso}
+        </Alert>
+      ) : null}
+      <ul className="space-y-2">
+        {vinculos.map((v) => (
+          <li
+            key={v.lid}
+            className="bg-paper border border-line p-3 flex flex-wrap items-center justify-between gap-2"
+          >
+            <div className="text-sm">
+              {v.leadId ? (
+                <Link
+                  href={`/derma-lux/leads/${v.leadId}`}
+                  className="font-medium underline"
+                >
+                  {v.leadNome}
+                </Link>
+              ) : (
+                <span className="font-medium">{v.leadNome}</span>
+              )}
+              {v.leadDetalhe ? (
+                <span className="text-muted"> · {v.leadDetalhe}</span>
+              ) : null}
+              <span className="block text-xs text-muted">
+                vinculado em {quando(v.criadoEm)}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={desfazendo === v.lid}
+              onClick={() => desfazer(v)}
+            >
+              Desfazer
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

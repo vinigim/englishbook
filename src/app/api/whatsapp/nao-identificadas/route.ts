@@ -188,3 +188,100 @@ export async function POST(request: NextRequest) {
     });
   }
 }
+
+const desfazerSchema = z.object({
+  lid: z.string().regex(/^\d+$/, "LID inválido"),
+});
+
+/**
+ * Desfaz um vínculo feito no lead errado.
+ *
+ * Apaga o vínculo e as mensagens daquele LID que ele trouxe para o lead, e
+ * recalcula as datas de conversa do lead a partir do que sobrou — senão ele
+ * continuaria "em conversa" e no "Devo responder" por causa de uma conversa
+ * que não é dele. A conversa volta para a lista de não identificadas e pode
+ * ser vinculada de novo.
+ */
+export async function DELETE(request: NextRequest) {
+  const supabase = await exigirUsuario();
+  if (!supabase) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const parsed = desfazerSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+  const { lid } = parsed.data;
+
+  const { data: link } = await supabase
+    .from("wa_lid_links")
+    .select("lead_id")
+    .eq("lid", lid)
+    .maybeSingle();
+  const leadId = (link as { lead_id: string | null } | null)?.lead_id ?? null;
+
+  // As mensagens trazidas pelo vínculo guardam o LID como chat_id: é o
+  // endereço original da conversa, e é por ele que se separa o que veio daqui.
+  let removidas = 0;
+  if (leadId) {
+    const { data: apagadas, error } = await supabase
+      .from("wa_messages")
+      .delete()
+      .eq("lead_id", leadId)
+      .eq("chat_id", `${lid}@lid`)
+      .select("id");
+    if (error) {
+      return NextResponse.json(
+        { error: "falha_ao_apagar", message: error.message },
+        { status: 500 },
+      );
+    }
+    removidas = (apagadas ?? []).length;
+
+    await recalcularDatas(supabase, leadId);
+  }
+
+  const { error: delErr } = await supabase.from("wa_lid_links").delete().eq("lid", lid);
+  if (delErr) {
+    return NextResponse.json(
+      { error: "falha_ao_desfazer", message: delErr.message },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ ok: true, removidas });
+}
+
+type Supa = NonNullable<Awaited<ReturnType<typeof exigirUsuario>>>;
+
+/** Última mensagem de cada lado, a partir do que ficou no banco. */
+async function recalcularDatas(supabase: Supa, leadId: string) {
+  const ultima = async (direcao?: "in" | "out") => {
+    let q = supabase
+      .from("wa_messages")
+      .select("sent_at")
+      .eq("lead_id", leadId)
+      .order("sent_at", { ascending: false })
+      .limit(1);
+    if (direcao) q = q.eq("direction", direcao);
+    const { data } = await q.maybeSingle();
+    return (data as { sent_at: string } | null)?.sent_at ?? null;
+  };
+
+  const [geral, entrada, saida] = await Promise.all([
+    ultima(),
+    ultima("in"),
+    ultima("out"),
+  ]);
+
+  await supabase
+    .from("wa_leads")
+    .update({
+      last_message_at: geral,
+      last_inbound_at: entrada,
+      last_outbound_at: saida,
+      needs_analysis: true,
+    })
+    .eq("id", leadId);
+}
