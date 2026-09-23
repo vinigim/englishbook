@@ -224,6 +224,13 @@ export interface WhatsAppProvider {
   fetchLidMap?(): Promise<LidMapResult>;
 
   /**
+   * Todos os nomes que o provedor conhece para cada LID (só dígitos): o nome
+   * salvo na agenda do celular, o pushName, o nome verificado de empresa.
+   * É a matéria-prima das sugestões de vínculo.
+   */
+  nomesPorLid?(): Promise<Record<string, string[]>>;
+
+  /**
    * Amostra de diagnóstico: as CHAVES cruas de algumas mensagens, como o
    * provedor as devolve.
    *
