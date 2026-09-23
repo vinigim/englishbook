@@ -47,9 +47,13 @@ export const MESES_CLIENTE_ATIVO = 3;
  *
  * A ordem importa: locação recente ganha de locação antiga, que ganha de
  * conversa, que ganha de nada.
+ *
+ * Mensagem pelo direct conta como conversa: o Instagram não sincroniza, então
+ * `last_message_at` nunca muda por ele, e um lead abordado por lá continuava
+ * em "Novo" ao lado de quem ninguém procurou.
  */
 export function situacaoEfetiva(
-  lead: Pick<Lead, "status" | "last_message_at">,
+  lead: Pick<Lead, "status" | "last_message_at" | "instagram_sent_at">,
   rentals: Pick<LeadRentals, "ultima"> | null,
 ): LeadStatus {
   if (lead.status) return lead.status;
@@ -60,7 +64,9 @@ export function situacaoEfetiva(
     return new Date(rentals.ultima) >= corte ? "cliente" : "inativo";
   }
 
-  return lead.last_message_at ? "em_conversa" : "novo";
+  return lead.last_message_at || lead.instagram_sent_at
+    ? "em_conversa"
+    : "novo";
 }
 
 /**
