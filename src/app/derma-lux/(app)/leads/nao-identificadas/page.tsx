@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatPhoneBR } from "../../../leads-shared";
 import { VoltarAoRadar } from "../VoltarAoRadar";
-import { NaoIdentificadasClient, type LeadOpcao } from "./NaoIdentificadasClient";
+import {
+  NaoIdentificadasClient,
+  type LeadOpcao,
+  type VinculoFeito,
+} from "./NaoIdentificadasClient";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +45,27 @@ export default async function NaoIdentificadasPage() {
     };
   });
 
+  // Vínculos já feitos, para dar para desfazer um feito no lead errado. Tabela
+  // ausente (migração 0017 não rodada) só deixa a lista vazia.
+  const { data: links } = await supabase
+    .from("wa_lid_links")
+    .select("lid, created_at, lead_id")
+    .order("created_at", { ascending: false });
+
+  const porId = new Map(leads.map((l) => [l.id, l]));
+  const vinculos: VinculoFeito[] = (
+    (links ?? []) as { lid: string; created_at: string; lead_id: string | null }[]
+  ).map((v) => {
+    const lead = v.lead_id ? porId.get(v.lead_id) : undefined;
+    return {
+      lid: v.lid,
+      criadoEm: v.created_at,
+      leadId: v.lead_id,
+      leadNome: lead?.nome ?? "Lead removido",
+      leadDetalhe: lead?.detalhe ?? "",
+    };
+  });
+
   return (
     <div>
       <div className="mb-6">
@@ -56,7 +81,7 @@ export default async function NaoIdentificadasPage() {
         </p>
       </div>
 
-      <NaoIdentificadasClient leads={leads} />
+      <NaoIdentificadasClient leads={leads} vinculos={vinculos} />
     </div>
   );
 }
