@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDraftTokenProfile, getLeadDetail } from "../../../leads-data";
 import { leadDisplayName } from "../../../leads-shared";
 import { LeadDetailClient } from "./LeadDetailClient";
+import { VoltarAoRadar } from "../VoltarAoRadar";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,7 @@ export default async function LeadPage({
   return (
     <div>
       <div className="mb-5">
-        <Link
-          href="/derma-lux/leads"
-          className="text-sm text-muted hover:text-ink transition-colors"
-        >
-          ← Voltar ao radar
-        </Link>
+        <VoltarAoRadar />
         <h1 className="font-display text-3xl text-ink tracking-tight mt-2">
           {leadDisplayName(detail.lead)}
         </h1>
