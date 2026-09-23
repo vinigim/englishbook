@@ -267,7 +267,13 @@ export function contentHash(input: AnalysisInput): string {
       .map((e) => e.name)
       .sort()
       .join(","),
-    ...input.messages.slice(-MAX_MESSAGES).map((m) => m.provider_message_id),
+    // Reação marcada à parte pelo mesmo motivo do Instagram: a transcrição
+    // passou a descrevê-la como reação em vez de "[anexo]", mas o id da
+    // mensagem não mudou. Sem a marca, o hash seguia igual e o lead continuava
+    // preso à análise que falava de um arquivo inexistente.
+    ...input.messages
+      .slice(-MAX_MESSAGES)
+      .map((m) => (ehReacao(m) ? `${m.provider_message_id}:reacao` : m.provider_message_id)),
   ];
 
   return createHash("sha256").update(partes.join("|")).digest("hex");
@@ -479,7 +485,12 @@ export async function analyzeLead(
   const record: AnalysisRecord = {
     lead_id: input.lead.id,
     version,
-    content_hash: hash,
+    // A tabela tem unique (lead_id, content_hash, model). Uma reanálise forçada
+    // do mesmo conteúdo com o mesmo modelo batia nela: a IA era paga, o insert
+    // falhava com 23505 e a análise nova era descartada como "concorrente" —
+    // o botão "Reanalisar" nunca trocava nada. A versão no sufixo torna o hash
+    // único; a busca do cache continua achando a análise original pelo hash puro.
+    content_hash: options.force ? `${hash}:forcada:${version}` : hash,
     prompt_version: PROMPT_VERSION,
     stage: triagem.output.stage,
     temperature: triagem.output.temperature,

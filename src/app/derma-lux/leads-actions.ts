@@ -105,6 +105,12 @@ export async function reanalyzeLead(
       };
     }
 
+    // Pulada = a IA respondeu mas nada foi gravado. Dizer "concluída" aqui foi
+    // o que escondeu, por muito tempo, reanálises pagas e jogadas fora.
+    if (resultado.status === "skipped") {
+      return { ok: false, error: `A análise não foi gravada: ${resultado.reason}.` };
+    }
+
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Falha na análise.";
