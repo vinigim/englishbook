@@ -76,6 +76,65 @@ export function temperaturaEfetiva(
   return lead.temperature_manual ?? analysis?.temperature ?? null;
 }
 
+/**
+ * De quem é a bola.
+ *
+ * A pergunta que a caixa de entrada precisa responder num relance é "a quem eu
+ * mando agora, e a quem eu já mandei e só preciso esperar?". Antes disto a tela
+ * não distinguia "nunca abordei" de "mandei e estou esperando": os dois casos
+ * ficavam sem selo nenhum, o que jogava os leads de planilha no mesmo silêncio
+ * de quem recebeu mensagem semana passada.
+ *
+ * As três saídas são excludentes de propósito — todo lead está em exatamente
+ * uma, e a soma dos filtros fecha com o total.
+ *
+ * O que NÃO entra aqui: cópia do rascunho e clique em "Abrir no WhatsApp".
+ * Abrir o app não é ter enviado, e o dono preferiu que só o fato conte. O preço
+ * dessa escolha é o atraso: mensagem mandada pelo WhatsApp só aparece depois de
+ * sincronizar, quando ela volta do celular e preenche `last_outbound_at`. No
+ * Instagram não há atraso, porque lá quem marca é ele.
+ */
+export type EstadoContato = {
+  estado: "nunca_abordado" | "devo_responder" | "aguardando_ele";
+  /** Quando a bola passou de lado. Nulo em "nunca abordado". */
+  desde: string | null;
+  /** Por onde saiu a última mensagem nossa. Nulo quando não saiu nenhuma. */
+  canal: "whatsapp" | "instagram" | null;
+};
+
+export function estadoContato(
+  lead: Pick<Lead, "last_inbound_at" | "last_outbound_at" | "instagram_sent_at">,
+): EstadoContato {
+  const { last_inbound_at, last_outbound_at, instagram_sent_at } = lead;
+
+  // Ele falou por último: a bola é nossa. Mesma regra de sempre, agora num
+  // lugar só — ela estava copiada na lista, no priorityScore e no prompt da IA.
+  if (
+    last_inbound_at != null &&
+    (last_outbound_at == null ||
+      new Date(last_inbound_at) > new Date(last_outbound_at))
+  ) {
+    return { estado: "devo_responder", desde: last_inbound_at, canal: null };
+  }
+
+  // Saímos por algum canal: vale a saída mais recente, porque é ela que diz há
+  // quanto tempo ele está devendo resposta.
+  const saida =
+    last_outbound_at && instagram_sent_at
+      ? new Date(last_outbound_at) >= new Date(instagram_sent_at)
+        ? ({ desde: last_outbound_at, canal: "whatsapp" } as const)
+        : ({ desde: instagram_sent_at, canal: "instagram" } as const)
+      : last_outbound_at
+        ? ({ desde: last_outbound_at, canal: "whatsapp" } as const)
+        : instagram_sent_at
+          ? ({ desde: instagram_sent_at, canal: "instagram" } as const)
+          : null;
+
+  if (saida) return { estado: "aguardando_ele", ...saida };
+
+  return { estado: "nunca_abordado", desde: null, canal: null };
+}
+
 const STAGE_WEIGHT: Record<FunnelStage, number> = {
   negociacao: 5,
   proposta_enviada: 4,
@@ -113,11 +172,7 @@ export function priorityScore(
   score += STAGE_WEIGHT[analysis.stage] * 5;
 
   // O sinal mais forte: ele falou por último e ninguém respondeu.
-  const awaitingReply =
-    lead.last_inbound_at != null &&
-    (lead.last_outbound_at == null ||
-      new Date(lead.last_inbound_at) > new Date(lead.last_outbound_at));
-  if (awaitingReply) score += 25;
+  if (estadoContato(lead).estado === "devo_responder") score += 25;
 
   // Quanto mais frio o contato, mais a urgência decai.
   score -= Math.min(daysSince(lead.last_message_at) ?? 30, 30) * 0.5;

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lead, LeadRental, WaMessage } from "@/app/derma-lux/leads-types";
 import {
   daysSince,
+  estadoContato,
   extraFields,
   instagramDoLead,
   leadDisplayName,
@@ -134,10 +135,9 @@ function buildContext(input: AnalysisInput): string {
     ? daysSince(contatoNaPlanilha.data.toISOString())
     : null;
 
-  const esperandoResposta =
-    lead.last_inbound_at != null &&
-    (lead.last_outbound_at == null ||
-      new Date(lead.last_inbound_at) > new Date(lead.last_outbound_at));
+  // Mesma regra da tela, de propósito: o que o modelo lê como "ele falou por
+  // último" tem de ser o que o dono vê marcado no card.
+  const esperandoResposta = estadoContato(lead).estado === "devo_responder";
 
   const contato = [
     `Nome: ${leadDisplayName(lead)}`,

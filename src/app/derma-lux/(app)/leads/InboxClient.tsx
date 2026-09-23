@@ -14,6 +14,7 @@ import {
   type LeadStatus,
 } from "@/lib/leads/taxonomy";
 import {
+  estadoContato,
   instagramDoLead,
   leadDisplayName,
   messagePreview,
@@ -38,10 +39,18 @@ type Filtro =
   | "todos"
   | EffectiveTemperature
   | "sem_analise"
-  | "aguardando_resposta";
+  | "aguardando_resposta"
+  | "nunca_abordado"
+  | "aguardando_ele";
 
 // Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
 // leitura natural da barra é do mais quente para o mais frio.
+//
+// Os três últimos não são temperatura: são de quem é a bola. Ficam nesta mesma
+// linha porque a alternativa era uma terceira fila de chips, e a barra já tem
+// duas. "Devo responder" chamava-se "Esperando resposta", nome que dizia o
+// contrário do que faz — ele marca quem FALOU por último, não quem está
+// esperando a resposta dele.
 const FILTROS: { id: Filtro; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "quente", label: "Quentes" },
@@ -49,7 +58,9 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "morno", label: "Mornos" },
   { id: "frio", label: "Frios" },
   { id: "frio_confirmado", label: "Frio confirmado" },
-  { id: "aguardando_resposta", label: "Esperando resposta" },
+  { id: "aguardando_resposta", label: "Devo responder" },
+  { id: "nunca_abordado", label: "Nunca abordado" },
+  { id: "aguardando_ele", label: "Aguardando ele" },
   { id: "sem_analise", label: "Sem análise" },
 ];
 
@@ -76,12 +87,14 @@ function instagramArroba(lead: LeadInboxRow["lead"]): string | null {
   return handle ? `@${handle}` : null;
 }
 
-function aguardandoResposta(row: LeadInboxRow): boolean {
-  const { last_inbound_at, last_outbound_at } = row.lead;
-  if (!last_inbound_at) return false;
-  if (!last_outbound_at) return true;
-  return new Date(last_inbound_at) > new Date(last_outbound_at);
-}
+const CANAL_LABEL = { whatsapp: "WhatsApp", instagram: "Instagram" } as const;
+
+/** O chip e o estado têm nomes diferentes porque o chip é mais antigo que o estado. */
+const ESTADO_DO_FILTRO = {
+  aguardando_resposta: "devo_responder",
+  nunca_abordado: "nunca_abordado",
+  aguardando_ele: "aguardando_ele",
+} as const;
 
 export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -101,7 +114,14 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       }
 
       if (filtro === "sem_analise" && row.analysis) return false;
-      if (filtro === "aguardando_resposta" && !aguardandoResposta(row)) {
+      // Os três estados de contato são excludentes, então um `switch` de
+      // igualdade basta — e a soma dos chips fecha com o total.
+      if (
+        (filtro === "aguardando_resposta" ||
+          filtro === "nunca_abordado" ||
+          filtro === "aguardando_ele") &&
+        ESTADO_DO_FILTRO[filtro] !== estadoContato(row.lead).estado
+      ) {
         return false;
       }
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
@@ -146,6 +166,8 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       frio_confirmado: 0,
       sem_analise: 0,
       aguardando_resposta: 0,
+      nunca_abordado: 0,
+      aguardando_ele: 0,
     };
     for (const row of rows) {
       const t = temperaturaEfetiva(row.lead, row.analysis);
@@ -153,7 +175,11 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       // "Sem análise" continua significando o que a IA ainda não leu, mesmo
       // que o dono já tenha marcado a temperatura à mão.
       if (!row.analysis) c.sem_analise += 1;
-      if (aguardandoResposta(row)) c.aguardando_resposta += 1;
+
+      const { estado } = estadoContato(row.lead);
+      if (estado === "devo_responder") c.aguardando_resposta += 1;
+      else if (estado === "nunca_abordado") c.nunca_abordado += 1;
+      else c.aguardando_ele += 1;
     }
     return c;
   }, [rows]);
@@ -245,7 +271,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 function LeadRow({ row }: { row: LeadInboxRow }) {
   const { lead, analysis, lastMessage } = row;
   const temperatura = temperaturaEfetiva(lead, analysis);
-  const esperando = aguardandoResposta(row);
+  const contato = estadoContato(lead);
 
   return (
     <li>
@@ -296,18 +322,19 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
             </Badge>
           )}
 
-          {esperando ? (
+          {/*
+            De quem é a bola. "Nunca abordado" não ganha selo: são a maioria da
+            carteira, e um selo repetido em centenas de cards vira ruído — a
+            ausência já diz o que é. Saber isso sem abrir a ficha é o ponto:
+            abrir um por um é justamente o trabalho que o selo deveria poupar.
+          */}
+          {contato.estado === "devo_responder" ? (
             <Badge variant="warning" className="whitespace-nowrap">
-              esperando resposta
+              responder ele
             </Badge>
-          ) : null}
-
-          {/* Sem isto a marcação só existiria dentro da ficha, e saber a quem
-              já mandei exigiria abrir os 138 leads com Instagram um por um —
-              que é justamente o trabalho que ela deveria poupar. */}
-          {lead.instagram_sent_at ? (
+          ) : contato.estado === "aguardando_ele" && contato.canal ? (
             <Badge variant="success" className="whitespace-nowrap">
-              ✓ Instagram
+              ✓ mandei no {CANAL_LABEL[contato.canal]} {relativeDays(contato.desde)}
             </Badge>
           ) : null}
         </div>
