@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import {
@@ -23,6 +24,7 @@ import {
   temperaturaEfetiva,
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
+import { guardarFiltrosDoRadar } from "./filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -96,10 +98,44 @@ const ESTADO_DO_FILTRO = {
   aguardando_ele: "aguardando_ele",
 } as const;
 
+function lerFiltro(v: string | null): Filtro {
+  return FILTROS.some((f) => f.id === v) ? (v as Filtro) : "todos";
+}
+
+function lerSituacao(v: string | null): FiltroSituacao {
+  return FILTROS_SITUACAO.some((f) => f.id === v)
+    ? (v as FiltroSituacao)
+    : "todas";
+}
+
 export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
-  const [filtro, setFiltro] = useState<Filtro>("todos");
-  const [situacao, setSituacao] = useState<FiltroSituacao>("todas");
-  const [busca, setBusca] = useState("");
+  // Os filtros moram na URL. Antes moravam só no estado do componente, e abrir
+  // um lead e voltar zerava tudo — o dono refazia a mesma filtragem a cada
+  // lead que conferia. Na URL, o "Voltar" do navegador já traz de volta, e o
+  // "← Voltar ao radar" usa a cópia guardada em guardarFiltrosDoRadar().
+  const params = useSearchParams();
+  const [filtro, setFiltro] = useState<Filtro>(() => lerFiltro(params.get("filtro")));
+  const [situacao, setSituacao] = useState<FiltroSituacao>(() =>
+    lerSituacao(params.get("situacao")),
+  );
+  const [busca, setBusca] = useState(() => params.get("busca") ?? "");
+
+  useEffect(() => {
+    const q = new URLSearchParams();
+    if (filtro !== "todos") q.set("filtro", filtro);
+    if (situacao !== "todas") q.set("situacao", situacao);
+    if (busca.trim()) q.set("busca", busca);
+    const query = q.toString();
+    // replaceState, e não router.replace: cada tecla da busca viraria uma
+    // navegação do Next, com nova renderização no servidor. O Next 15 escuta
+    // o history nativo, então useSearchParams continua em dia.
+    window.history.replaceState(
+      null,
+      "",
+      query ? `${window.location.pathname}?${query}` : window.location.pathname,
+    );
+    guardarFiltrosDoRadar(query);
+  }, [filtro, situacao, busca]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
