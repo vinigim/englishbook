@@ -636,8 +636,8 @@ export function createEvolutionProvider(): WhatsAppProvider {
       return { providerMessageId: data?.key?.id ?? "" };
     },
 
-    async diagnosticarTelefone(phoneE164) {
-      return diagnosticar(phoneE164, call, readConfig().instance);
+    async diagnosticarTelefone(phoneE164, lidsExtras) {
+      return diagnosticar(phoneE164, call, readConfig().instance, lidsExtras);
     },
 
     async fetchLidMap(): Promise<LidMapResult> {
@@ -861,10 +861,11 @@ export async function diagnosticar(
   phoneE164: string,
   call: <T>(path: string, init?: { method?: string; body?: unknown }) => Promise<T>,
   instancia: string,
+  lidsExtras: string[] = [],
 ): Promise<DiagnosticoTelefone> {
   const variantes = variantesDoNumero(phoneE164);
   const jids = new Set(variantes.map((v) => `${v}@s.whatsapp.net`));
-  const lids = new Set<string>();
+  const lids = new Set<string>(lidsExtras.map((l) => `${l}@lid`));
 
   // 1. "Esse número tem WhatsApp?" — em versões novas vem com o LID junto.
   let numeros: DiagnosticoTelefone["numeros"];
