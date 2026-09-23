@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
+import { carregarVinculosLid } from "@/lib/whatsapp/lid-links";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 
 export const runtime = "nodejs";
@@ -78,6 +79,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const mensagens = provider.normalizeInbound(payload);
+
+    // Mensagem só com LID: entra se o dono já vinculou esse LID a um lead.
+    const pendentes = provider.pendentesInbound?.(payload) ?? [];
+    if (pendentes.length > 0) {
+      const vinculos = await carregarVinculosLid(admin);
+      for (const p of pendentes) {
+        const telefone = vinculos[p.lid];
+        if (telefone) mensagens.push(p.resolver(telefone));
+      }
+    }
+
     const resultado = await ingestMessages(admin, provider.id, mensagens);
 
     if (resultado.mensagensGravadas > 0 || resultado.leadsCriados > 0) {
