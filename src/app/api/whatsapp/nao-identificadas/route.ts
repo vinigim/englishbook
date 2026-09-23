@@ -84,9 +84,18 @@ export async function GET() {
         enviadas: ordenadas.filter((m) => m.fromMe).length,
         primeira: ordenadas[0]?.sentAt ?? null,
         ultima: ordenadas[ordenadas.length - 1]?.sentAt ?? null,
-        nome: ordenadas.find((m) => !m.fromMe && m.pushName)?.pushName ?? null,
-        trechos: ordenadas
-          .filter((m) => m.texto)
+        // Nas cópias do histórico o pushName costuma vir com o próprio LID
+        // (só dígitos). Isso não é nome: sem letra, fica "Contato sem nome".
+        nome:
+          ordenadas.find((m) => !m.fromMe && m.pushName && /\p{L}/u.test(m.pushName))
+            ?.pushName ?? null,
+        // As mensagens DO CONTATO primeiro. A nossa é quase sempre a mesma
+        // abordagem para todo mundo, e mostrada primeiro deixava as 89
+        // conversas idênticas na tela.
+        trechos: [
+          ...ordenadas.filter((m) => !m.fromMe && m.texto),
+          ...ordenadas.filter((m) => m.fromMe && m.texto),
+        ]
           .slice(0, TRECHOS)
           .map((m) => ({ fromMe: m.fromMe, sentAt: m.sentAt, texto: cortar(m.texto) })),
       };

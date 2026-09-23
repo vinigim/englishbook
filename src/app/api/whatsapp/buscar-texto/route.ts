@@ -70,6 +70,15 @@ export async function POST(request: NextRequest) {
   try {
     const provider = getWhatsAppProvider();
     const achados: Achado[] = [];
+    // A Evolution guarda a mesma mensagem duas vezes (cópia do histórico e
+    // cópia ao vivo). Na busca, uma basta.
+    const vistos = new Set<string>();
+    const repetido = (sentAt: string, fromMe: boolean, texto: string) => {
+      const chave = `${sentAt}|${fromMe}|${texto}`;
+      if (vistos.has(chave)) return true;
+      vistos.add(chave);
+      return false;
+    };
     const lidMapAlt: Record<string, string> = {};
     const inicio = Date.now();
     let paginas = 0;
@@ -84,6 +93,7 @@ export async function POST(request: NextRequest) {
         const texto = m.body ?? m.caption;
         if (!texto || !normalizar(texto).includes(termo)) continue;
         if (achados.length >= MAX_ACHADOS) break;
+        if (repetido(m.sentAt, m.direction === "out", texto)) continue;
         achados.push({
           sentAt: m.sentAt,
           fromMe: m.direction === "out",
@@ -98,6 +108,7 @@ export async function POST(request: NextRequest) {
         const texto = p.resumo.texto;
         if (!texto || !normalizar(texto).includes(termo)) continue;
         if (achados.length >= MAX_ACHADOS) break;
+        if (repetido(p.resumo.sentAt, p.resumo.fromMe, texto)) continue;
         achados.push({
           sentAt: p.resumo.sentAt,
           fromMe: p.resumo.fromMe,
