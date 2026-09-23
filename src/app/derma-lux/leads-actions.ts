@@ -56,6 +56,8 @@ export async function reanalyzeLead(
     gerarRascunho?: boolean;
     /** Quem escreve a mensagem NESTA chamada. Nulo = o padrão. */
     draftModel?: string;
+    /** "Gerar mensagem assim mesmo": a IA tem que devolver texto. */
+    exigirMensagem?: boolean;
   } = {},
 ): Promise<ReanalyzeResult> {
   const supabase = await requireSupabase();
@@ -89,6 +91,7 @@ export async function reanalyzeLead(
     const resultado = await analyzeLead(admin, input, {
       force: opts.force ?? true,
       forceDraft: opts.gerarRascunho ?? true,
+      exigirMensagem: opts.exigirMensagem ?? false,
       draftModel,
     });
 
