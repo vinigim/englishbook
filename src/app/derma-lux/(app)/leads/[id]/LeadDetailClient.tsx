@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
+  estadoContato,
   extraFields,
   formatPhoneBR,
   instagramDoLead,
@@ -246,6 +247,8 @@ export function LeadDetailClient({
   // área de transferência, copiado no mesmo toque que abre o direct — é o que
   // mais perto chega de "abrir já com a mensagem pronta".
   const instagram = instagramDoLead(lead);
+
+  const contato = estadoContato(lead);
 
   function aoAbrirInstagram() {
     if (!rascunho.trim()) return;
@@ -718,6 +721,28 @@ export function LeadDetailClient({
                 </a>
               ) : null}
             </div>
+
+            {/*
+              De quem é a bola, em uma linha. O caso do Instagram é o único que
+              fica de fora: o bloco logo abaixo já diz isso, com o botão de
+              desmarcar junto, e repetir seria dizer duas vezes no mesmo cartão.
+            */}
+            {contato.estado === "aguardando_ele" &&
+            contato.canal === "instagram" ? null : (
+              <p className="text-xs text-muted mt-3">
+                {contato.estado === "devo_responder"
+                  ? `Ele falou por último ${relativeDays(contato.desde)} — responder é com você.`
+                  : contato.estado === "aguardando_ele"
+                    ? `Você mandou pelo WhatsApp ${relativeDays(contato.desde)} e ele ainda não respondeu.`
+                    : lead.phone_e164
+                      ? // Sem esta ressalva, o primeiro lead que ele abordar e
+                        // vir marcado como "nunca abordado" parece defeito: a
+                        // mensagem do WhatsApp só chega aqui quando volta do
+                        // celular, na sincronização.
+                        "Ninguém abordou este lead ainda — ou você mandou e ainda não sincronizou. O que sai pelo seu WhatsApp só aparece aqui depois de “Sincronizar histórico”."
+                      : "Ninguém abordou este lead ainda."}
+              </p>
+            )}
 
             {/* A marcação de envio fica em linha própria: ela não é uma saída
                 para outro app como as de cima, é o registro de que já saiu. */}

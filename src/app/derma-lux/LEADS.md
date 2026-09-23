@@ -207,6 +207,35 @@ A marca entra no contexto da IA junto com o handle — sem ela o modelo lê um l
 já abordado como alguém com quem nunca se falou, e volta a sugerir primeiro
 contato.
 
+### De quem é a bola
+
+`estadoContato(lead)` (em `leads-shared.ts`) reduz o lead a um de três estados
+**excludentes** — todo lead está em exatamente um, e a soma dos três chips fecha
+com o total da carteira:
+
+| Estado | Quando | O que aparece no card |
+|---|---|---|
+| `devo_responder` | ele falou por último | selo `responder ele` |
+| `aguardando_ele` | a última saída foi nossa (WhatsApp ou Instagram) | `✓ mandei no <canal> há N dias` |
+| `nunca_abordado` | nenhuma saída registrada | nada — a ausência é o sinal |
+
+A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estava
+copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
+de concordar para a tela não mentir.
+
+**Cópia do rascunho e clique em "Abrir no WhatsApp" não contam como envio.**
+Abrir o app não é ter enviado, e foi decisão do dono que só o fato conte. O preço
+é o atraso: mensagem mandada pelo WhatsApp só entra no painel quando volta do
+celular, em "Sincronizar histórico". A ficha avisa isso em quem está como
+`nunca_abordado` e tem telefone — sem o aviso, o primeiro lead abordado e ainda
+não sincronizado parece defeito. No Instagram não há atraso, porque lá quem
+marca é ele.
+
+O chip da barra ainda se chama `aguardando_resposta` no código — é o `id`
+original, usado como chave de `Record` em vários pontos. O rótulo na tela virou
+**"Devo responder"** porque "Esperando resposta" dizia o contrário do que o
+filtro faz.
+
 ## Privacidade
 
 - **Mídia não é baixada.** Guardamos url e mimetype; o binário nunca entra no

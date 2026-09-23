@@ -72,6 +72,11 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 3. **Analyze** — `src/lib/ai/lead-analysis.ts`. Haiku triages every lead, Sonnet drafts
    the message only for hot/warm leads or on demand.
 4. **Suggest** — the lead page shows the draft with a copy button and a `wa.me` link.
+5. **Whose turn** — `estadoContato()` in `leads-shared.ts` reduces each lead to one
+   of three exclusive states (`devo_responder`, `aguardando_ele`, `nunca_abordado`),
+   which drive a badge and three filter chips. Only facts count as "sent": the sync
+   bringing our own WhatsApp message back, or the manual Instagram marker. Copying
+   the draft and opening `wa.me` do not.
 
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
 button calls it: bulk sending through an unofficial provider is what gets numbers
