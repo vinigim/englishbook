@@ -5,6 +5,7 @@ import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 import { carregarVinculosLid, varrerPendentes } from "@/lib/whatsapp/lid-links";
+import { criarSugeridor } from "@/lib/whatsapp/sugestoes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export async function GET() {
 
   try {
     const provider = getWhatsAppProvider();
-    const [varredura, manuais, porNome] = await Promise.all([
+    const [varredura, manuais, porNome, nomesLid, leadsRes] = await Promise.all([
       varrerPendentes(provider, LIMITE_MS),
       carregarVinculosLid(adminResult.admin),
       provider.fetchLidMap
@@ -62,7 +63,30 @@ export async function GET() {
             .then((r) => r.map)
             .catch(() => ({}) as Record<string, string>)
         : Promise.resolve({} as Record<string, string>),
+      provider.nomesPorLid
+        ? provider.nomesPorLid().catch(() => ({}) as Record<string, string[]>)
+        : Promise.resolve({} as Record<string, string[]>),
+      supabase
+        .from("wa_leads")
+        .select("id, sheet_name, display_name, clinic_name")
+        .eq("archived", false)
+        .limit(5000),
     ]);
+
+    const leads = (
+      (leadsRes.data ?? []) as {
+        id: string;
+        sheet_name: string | null;
+        display_name: string | null;
+        clinic_name: string | null;
+      }[]
+    ).map((l) => ({
+      id: l.id,
+      nomes: [l.sheet_name, l.display_name, l.clinic_name].filter(
+        (n): n is string => Boolean(n),
+      ),
+    }));
+    const sugerir = criarSugeridor(leads);
 
     const grupos = new Map<string, typeof varredura.pendentes>();
     for (const p of varredura.pendentes) {
@@ -77,8 +101,20 @@ export async function GET() {
       const ordenadas = msgs
         .map((m) => m.resumo)
         .sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+
+      const nomesDoContato = [
+        ...(nomesLid[lid] ?? []),
+        ...ordenadas
+          .filter((m) => !m.fromMe && m.pushName && /\p{L}/u.test(m.pushName))
+          .map((m) => m.pushName as string),
+      ];
+      const textosDoContato = ordenadas
+        .filter((m) => !m.fromMe && m.texto)
+        .map((m) => m.texto as string);
+
       return {
         lid,
+        sugestao: sugerir(nomesDoContato, textosDoContato),
         total: ordenadas.length,
         recebidas: ordenadas.filter((m) => !m.fromMe).length,
         enviadas: ordenadas.filter((m) => m.fromMe).length,
@@ -86,9 +122,8 @@ export async function GET() {
         ultima: ordenadas[ordenadas.length - 1]?.sentAt ?? null,
         // Nas cópias do histórico o pushName costuma vir com o próprio LID
         // (só dígitos). Isso não é nome: sem letra, fica "Contato sem nome".
-        nome:
-          ordenadas.find((m) => !m.fromMe && m.pushName && /\p{L}/u.test(m.pushName))
-            ?.pushName ?? null,
+        // O nome salvo no celular, se o WhatsApp repassou; senão o pushName.
+        nome: nomesDoContato[0] ?? null,
         // As mensagens DO CONTATO primeiro. A nossa é quase sempre a mesma
         // abordagem para todo mundo, e mostrada primeiro deixava as 89
         // conversas idênticas na tela.
@@ -115,10 +150,18 @@ export async function GET() {
   }
 }
 
-const vinculoSchema = z.object({
+const umVinculo = z.object({
   lid: z.string().regex(/^\d+$/, "LID inválido"),
   leadId: z.string().uuid(),
 });
+
+// Um só, ou vários de uma vez ("vincular todas as sugestões"): em lote, o
+// histórico é lido UMA vez para todos, em vez de uma leitura de 40s por
+// conversa.
+const vinculoSchema = z.union([
+  umVinculo,
+  z.object({ vinculos: z.array(umVinculo).min(1).max(200) }),
+]);
 
 export async function POST(request: NextRequest) {
   const supabase = await exigirUsuario();
@@ -133,28 +176,35 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const { lid, leadId } = parsed.data;
+  const pedidos = "vinculos" in parsed.data ? parsed.data.vinculos : [parsed.data];
 
   const adminResult = tryCreateAdminClient();
   if (!adminResult.ok) {
     return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
   }
 
-  // Cliente do usuário: a RLS (lux_staff) decide se ele vê o lead e se pode
-  // gravar o vínculo.
-  const { data: lead } = await supabase
+  // Cliente do usuário: a RLS (lux_staff) decide se ele vê os leads e se pode
+  // gravar os vínculos.
+  const { data: leadsData } = await supabase
     .from("wa_leads")
-    .select("phone_e164")
-    .eq("id", leadId)
-    .maybeSingle();
-  const telefone = (lead as { phone_e164: string | null } | null)?.phone_e164;
-  if (!telefone) {
+    .select("id, phone_e164")
+    .in("id", [...new Set(pedidos.map((p) => p.leadId))]);
+  const telefonePorLead = new Map(
+    ((leadsData ?? []) as { id: string; phone_e164: string | null }[])
+      .filter((l) => l.phone_e164)
+      .map((l) => [l.id, l.phone_e164 as string]),
+  );
+
+  const linhas = pedidos
+    .filter((p) => telefonePorLead.has(p.leadId))
+    .map((p) => ({ lid: p.lid, phone_e164: telefonePorLead.get(p.leadId)!, lead_id: p.leadId }));
+  if (linhas.length === 0) {
     return NextResponse.json({ error: "lead_sem_telefone" }, { status: 404 });
   }
 
   const { error } = await supabase
     .from("wa_lid_links")
-    .upsert({ lid, phone_e164: telefone, lead_id: leadId }, { onConflict: "lid" });
+    .upsert(linhas, { onConflict: "lid" });
   if (error) {
     // 42P01: a tabela não existe — a migração 0017 ainda não rodou.
     const semTabela = error.code === "42P01" || /wa_lid_links/.test(error.message);
@@ -169,18 +219,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Vínculo gravado: traz a conversa agora. Se o tempo acabar antes, o
-  // vínculo já vale e o "Reler tudo" termina o serviço.
+  // Vínculos gravados: traz as conversas agora. Se o tempo acabar antes, os
+  // vínculos já valem e o "Reler tudo" termina o serviço.
+  const telefonePorLid = new Map(linhas.map((l) => [l.lid, l.phone_e164]));
   try {
     const provider = getWhatsAppProvider();
     const varredura = await varrerPendentes(provider, LIMITE_MS);
     const mensagens = varredura.pendentes
-      .filter((p) => p.lid === lid)
-      .map((p) => p.resolver(telefone));
+      .filter((p) => telefonePorLid.has(p.lid))
+      .map((p) => p.resolver(telefonePorLid.get(p.lid)!));
     const resultado = await ingestMessages(adminResult.admin, provider.id, mensagens);
 
     return NextResponse.json({
       ok: true,
+      vinculados: linhas.length,
       mensagens: mensagens.length,
       gravadas: resultado.mensagensGravadas,
       completo: varredura.chegouAoFim,
@@ -190,10 +242,11 @@ export async function POST(request: NextRequest) {
     console.error("[wa-nao-identificadas] POST:", msg);
     return NextResponse.json({
       ok: true,
+      vinculados: linhas.length,
       mensagens: 0,
       gravadas: 0,
       completo: false,
-      aviso: `Vínculo salvo, mas a conversa não veio agora (${msg}). Use "Reler tudo".`,
+      aviso: `Vínculo(s) salvo(s), mas as conversas não vieram agora (${msg}). Use "Reler tudo".`,
     });
   }
 }

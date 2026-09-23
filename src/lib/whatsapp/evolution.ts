@@ -640,6 +640,40 @@ export function createEvolutionProvider(): WhatsAppProvider {
       return diagnosticar(phoneE164, call, readConfig().instance, lidsExtras);
     },
 
+    async nomesPorLid(): Promise<Record<string, string[]>> {
+      const cfg = readConfig();
+      const nomes: Record<string, Set<string>> = {};
+
+      for (const rota of ["findContacts", "findChats"] as const) {
+        let registros: Record<string, unknown>[] = [];
+        try {
+          const d = await call<unknown>(`/chat/${rota}/${cfg.instance}`, {
+            method: "POST",
+            body: {},
+          });
+          registros = listaDe(d, rota);
+        } catch {
+          // Uma das duas listas falhar não impede de usar a outra.
+          continue;
+        }
+        for (const r of registros) {
+          const jid = str(r.remoteJid) ?? str(r.id) ?? "";
+          if (!isLidJid(jid)) continue;
+          const lid = jidToPhone(jid);
+          if (!lid) continue;
+          for (const campo of ["name", "pushName", "verifiedName", "notify"]) {
+            const v = str(r[campo]);
+            // Sem letra não é nome: nas cópias do histórico vem o próprio LID.
+            if (v && /\p{L}/u.test(v)) (nomes[lid] ??= new Set()).add(v.trim());
+          }
+        }
+      }
+
+      return Object.fromEntries(
+        Object.entries(nomes).map(([lid, set]) => [lid, Array.from(set)]),
+      );
+    },
+
     async fetchLidMap(): Promise<LidMapResult> {
       const cfg = readConfig();
       const d = await call<unknown>(`/chat/findContacts/${cfg.instance}`, {

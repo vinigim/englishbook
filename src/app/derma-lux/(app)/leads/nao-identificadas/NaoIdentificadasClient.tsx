@@ -23,8 +23,11 @@ export type VinculoFeito = {
   leadDetalhe: string;
 };
 
+type Sugestao = { leadId: string; forca: "forte" | "fraca"; motivo: string };
+
 type Conversa = {
   lid: string;
+  sugestao: Sugestao | null;
   total: number;
   recebidas: number;
   enviadas: number;
@@ -75,7 +78,7 @@ export function NaoIdentificadasClient({
     }
   }
 
-  const pendentes = lista?.conversas.filter((c) => !vinculadas[c.lid]) ?? [];
+  const pendentes = lista?.conversas.filter((c) => !(c.lid in vinculadas)) ?? [];
 
   return (
     <div>
@@ -107,13 +110,26 @@ export function NaoIdentificadasClient({
               : " A leitura parou pelo tempo antes do fim do histórico — procure de novo depois de vincular estas."}
           </p>
 
-          {Object.entries(vinculadas).length > 0 ? (
+          {Object.values(vinculadas).some(Boolean) ? (
             <Alert variant="info" className="mb-4">
-              {Object.values(vinculadas).map((texto, i) => (
-                <p key={i}>{texto}</p>
-              ))}
+              {Object.values(vinculadas)
+                .filter(Boolean)
+                .map((texto, i) => (
+                  <p key={i}>{texto}</p>
+                ))}
             </Alert>
           ) : null}
+
+          <VincularSugestoesFortes
+            conversas={pendentes}
+            leads={leads}
+            aoVincular={(lids, texto) =>
+              setVinculadas((v) => ({
+                ...v,
+                ...Object.fromEntries(lids.map((lid, i) => [lid, i === 0 ? texto : ""])),
+              }))
+            }
+          />
 
           <ul className="space-y-3">
             {pendentes.map((c) => (
@@ -177,7 +193,12 @@ function ConversaItem({
       )}
 
       <div className="mt-3">
-        <VincularLead lid={c.lid} leads={leads} aoVincular={aoVincular} />
+        <VincularLead
+          lid={c.lid}
+          leads={leads}
+          aoVincular={aoVincular}
+          sugestao={c.sugestao}
+        />
       </div>
     </li>
   );
@@ -193,13 +214,18 @@ function VincularLead({
   lid,
   leads,
   aoVincular,
+  sugestao = null,
 }: {
   lid: string;
   leads: LeadOpcao[];
   aoVincular: (texto: string) => void;
+  sugestao?: Sugestao | null;
 }) {
   const [busca, setBusca] = useState("");
-  const [escolhido, setEscolhido] = useState<LeadOpcao | null>(null);
+  // A sugestão já vem escolhida: basta confirmar, ou "Trocar" se estiver errada.
+  const [escolhido, setEscolhido] = useState<LeadOpcao | null>(
+    () => (sugestao ? (leads.find((l) => l.id === sugestao.leadId) ?? null) : null),
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
@@ -245,6 +271,17 @@ function VincularLead({
     <div>
       {escolhido ? (
         <div className="flex flex-wrap items-center gap-2">
+          {sugestao && sugestao.leadId === escolhido.id ? (
+            <span
+              className={cn(
+                "w-full text-xs",
+                sugestao.forca === "forte" ? "text-ink" : "text-accent",
+              )}
+            >
+              {sugestao.forca === "forte" ? "Sugestão" : "Sugestão — confira"}:{" "}
+              {sugestao.motivo}.
+            </span>
+          ) : null}
           <span className="text-sm">
             Vincular a <strong>{escolhido.nome}</strong>
             {escolhido.detalhe ? (
@@ -517,6 +554,95 @@ function BuscarTexto({ leads }: { leads: LeadOpcao[] }) {
           </ul>
         )
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Um toque para todas as sugestões FORTES — nome do contato igual ao de um
+ * lead. As fracas ficam de fora de propósito: pedem conferência uma a uma.
+ */
+function VincularSugestoesFortes({
+  conversas,
+  leads,
+  aoVincular,
+}: {
+  conversas: Conversa[];
+  leads: LeadOpcao[];
+  aoVincular: (lids: string[], texto: string) => void;
+}) {
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const idsValidos = new Set(leads.map((l) => l.id));
+  const fortes = conversas.filter(
+    (c) => c.sugestao?.forca === "forte" && idsValidos.has(c.sugestao.leadId),
+  );
+  const fracas = conversas.filter((c) => c.sugestao?.forca === "fraca").length;
+
+  if (fortes.length === 0 && fracas === 0) {
+    return (
+      <p className="text-sm text-muted mb-3">
+        Nenhuma sugestão automática: o WhatsApp não repassou nomes que batam com
+        os leads. Vincule pela busca de cada cartão.
+      </p>
+    );
+  }
+
+  async function vincularTodas() {
+    const ok = window.confirm(
+      `Vincular ${fortes.length} conversa(s) aos leads sugeridos? Dá para desfazer cada uma em "Vínculos já feitos".`,
+    );
+    if (!ok) return;
+    setSalvando(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/whatsapp/nao-identificadas", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          vinculos: fortes.map((c) => ({ lid: c.lid, leadId: c.sugestao!.leadId })),
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErro(json?.message ?? json?.error ?? `Erro ${res.status}`);
+        return;
+      }
+      aoVincular(
+        fortes.map((c) => c.lid),
+        json?.aviso ??
+          `${json?.vinculados ?? fortes.length} conversa(s) vinculada(s) — ${json?.gravadas ?? 0} mensagem(ns) trazida(s)${
+            json?.completo ? "" : " (o resto chega no próximo \"Reler tudo\")"
+          }.`,
+      );
+    } catch {
+      setErro("A resposta não chegou. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 p-3 border border-line bg-paper">
+      <p className="text-sm">
+        <strong>{fortes.length}</strong> conversa(s) com nome igual ao de um
+        lead
+        {fracas > 0 ? (
+          <>
+            {" "}
+            e <strong>{fracas}</strong> com sugestão para conferir, marcada no
+            cartão
+          </>
+        ) : null}
+        .
+      </p>
+      {fortes.length > 0 ? (
+        <Button size="sm" className="mt-2" onClick={vincularTodas} loading={salvando}>
+          Vincular as {fortes.length} com nome igual
+        </Button>
+      ) : null}
+      {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}
     </div>
   );
 }
