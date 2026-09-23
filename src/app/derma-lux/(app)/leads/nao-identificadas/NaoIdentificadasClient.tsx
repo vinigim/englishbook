@@ -80,7 +80,7 @@ export function NaoIdentificadasClient({
   return (
     <div>
       <VinculosFeitos vinculos={vinculos} />
-      <BuscarTexto />
+      <BuscarTexto leads={leads} />
 
       <Button onClick={procurar} loading={carregando}>
         {lista ? "Procurar de novo" : "Procurar conversas"}
@@ -142,45 +142,6 @@ function ConversaItem({
   leads: LeadOpcao[];
   aoVincular: (texto: string) => void;
 }) {
-  const [busca, setBusca] = useState("");
-  const [escolhido, setEscolhido] = useState<LeadOpcao | null>(null);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  const opcoes = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    if (termo.length < 2) return [];
-    return leads.filter((l) => l.busca.includes(termo)).slice(0, 8);
-  }, [busca, leads]);
-
-  async function vincular() {
-    if (!escolhido) return;
-    setSalvando(true);
-    setErro(null);
-    try {
-      const res = await fetch("/api/whatsapp/nao-identificadas", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lid: c.lid, leadId: escolhido.id }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setErro(json?.message ?? json?.error ?? `Erro ${res.status}`);
-        return;
-      }
-      aoVincular(
-        json?.aviso ??
-          `${escolhido.nome}: vinculada — ${json?.gravadas ?? 0} mensagem(ns) trazida(s)${
-            json?.completo ? "" : " (o resto chega no próximo \"Reler tudo\")"
-          }.`,
-      );
-    } catch {
-      setErro("A resposta não chegou. Tente de novo.");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
   return (
     <li className="bg-paper border border-line p-4">
       <div className="flex items-baseline justify-between gap-2">
@@ -191,7 +152,7 @@ function ConversaItem({
       </div>
       <p className="text-xs text-muted mt-0.5">
         {c.enviadas} enviada(s) por você · {c.recebidas} recebida(s) · desde{" "}
-        {quando(c.primeira)}
+        {quando(c.primeira)} · código {c.lid}
       </p>
 
       {c.trechos.length > 0 ? (
@@ -216,59 +177,122 @@ function ConversaItem({
       )}
 
       <div className="mt-3">
-        {escolhido ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm">
-              Vincular a <strong>{escolhido.nome}</strong>
-              {escolhido.detalhe ? (
-                <span className="text-muted"> ({escolhido.detalhe})</span>
-              ) : null}
-              ?
-            </span>
-            <Button size="sm" onClick={vincular} loading={salvando}>
-              Confirmar
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setEscolhido(null)}
-              disabled={salvando}
-            >
-              Trocar
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* text-base no celular: abaixo de 16px o Safari dá zoom no foco. */}
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="A qual lead pertence? Digite nome, clínica, cidade ou telefone"
-              className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
-            />
-            {opcoes.length > 0 ? (
-              <ul className="mt-1 border border-line divide-y divide-line">
-                {opcoes.map((l) => (
-                  <li key={l.id}>
-                    <button
-                      type="button"
-                      onClick={() => setEscolhido(l)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-line/40"
-                    >
-                      {l.nome}
-                      {l.detalhe ? (
-                        <span className="text-muted"> · {l.detalhe}</span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </>
-        )}
-        {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}
+        <VincularLead lid={c.lid} leads={leads} aoVincular={aoVincular} />
       </div>
     </li>
+  );
+}
+
+/**
+ * Escolher o lead e gravar o vínculo de um LID.
+ *
+ * Usado nos cartões da lista e nos resultados da busca por texto — que é onde
+ * dá para reconhecer a conversa quando a lista não ajuda.
+ */
+function VincularLead({
+  lid,
+  leads,
+  aoVincular,
+}: {
+  lid: string;
+  leads: LeadOpcao[];
+  aoVincular: (texto: string) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [escolhido, setEscolhido] = useState<LeadOpcao | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [feito, setFeito] = useState<string | null>(null);
+
+  const opcoes = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (termo.length < 2) return [];
+    return leads.filter((l) => l.busca.includes(termo)).slice(0, 8);
+  }, [busca, leads]);
+
+  async function vincular() {
+    if (!escolhido) return;
+    setSalvando(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/whatsapp/nao-identificadas", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lid, leadId: escolhido.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErro(json?.message ?? json?.error ?? `Erro ${res.status}`);
+        return;
+      }
+      const texto =
+        json?.aviso ??
+        `${escolhido.nome}: vinculada — ${json?.gravadas ?? 0} mensagem(ns) trazida(s)${
+          json?.completo ? "" : " (o resto chega no próximo \"Reler tudo\")"
+        }.`;
+      setFeito(texto);
+      aoVincular(texto);
+    } catch {
+      setErro("A resposta não chegou. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (feito) return <p className="text-sm font-medium">{feito}</p>;
+
+  return (
+    <div>
+      {escolhido ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm">
+            Vincular a <strong>{escolhido.nome}</strong>
+            {escolhido.detalhe ? (
+              <span className="text-muted"> ({escolhido.detalhe})</span>
+            ) : null}
+            ?
+          </span>
+          <Button size="sm" onClick={vincular} loading={salvando}>
+            Confirmar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setEscolhido(null)}
+            disabled={salvando}
+          >
+            Trocar
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* text-base no celular: abaixo de 16px o Safari dá zoom no foco. */}
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="A qual lead pertence? Digite nome, clínica, cidade ou telefone"
+            className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
+          />
+          {opcoes.length > 0 ? (
+            <ul className="mt-1 border border-line divide-y divide-line">
+              {opcoes.map((l) => (
+                <li key={l.id}>
+                  <button
+                    type="button"
+                    onClick={() => setEscolhido(l)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-line/40"
+                  >
+                    {l.nome}
+                    {l.detalhe ? <span className="text-muted"> · {l.detalhe}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      )}
+      {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}
+    </div>
   );
 }
 
@@ -387,7 +411,7 @@ const VIA: Record<NonNullable<Achado["via"]>, string> = {
  * Para achar conversa que "sumiu": ligada pelo nome ao telefone errado, ela
  * não aparece como não identificada — cai no lead de outra pessoa.
  */
-function BuscarTexto() {
+function BuscarTexto({ leads }: { leads: LeadOpcao[] }) {
   const [texto, setTexto] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [achados, setAchados] = useState<Achado[] | null>(null);
@@ -453,7 +477,13 @@ function BuscarTexto() {
             {achados.map((a, i) => (
               <li key={i} className="bg-paper border border-line p-3 text-sm">
                 <p className="text-xs text-muted">
-                  {a.fromMe ? "Você" : (a.pushName ?? "Contato")} · {quando(a.sentAt)}
+                  {a.fromMe
+                    ? "Você"
+                    : a.pushName && /\p{L}/u.test(a.pushName)
+                      ? a.pushName
+                      : "Contato"}{" "}
+                  · {quando(a.sentAt)}
+                  {a.lid ? ` · código ${a.lid}` : ""}
                 </p>
                 <p className="mt-0.5">{a.trecho}</p>
                 <p className="text-xs mt-1">
@@ -476,6 +506,12 @@ function BuscarTexto() {
                     <strong>Sem telefone — é uma conversa não identificada.</strong>
                   )}
                 </p>
+                {/* Um seletor por conversa, no primeiro resultado dela. */}
+                {!a.telefone && a.lid && achados.findIndex((x) => x.lid === a.lid) === i ? (
+                  <div className="mt-2">
+                    <VincularLead lid={a.lid} leads={leads} aoVincular={() => {}} />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
