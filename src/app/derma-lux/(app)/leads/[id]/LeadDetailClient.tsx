@@ -291,11 +291,12 @@ export function LeadDetailClient({
     });
   }
 
-  function analisar(gerarRascunho: boolean, onde: Onde) {
+  function analisar(gerarRascunho: boolean, onde: Onde, exigirMensagem = false) {
     executar(onde, async () => {
       const r = await reanalyzeLead(lead.id, {
         force: true,
         gerarRascunho,
+        exigirMensagem,
         draftModel: modelo,
       });
 
@@ -680,7 +681,7 @@ export function LeadDetailClient({
                   size="sm"
                   variant="secondary"
                   loading={pendente}
-                  onClick={() => analisar(true, "mensagem")}
+                  onClick={() => analisar(true, "mensagem", true)}
                 >
                   Gerar mensagem assim mesmo
                 </Button>

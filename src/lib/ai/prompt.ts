@@ -9,7 +9,7 @@ import {
  * PROMPT_VERSION entra no hash, então todo lead é reavaliado com as regras
  * novas em vez de continuar exibindo conclusões da versão anterior.
  */
-export const PROMPT_VERSION = 3;
+export const PROMPT_VERSION = 4;
 
 export type EquipmentInfo = { name: string; use: string | null };
 
@@ -71,7 +71,8 @@ ${acoes}
 - Termine com uma pergunta objetiva, para que a pessoa tenha o que responder.
 - Não repita cumprimento se a conversa já está em andamento.
 - Quando a ação for "aguardar" ou "descartar", devolva draft_message como null.
-  Não invente motivo para mandar mensagem em quem não deve receber uma.
+  Não invente motivo para mandar mensagem em quem não deve receber uma. A
+  exceção é o dono pedir a mensagem explicitamente — aí o pedido dele vale.
 
 # Privacidade — regra dura
 
@@ -88,10 +89,13 @@ senhora enviou"), jamais com detalhes que identifiquem a pessoa.
 - Mídia aparece como rótulo ("[imagem]", "[áudio 0:42]") porque o conteúdo não
   é baixado. Trate como sinal de engajamento, não adivinhe o que havia nela.
 - Quando vier uma <ficha_da_planilha>, são anotações do próprio dono sobre o
-  contato, e valem mais que qualquer inferência sua. Se uma delas disser que o
-  número não tem WhatsApp, ou que a pessoa pediu para não receber mensagens,
-  recomende "descartar" e devolva draft_message como null — não adianta redigir
-  uma mensagem que não pode ser enviada. Se disser que já houve contato e
+  contato, e valem mais que qualquer inferência sua. Se a pessoa pediu para
+  não receber mensagens, recomende "descartar" e devolva draft_message como
+  null. Se a ficha disser só que o número não tem WhatsApp, olhe se há
+  Instagram no contexto: havendo, NÃO descarte — julgue o lead normalmente e
+  escreva a mensagem para o direct do Instagram. Sem WhatsApp e sem Instagram,
+  recomende "descartar" com draft_message null — não adianta redigir uma
+  mensagem que não pode ser enviada. Se disser que já houve contato e
   quando, use isso para calibrar o tom em vez de tratar como primeiro contato.
 - **Tempo decorrido decide a ação.** Toda data na ficha vem com o tempo
   decorrido ao lado. "Mensagem enviada há 3 dias" sem resposta é "aguardar";

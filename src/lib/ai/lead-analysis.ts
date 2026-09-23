@@ -323,11 +323,23 @@ async function runTriage(
   return { output: parsed.data, usage: readUsage(message) };
 }
 
+/**
+ * Anexado quando o dono toca em "Gerar mensagem assim mesmo".
+ *
+ * Sem isto o botão não fazia nada em lead "aguardar" ou "descartar": o modelo
+ * seguia a regra do prompt e devolvia draft_message nulo de novo. Vai na
+ * mensagem do usuário, e não no system, para não quebrar o prefixo em cache.
+ */
+const PEDIDO_EXPLICITO = `
+
+O dono pediu explicitamente uma mensagem para este contato. Mantenha em recommended_action e rationale a sua leitura honesta — pode continuar sendo "aguardar" ou "descartar" —, mas draft_message NÃO pode ser null: escreva a melhor mensagem possível. Se o telefone não tem WhatsApp e há Instagram, escreva para o direct do Instagram. A única exceção é a ficha dizer que a pessoa pediu para não receber mensagens.`;
+
 async function runDraft(
   system: Anthropic.TextBlockParam[],
   context: string,
   triage: TriageOutput,
   model: string,
+  exigirMensagem = false,
 ): Promise<{ output: DraftOutput; usage: Usage }> {
   const client = getAnthropic();
 
@@ -347,7 +359,7 @@ async function runDraft(
     messages: [
       {
         role: "user",
-        content: `${context}\n\n${resumoTriagem}\n\nEscolha a ação e escreva a mensagem.`,
+        content: `${context}\n\n${resumoTriagem}\n\nEscolha a ação e escreva a mensagem.${exigirMensagem ? PEDIDO_EXPLICITO : ""}`,
       },
     ],
     output_config: {
@@ -375,6 +387,12 @@ export type AnalyzeOptions = {
   force?: boolean;
   /** Gera o rascunho mesmo num lead frio (o botão "Gerar mensagem"). */
   forceDraft?: boolean;
+  /**
+   * O dono pediu a mensagem mesmo discordando da IA ("Gerar mensagem assim
+   * mesmo"). `forceDraft` só garante que a redação rode; isto garante que ela
+   * devolva texto.
+   */
+  exigirMensagem?: boolean;
   /**
    * Quem escreve a mensagem nesta chamada.
    *
@@ -440,6 +458,7 @@ export async function analyzeLead(
 
   const valeRascunho =
     options.forceDraft ||
+    options.exigirMensagem ||
     triagem.output.temperature === "quente" ||
     triagem.output.temperature === "morno";
 
@@ -453,7 +472,13 @@ export async function analyzeLead(
 
   let redacao: { output: DraftOutput; usage: Usage } | null = null;
   if (valeRascunho) {
-    redacao = await runDraft(system, context, triagem.output, modeloRedacao);
+    redacao = await runDraft(
+      system,
+      context,
+      triagem.output,
+      modeloRedacao,
+      options.exigirMensagem,
+    );
   }
 
   const custo =
