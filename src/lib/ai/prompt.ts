@@ -3,13 +3,14 @@ import {
   ACTION_LABEL,
   RECOMMENDED_ACTIONS,
 } from "@/lib/leads/taxonomy";
+import { TABELA_CO2 } from "@/lib/leads/tabela-precos";
 
 /**
  * Mudar qualquer coisa aqui invalida o cache de análises de propósito: o
  * PROMPT_VERSION entra no hash, então todo lead é reavaliado com as regras
  * novas em vez de continuar exibindo conclusões da versão anterior.
  */
-export const PROMPT_VERSION = 4;
+export const PROMPT_VERSION = 5;
 
 export type EquipmentInfo = { name: string; use: string | null };
 
@@ -52,6 +53,27 @@ plástico, ginecologista) ou o responsável por uma clínica de estética.
 
 ${catalogo}
 
+# Tabela de preços — Laser de CO2
+
+Quando a pessoa pedir valor, preço, orçamento ou "as informações" sobre a
+locação do laser de CO2 (ou o contexto deixar claro que ela quer saber como
+funciona e quanto custa), a ação é "resposta_preco" e a mensagem É a tabela
+abaixo, copiada caractere por caractere — mesmos emojis, mesmas quebras de
+linha, mesmos valores. Você só pode:
+
+- pôr ANTES dela uma linha curta de abertura, chamando a pessoa pelo nome
+  quando souber (ex.: "Olá Maria, tudo bem? Seguem as informações:");
+- pôr DEPOIS dela uma pergunta curta para seguir a conversa (ex.: data ou
+  quantas horas pretende usar).
+
+Não resuma, não reordene, não arredonde e não acrescente condição que não
+esteja na tabela. Para outro equipamento do catálogo não há tabela: aí vale a
+regra de nunca inventar preço.
+
+<tabela_co2>
+${TABELA_CO2}
+</tabela_co2>
+
 # Ações possíveis
 
 Você escolhe exatamente uma destas:
@@ -64,9 +86,10 @@ ${acoes}
   profissionais: cordial, direto, sem formalidade de ofício.
 - Trate por "Dr." ou "Dra." quando o nome ou o contexto indicarem médico.
 - No máximo 600 caracteres. Emoji só se a conversa já tiver esse tom, e no
-  máximo um.
+  máximo um. A mensagem com a tabela de preços é a exceção: ela vai inteira,
+  com os emojis dela.
 - NUNCA invente preço, data disponível, prazo ou condição comercial que não
-  esteja na conversa ou nos dados fornecidos. Se falta a informação, escreva
+  esteja na tabela, na conversa ou nos dados fornecidos. Se falta a informação, escreva
   uma mensagem que a peça ou que prometa retornar com ela.
 - Termine com uma pergunta objetiva, para que a pessoa tenha o que responder.
 - Não repita cumprimento se a conversa já está em andamento.
