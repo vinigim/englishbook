@@ -29,7 +29,10 @@ import {
   instagramDirectUrl,
   instagramProfileUrl,
 } from "@/lib/leads/instagram";
-import { APRESENTACAO_INSTAGRAM } from "@/lib/leads/apresentacao";
+import {
+  apresentacaoInstagram,
+  tratamentoDoMedico,
+} from "@/lib/leads/apresentacao";
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
@@ -256,6 +259,7 @@ export function LeadDetailClient({
   const instagram = instagramDoLead(lead);
 
   const contato = estadoContato(lead);
+  const tratamento = tratamentoDoMedico(lead.sheet_name, lead.display_name);
 
   /**
    * Copia a apresentação fixa, e não o rascunho da IA.
@@ -267,7 +271,7 @@ export function LeadDetailClient({
   function aoAbrirInstagram() {
     // Sem await: segurar aqui adiaria a navegação, e a cópia precisa
     // acontecer dentro do gesto do toque para o navegador permitir.
-    void navigator.clipboard.writeText(APRESENTACAO_INSTAGRAM).catch(() => {
+    void navigator.clipboard.writeText(apresentacaoInstagram(tratamento)).catch(() => {
       setFeedback({
         onde: "mensagem",
         tipo: "erro",
@@ -816,7 +820,9 @@ export function LeadDetailClient({
             {instagram ? (
               <p className="text-xs text-muted mt-1">
                 &ldquo;Abrir no Instagram&rdquo; copia a sua apresentação (não a
-                mensagem acima) no mesmo toque, é só colar no direct de{" "}
+                mensagem acima), começando com &ldquo;
+                {tratamento ? `Olá, ${tratamento}!` : "Olá!"}&rdquo;, no mesmo
+                toque — é só colar no direct de{" "}
                 <a
                   href={instagramProfileUrl(instagram)}
                   target="_blank"
