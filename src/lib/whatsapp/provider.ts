@@ -168,7 +168,11 @@ export interface WhatsAppProvider {
    * Só diagnóstico — não grava nada. Existe para descobrir por que um lead
    * da planilha, que sabidamente recebeu mensagem, aparece sem conversa.
    */
-  diagnosticarTelefone?(phoneE164: string): Promise<DiagnosticoTelefone>;
+  diagnosticarTelefone?(
+    phoneE164: string,
+    /** LIDs já vinculados à mão a este lead: entram na varredura também. */
+    lidsExtras?: string[],
+  ): Promise<DiagnosticoTelefone>;
 
   fetchChatHistory(
     chatId: string,

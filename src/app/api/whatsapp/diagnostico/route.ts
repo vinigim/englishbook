@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
+import { waJidPhone, waPhoneKey } from "@/lib/leads/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,16 +37,34 @@ export async function POST(request: NextRequest) {
 
   // Cliente do usuário, não o admin: a RLS dos leads (lux_staff) decide se
   // ele pode ver este telefone.
+  const leadId = parsed.data.leadId;
   const { data: lead } = await supabase
     .from("wa_leads")
-    .select("phone_e164")
-    .eq("id", parsed.data.leadId)
+    .select("phone_e164, phone_key")
+    .eq("id", leadId)
     .maybeSingle();
 
-  const telefone = (lead as { phone_e164: string | null } | null)?.phone_e164;
+  const l = lead as { phone_e164: string | null; phone_key: string } | null;
+  const telefone = l?.phone_e164;
   if (!telefone) {
     return NextResponse.json({ error: "lead_sem_telefone" }, { status: 404 });
   }
+
+  // Vínculos manuais (0017). Tabela ausente não derruba o diagnóstico.
+  const { data: links, error: linksErr } = await supabase
+    .from("wa_lid_links")
+    .select("lid, phone_e164, lead_id")
+    .or(`lead_id.eq.${leadId},phone_e164.eq.${telefone}`);
+  const vinculos = (links ?? []) as {
+    lid: string;
+    phone_e164: string;
+    lead_id: string | null;
+  }[];
+
+  // A mesma conta que o ingest faz: se der diferente de phone_key, a
+  // conversa resolvida cai em outro lead (ou num lead novo).
+  const e164 = waJidPhone(telefone);
+  const chaveDoIngest = e164 ? waPhoneKey(e164) : null;
 
   try {
     const provider = getWhatsAppProvider();
@@ -55,8 +74,41 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const resultado = await provider.diagnosticarTelefone(telefone);
-    return NextResponse.json(resultado);
+    const resultado = await provider.diagnosticarTelefone(
+      telefone,
+      vinculos.map((v) => v.lid),
+    );
+
+    // As mensagens achadas no WhatsApp já estão no banco? Em qual lead?
+    const ids = resultado.mensagens.amostra
+      .map((m) => m.id)
+      .filter((id): id is string => Boolean(id));
+    let noBanco: { id: string; leadId: string; esteLead: boolean }[] = [];
+    if (ids.length > 0) {
+      const { data: rows } = await supabase
+        .from("wa_messages")
+        .select("provider_message_id, lead_id")
+        .in("provider_message_id", ids);
+      noBanco = ((rows ?? []) as { provider_message_id: string; lead_id: string }[]).map(
+        (r) => ({
+          id: r.provider_message_id,
+          leadId: r.lead_id,
+          esteLead: r.lead_id === leadId,
+        }),
+      );
+    }
+
+    return NextResponse.json({
+      ...resultado,
+      lead: {
+        phone_e164: telefone,
+        phone_key: l?.phone_key ?? null,
+        chaveDoIngest,
+        chavesBatem: chaveDoIngest === (l?.phone_key ?? null),
+      },
+      vinculos: linksErr ? { erro: linksErr.message } : vinculos,
+      noBanco,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[wa-diagnostico]", msg);

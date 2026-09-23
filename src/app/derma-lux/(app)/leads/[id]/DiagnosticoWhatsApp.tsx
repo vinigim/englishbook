@@ -4,6 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { DiagnosticoTelefone } from "@/lib/whatsapp/provider";
 
+type Resultado = DiagnosticoTelefone & {
+  lead?: {
+    phone_e164: string;
+    phone_key: string | null;
+    chaveDoIngest: string | null;
+    chavesBatem: boolean;
+  };
+  vinculos?: { lid: string }[] | { erro: string };
+  noBanco?: { id: string; leadId: string; esteLead: boolean }[];
+};
+
 /**
  * Botão de diagnóstico: o que o WhatsApp sabe sobre o telefone deste lead.
  *
@@ -13,7 +24,7 @@ import type { DiagnosticoTelefone } from "@/lib/whatsapp/provider";
  */
 export function DiagnosticoWhatsApp({ leadId }: { leadId: string }) {
   const [rodando, setRodando] = useState(false);
-  const [resultado, setResultado] = useState<DiagnosticoTelefone | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   async function rodar() {
@@ -30,7 +41,7 @@ export function DiagnosticoWhatsApp({ leadId }: { leadId: string }) {
       if (!res.ok) {
         setErro(json?.message ?? json?.error ?? `Erro ${res.status}`);
       } else {
-        setResultado(json as DiagnosticoTelefone);
+        setResultado(json as Resultado);
       }
     } catch {
       setErro("A resposta não chegou. Tente de novo.");
@@ -82,6 +93,33 @@ export function DiagnosticoWhatsApp({ leadId }: { leadId: string }) {
               {r.mensagens.chegouAoFim ? ", histórico inteiro" : ", parou pelo tempo"}
               {r.mensagens.ok ? "" : `; erro: ${r.mensagens.erro}`})
             </span>
+          </p>
+          <p>
+            <strong>Vínculo manual:</strong>{" "}
+            {!r.vinculos
+              ? "—"
+              : "erro" in r.vinculos
+                ? `falhou (${r.vinculos.erro})`
+                : r.vinculos.length > 0
+                  ? r.vinculos.map((v) => v.lid).join(", ")
+                  : "nenhum"}
+          </p>
+          <p>
+            <strong>Chave do telefone:</strong>{" "}
+            {r.lead
+              ? r.lead.chavesBatem
+                ? `ok (${r.lead.phone_key})`
+                : `DIFERENTE — lead ${r.lead.phone_key}, conversa ${r.lead.chaveDoIngest}`
+              : "—"}
+          </p>
+          <p>
+            <strong>Já gravadas no banco:</strong>{" "}
+            {r.noBanco
+              ? `${r.noBanco.length} de ${r.mensagens.amostra.length} da amostra` +
+                (r.noBanco.length > 0
+                  ? `, ${r.noBanco.filter((m) => m.esteLead).length} neste lead`
+                  : "")
+              : "—"}
           </p>
           <details className="mt-2">
             <summary className="text-xs text-muted cursor-pointer">
