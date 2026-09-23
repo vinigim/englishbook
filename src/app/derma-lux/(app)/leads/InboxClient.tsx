@@ -108,6 +108,26 @@ function lerSituacao(v: string | null): FiltroSituacao {
     : "todas";
 }
 
+/**
+ * Frio confirmado sai de "Devo responder".
+ *
+ * O dono já decidiu que não vai investir nesse contato; mantê-lo na fila de
+ * resposta só empurrava para baixo quem de fato espera retorno. O estado
+ * continua "devo responder" — é um fato, e a IA e a tela do lead o usam —,
+ * só não entra na fila. Por isso a soma dos três chips de contato pode ficar
+ * abaixo do total: a diferença são esses leads.
+ */
+function foraDoDevoResponder(row: LeadInboxRow): boolean {
+  return temperaturaEfetiva(row.lead, row.analysis) === "frio_confirmado";
+}
+
+/** Desde quando ele espera resposta, para ordenar a fila. */
+function desdeMs(row: LeadInboxRow): number {
+  const desde = estadoContato(row.lead).desde;
+  const t = desde ? new Date(desde).getTime() : NaN;
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+}
+
 export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   // Os filtros moram na URL. Antes moravam só no estado do componente, e abrir
   // um lead e voltar zerava tudo — o dono refazia a mesma filtragem a cada
@@ -140,7 +160,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    return rows.filter((row) => {
+    const filtrados = rows.filter((row) => {
       // As duas linhas se COMBINAM: interseção, não união.
       if (
         situacao !== "todas" &&
@@ -151,13 +171,17 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
       if (filtro === "sem_analise" && row.analysis) return false;
       // Os três estados de contato são excludentes, então um `switch` de
-      // igualdade basta — e a soma dos chips fecha com o total.
+      // igualdade basta. A soma dos chips só não fecha com o total por causa
+      // dos frios confirmados tirados de "Devo responder".
       if (
         (filtro === "aguardando_resposta" ||
           filtro === "nunca_abordado" ||
           filtro === "aguardando_ele") &&
         ESTADO_DO_FILTRO[filtro] !== estadoContato(row.lead).estado
       ) {
+        return false;
+      }
+      if (filtro === "aguardando_resposta" && foraDoDevoResponder(row)) {
         return false;
       }
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
@@ -190,6 +214,15 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         .toLowerCase();
       return alvo.includes(termo);
     });
+
+    // "Devo responder" é uma fila: quem está esperando há mais tempo vem
+    // primeiro. Nos outros filtros vale a ordem de prioridade do servidor.
+    if (filtro === "aguardando_resposta") {
+      return filtrados
+        .slice()
+        .sort((a, b) => desdeMs(a) - desdeMs(b));
+    }
+    return filtrados;
   }, [rows, filtro, situacao, busca]);
 
   const contagem = useMemo(() => {
@@ -213,7 +246,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (!row.analysis) c.sem_analise += 1;
 
       const { estado } = estadoContato(row.lead);
-      if (estado === "devo_responder") c.aguardando_resposta += 1;
+      if (estado === "devo_responder") {
+        if (!foraDoDevoResponder(row)) c.aguardando_resposta += 1;
+      }
       else if (estado === "nunca_abordado") c.nunca_abordado += 1;
       else c.aguardando_ele += 1;
     }
