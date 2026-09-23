@@ -104,7 +104,9 @@ export function NaoIdentificadasClient({
           <p className="text-sm text-muted mb-3">
             {pendentes.length === 0
               ? "Nenhuma conversa sem identificação."
-              : `${pendentes.length} conversa(s) sem identificação, da mais recente para a mais antiga.`}
+              : `${pendentes.length} conversa(s) sem identificação — ${
+                  pendentes.filter((c) => c.recebidas > 0).length
+                } com resposta do contato, que aparecem primeiro.`}
             {lista.chegouAoFim
               ? ""
               : " A leitura parou pelo tempo antes do fim do histórico — procure de novo depois de vincular estas."}
@@ -626,8 +628,8 @@ function VincularSugestoesFortes({
   return (
     <div className="mb-4 p-3 border border-line bg-paper">
       <p className="text-sm">
-        <strong>{fortes.length}</strong> conversa(s) com nome igual ao de um
-        lead
+        <strong>{fortes.length}</strong> conversa(s) com sugestão segura (nome
+        do contato ou a sua saudação batem com um único lead)
         {fracas > 0 ? (
           <>
             {" "}
@@ -639,7 +641,7 @@ function VincularSugestoesFortes({
       </p>
       {fortes.length > 0 ? (
         <Button size="sm" className="mt-2" onClick={vincularTodas} loading={salvando}>
-          Vincular as {fortes.length} com nome igual
+          Vincular as {fortes.length} sugestões seguras
         </Button>
       ) : null}
       {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}

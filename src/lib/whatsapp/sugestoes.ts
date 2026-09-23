@@ -7,10 +7,17 @@
  *  - "forte": um nome que o WhatsApp tem para o contato é IGUAL (sem acento,
  *    caixa e pontuação) ao nome de UM lead. É o caso de quem salva o contato
  *    no celular com o nome da planilha.
+ *  - "forte" também quando a NOSSA mensagem começa cumprimentando alguém
+ *    ("Olá Dra Alessandra, tudo bem?") e só um lead é "Dra. Alessandra". É o
+ *    que sobra quando o WhatsApp não repassa o nome salvo no celular. Só a
+ *    saudação do começo conta: o resto do texto cita outras pessoas ("quem me
+ *    passou seu contato foi a Dra Daniela").
  *  - "fraca": uma palavra rara — que só aparece no nome de UM lead — está no
  *    nome do contato ou no que ele escreveu ("Dermacor", "Zamarian"). Útil,
  *    mas pede conferência: duas clínicas podem ter o mesmo nome.
  */
+
+import { tratamentoDoMedico } from "@/lib/leads/apresentacao";
 
 export type LeadParaSugestao = {
   id: string;
@@ -40,6 +47,10 @@ const COMUNS = new Set([
   "mensagem", "whatsapp", "contato", "equipe", "assistente", "administrativo",
   "valor", "locacao", "orcamento", "email", "gmail", "hotmail", "paulo", "sao",
 ]);
+
+/** "Olá Dra Alessandra", "Bom dia, Dr. Paulo" — o que vem depois do cumprimento. */
+const SAUDACAO =
+  /^\s*(?:ol[aá]|oi|bom dia|boa tarde|boa noite|prezad[ao])[\s,!.]+((?:dra|dr|doutora|doutor)\b.*)$/i;
 
 export function normalizarNome(s: string): string {
   return s
@@ -73,9 +84,19 @@ export function criarSugeridor(leads: LeadParaSugestao[]) {
     }
   }
 
+  // "Dra. Alessandra" → leads com esse tratamento no nome.
+  const porTratamento = new Map<string, Set<string>>();
+  for (const l of leads) {
+    const t = tratamentoDoMedico(...l.nomes);
+    if (!t) continue;
+    const k = normalizarNome(t);
+    (porTratamento.get(k) ?? porTratamento.set(k, new Set()).get(k)!).add(l.id);
+  }
+
   return function sugerir(
     nomesDoContato: string[],
     textosDoContato: string[],
+    textosNossos: string[] = [],
   ): Sugestao | null {
     // 1. Nome igual ao de um único lead.
     for (const nome of nomesDoContato) {
@@ -89,7 +110,22 @@ export function criarSugeridor(leads: LeadParaSugestao[]) {
       }
     }
 
-    // 2. Palavra rara que aponta para um único lead. Se palavras diferentes
+    // 2. Nossa saudação: "Olá Dra Alessandra" e um único lead "Dra. Alessandra".
+    for (const texto of textosNossos) {
+      const m = texto.match(SAUDACAO);
+      const t = m ? tratamentoDoMedico(m[1]) : null;
+      if (!t) continue;
+      const ids = porTratamento.get(normalizarNome(t));
+      if (ids && ids.size === 1) {
+        return {
+          leadId: [...ids][0],
+          forca: "forte",
+          motivo: `sua mensagem começa com "${m![0].trim().slice(0, 40)}"`,
+        };
+      }
+    }
+
+    // 3. Palavra rara que aponta para um único lead. Se palavras diferentes
     // apontarem para leads diferentes, não há sugestão: é ambíguo.
     const candidatos = new Map<string, string>();
     const fontes: [string, string[]][] = [

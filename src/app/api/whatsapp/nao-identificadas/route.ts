@@ -112,9 +112,13 @@ export async function GET() {
         .filter((m) => !m.fromMe && m.texto)
         .map((m) => m.texto as string);
 
+      const textosNossos = ordenadas
+        .filter((m) => m.fromMe && m.texto)
+        .map((m) => m.texto as string);
+
       return {
         lid,
-        sugestao: sugerir(nomesDoContato, textosDoContato),
+        sugestao: sugerir(nomesDoContato, textosDoContato, textosNossos),
         total: ordenadas.length,
         recebidas: ordenadas.filter((m) => !m.fromMe).length,
         enviadas: ordenadas.filter((m) => m.fromMe).length,
@@ -136,7 +140,13 @@ export async function GET() {
       };
     });
 
-    conversas.sort((a, b) => (b.ultima ?? "").localeCompare(a.ultima ?? ""));
+    // Quem respondeu vem primeiro: é conversa de verdade, que pode estar
+    // esperando retorno. Só a nossa abordagem sem resposta muda pouco no lead.
+    conversas.sort(
+      (a, b) =>
+        Number(b.recebidas > 0) - Number(a.recebidas > 0) ||
+        (b.ultima ?? "").localeCompare(a.ultima ?? ""),
+    );
 
     return NextResponse.json({
       conversas,
