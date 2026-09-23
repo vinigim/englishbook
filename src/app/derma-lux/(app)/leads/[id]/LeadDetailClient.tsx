@@ -303,7 +303,7 @@ export function LeadDetailClient({
         onde: "mensagem",
         tipo: "info",
         texto: enviado
-          ? "Marcado como enviado pelo Instagram."
+          ? "Marcado como enviado pelo Instagram e como frio confirmado."
           : "Marcação removida.",
       };
     });
@@ -803,7 +803,8 @@ export function LeadDetailClient({
                     <p className="text-xs text-muted mt-1.5">
                       O que sai pelo WhatsApp volta na sincronização e o painel
                       percebe sozinho. O Instagram não volta nunca — essa marca
-                      é a única forma de o sistema saber.
+                      é a única forma de o sistema saber. Marcar também põe o
+                      lead como frio confirmado.
                     </p>
                   </>
                 )}
