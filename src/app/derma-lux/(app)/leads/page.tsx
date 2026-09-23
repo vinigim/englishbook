@@ -45,12 +45,20 @@ export default async function LeadsPage() {
         </div>
 
         <div className="flex flex-col items-start sm:items-end gap-2">
-          <Link
-            href="/derma-lux/leads/importar"
-            className="text-sm text-muted hover:text-ink underline transition-colors"
-          >
-            Importar planilha
-          </Link>
+          <div className="flex gap-4">
+            <Link
+              href="/derma-lux/leads/importar"
+              className="text-sm text-muted hover:text-ink underline transition-colors"
+            >
+              Importar planilha
+            </Link>
+            <Link
+              href="/derma-lux/leads/nao-identificadas"
+              className="text-sm text-muted hover:text-ink underline transition-colors"
+            >
+              Conversas não identificadas
+            </Link>
+          </div>
           <InboxActions pendentes={pending} />
         </div>
       </div>

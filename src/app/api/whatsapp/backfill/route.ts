@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
+import { carregarVinculosLid } from "@/lib/whatsapp/lid-links";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 import type {
   NormalizedMessage,
@@ -124,6 +125,9 @@ export async function POST(request: NextRequest) {
         let nomeUnicos = 0;
         let nomeAmbiguos = 0;
         const pendentes: PendingLidMessage[] = [];
+        // Terceiro mapa: o que o dono vinculou à mão na tela "Conversas não
+        // identificadas". Não é inferência — vale mais que o nome.
+        const lidMapManual = await carregarVinculosLid(admin);
 
         if (provider.fetchLidMap) {
           try {
@@ -226,9 +230,11 @@ export async function POST(request: NextRequest) {
         const resolvidas: NormalizedMessage[] = [];
 
         // Verdade conhecida primeiro, inferência depois.
-        const resolverLid = (lid: string) => lidMapAlt[lid] ?? lidMapNome[lid];
+        const resolverLid = (lid: string) =>
+          lidMapAlt[lid] ?? lidMapManual[lid] ?? lidMapNome[lid];
         let porAlt = 0;
         let porNome = 0;
+        let porManual = 0;
 
         for (const p of pendentes) {
           const telefone = resolverLid(p.lid);
@@ -237,6 +243,7 @@ export async function POST(request: NextRequest) {
             continue;
           }
           if (lidMapAlt[p.lid]) porAlt += 1;
+          else if (lidMapManual[p.lid]) porManual += 1;
           else porNome += 1;
           resolvidas.push(p.resolver(telefone));
         }
@@ -296,6 +303,7 @@ export async function POST(request: NextRequest) {
           lidsConhecidos: Object.keys(lidMapAlt).length + Object.keys(lidMapNome).length,
           porAlt,
           porNome,
+          porManual,
           nomeUnicos,
           nomeAmbiguos,
           descartadasOutras,

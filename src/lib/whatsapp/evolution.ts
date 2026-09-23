@@ -157,6 +157,30 @@ function extractContent(message: EvolutionMessageContent): Extracted {
   return empty;
 }
 
+/**
+ * Mensagem que só tem LID, guardada para ser resolvida depois.
+ *
+ * Devolve `null` para o que não é LID: aí o descarte é definitivo.
+ */
+export function pendenteDeLid(raw: EvolutionRawMessage): PendingLidMessage | null {
+  const remoteJid = raw?.key?.remoteJid;
+  if (!raw?.key?.id || !remoteJid || !isLidJid(remoteJid)) return null;
+  const lid = jidToPhone(remoteJid);
+  if (!lid) return null;
+
+  const conteudo = extractContent(raw.message);
+  return {
+    lid,
+    resolver: (phoneE164) => normalizeComTelefone(raw, phoneE164),
+    resumo: {
+      sentAt: toIsoDate(raw.messageTimestamp),
+      fromMe: Boolean(raw.key.fromMe),
+      texto: conteudo.body ?? conteudo.caption,
+      pushName: str(raw.pushName),
+    },
+  };
+}
+
 export type EvolutionRawMessage = {
   key?: {
     id?: string;
@@ -474,15 +498,10 @@ export function createEvolutionProvider(): WhatsAppProvider {
       // Sobrou o caso do LID sem telefone ao lado. Em vez de descartar, fica
       // pendente: a cópia enriquecida da mesma conversa pode estar em
       // qualquer outra página.
-      if (isLidJid(remoteJid)) {
-        const lid = jidToPhone(remoteJid);
-        if (lid) {
-          pendentes.push({
-            lid,
-            resolver: (phoneE164) => normalizeComTelefone(raw, phoneE164),
-          });
-          continue;
-        }
+      const pendente = pendenteDeLid(raw);
+      if (pendente) {
+        pendentes.push(pendente);
+        continue;
       }
 
       descartadasOutras += 1;
@@ -536,6 +555,15 @@ export function createEvolutionProvider(): WhatsAppProvider {
       return asArray(p.data)
         .map(normalizeOne)
         .filter((m): m is NormalizedMessage => m !== null);
+    },
+
+    pendentesInbound(payload: unknown): PendingLidMessage[] {
+      const p = obj(payload);
+      if (!p) return [];
+      return asArray(p.data)
+        .filter((raw) => normalizeOne(raw) === null)
+        .map(pendenteDeLid)
+        .filter((m): m is PendingLidMessage => m !== null);
     },
 
     async listChats(opts): Promise<WaChat[]> {

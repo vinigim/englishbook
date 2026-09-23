@@ -79,6 +79,16 @@ export type WaChat = {
 export type PendingLidMessage = {
   lid: string;
   resolver: (phoneE164: string) => NormalizedMessage;
+  /**
+   * O bastante para o dono reconhecer a conversa na tela "Conversas não
+   * identificadas" — data, lado e o texto, sem mídia.
+   */
+  resumo: {
+    sentAt: string;
+    fromMe: boolean;
+    texto: string | null;
+    pushName: string | null;
+  };
 };
 
 export type MessagePage = {
@@ -141,6 +151,13 @@ export interface WhatsAppProvider {
 
   /** Um payload pode trazer de 0 a N mensagens. */
   normalizeInbound(payload: unknown): NormalizedMessage[];
+
+  /**
+   * As mensagens do mesmo payload que só têm LID e ficaram de fora de
+   * `normalizeInbound`. O webhook as resolve com os vínculos manuais
+   * (wa_lid_links); sem vínculo, continuam descartadas como antes.
+   */
+  pendentesInbound?(payload: unknown): PendingLidMessage[];
 
   listChats(opts?: { limit?: number }): Promise<WaChat[]>;
 
