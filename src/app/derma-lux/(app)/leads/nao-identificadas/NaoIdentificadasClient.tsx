@@ -80,6 +80,7 @@ export function NaoIdentificadasClient({
   return (
     <div>
       <VinculosFeitos vinculos={vinculos} />
+      <BuscarTexto />
 
       <Button onClick={procurar} loading={carregando}>
         {lista ? "Procurar de novo" : "Procurar conversas"}
@@ -358,6 +359,128 @@ function VinculosFeitos({ vinculos }: { vinculos: VinculoFeito[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+type Achado = {
+  sentAt: string;
+  fromMe: boolean;
+  trecho: string;
+  pushName: string | null;
+  telefone: string | null;
+  via: "telefone" | "alt" | "vinculo" | "nome" | null;
+  lid: string | null;
+  lead: { id: string; nome: string } | null;
+};
+
+const VIA: Record<NonNullable<Achado["via"]>, string> = {
+  telefone: "pelo telefone",
+  alt: "pelo WhatsApp",
+  vinculo: "pelo seu vínculo",
+  nome: "pelo NOME do contato (automático)",
+};
+
+/**
+ * Procura um texto no histórico e mostra para onde cada mensagem vai.
+ *
+ * Para achar conversa que "sumiu": ligada pelo nome ao telefone errado, ela
+ * não aparece como não identificada — cai no lead de outra pessoa.
+ */
+function BuscarTexto() {
+  const [texto, setTexto] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [achados, setAchados] = useState<Achado[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function buscar() {
+    if (texto.trim().length < 3) return;
+    setBuscando(true);
+    setErro(null);
+    setAchados(null);
+    try {
+      const res = await fetch("/api/whatsapp/buscar-texto", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ texto }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) setErro(json?.message ?? json?.error ?? `Erro ${res.status}`);
+      else setAchados((json?.achados ?? []) as Achado[]);
+    } catch {
+      setErro("A resposta não chegou. Tente de novo.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  return (
+    <div className="mb-8">
+      <h2 className="font-display text-xl text-ink tracking-tight mb-1">
+        Procurar uma conversa pelo texto
+      </h2>
+      <p className="text-sm text-muted mb-2">
+        Para achar uma conversa que não aparece em lugar nenhum: digite um
+        trecho de uma mensagem e veja em qual lead ela está.
+      </p>
+      <div className="flex gap-2">
+        {/* text-base no celular: abaixo de 16px o Safari dá zoom no foco. */}
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") buscar();
+          }}
+          placeholder="Ex.: Canal de Atendimento da Dermacor"
+          className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
+        />
+        <Button onClick={buscar} loading={buscando} disabled={texto.trim().length < 3}>
+          Buscar
+        </Button>
+      </div>
+      {buscando ? (
+        <p className="text-xs text-muted mt-2">Lendo o histórico — até um minuto.</p>
+      ) : null}
+      {erro ? <p className="text-sm text-accent mt-2">{erro}</p> : null}
+
+      {achados ? (
+        achados.length === 0 ? (
+          <p className="text-sm text-muted mt-3">
+            Nenhuma mensagem com esse texto no histórico do WhatsApp conectado.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {achados.map((a, i) => (
+              <li key={i} className="bg-paper border border-line p-3 text-sm">
+                <p className="text-xs text-muted">
+                  {a.fromMe ? "Você" : (a.pushName ?? "Contato")} · {quando(a.sentAt)}
+                </p>
+                <p className="mt-0.5">{a.trecho}</p>
+                <p className="text-xs mt-1">
+                  {a.telefone ? (
+                    <>
+                      Vai para{" "}
+                      {a.lead ? (
+                        <Link
+                          href={`/derma-lux/leads/${a.lead.id}`}
+                          className="underline font-medium"
+                        >
+                          {a.lead.nome}
+                        </Link>
+                      ) : (
+                        <strong>nenhum lead</strong>
+                      )}{" "}
+                      ({a.telefone}), ligada {a.via ? VIA[a.via] : ""}.
+                    </>
+                  ) : (
+                    <strong>Sem telefone — é uma conversa não identificada.</strong>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
     </div>
   );
 }
