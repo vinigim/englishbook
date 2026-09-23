@@ -29,6 +29,7 @@ import {
   instagramDirectUrl,
   instagramProfileUrl,
 } from "@/lib/leads/instagram";
+import { APRESENTACAO_INSTAGRAM } from "@/lib/leads/apresentacao";
 import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
@@ -249,18 +250,31 @@ export function LeadDetailClient({
         ? `https://wa.me/${numero}`
         : null;
 
-  // O ig.me não aceita texto na URL como o wa.me. Então o rascunho vai pela
+  // O ig.me não aceita texto na URL como o wa.me. Então o texto vai pela
   // área de transferência, copiado no mesmo toque que abre o direct — é o que
   // mais perto chega de "abrir já com a mensagem pronta".
   const instagram = instagramDoLead(lead);
 
   const contato = estadoContato(lead);
 
+  /**
+   * Copia a apresentação fixa, e não o rascunho da IA.
+   *
+   * Escolha do dono: pelo Instagram ele sempre se apresenta, em qualquer lead.
+   * Não chama registerDraftCopied — o que saiu não foi o rascunho, e registrar
+   * como se fosse estragaria a medida de quanto as mensagens da IA são usadas.
+   */
   function aoAbrirInstagram() {
-    if (!rascunho.trim()) return;
     // Sem await: segurar aqui adiaria a navegação, e a cópia precisa
     // acontecer dentro do gesto do toque para o navegador permitir.
-    void copiar();
+    void navigator.clipboard.writeText(APRESENTACAO_INSTAGRAM).catch(() => {
+      setFeedback({
+        onde: "mensagem",
+        tipo: "erro",
+        texto:
+          "O navegador bloqueou a cópia da apresentação. Volte e toque de novo em \"Abrir no Instagram\".",
+      });
+    });
   }
 
   /**
@@ -801,8 +815,8 @@ export function LeadDetailClient({
 
             {instagram ? (
               <p className="text-xs text-muted mt-1">
-                No Instagram o texto não viaja no link: ele é copiado no mesmo
-                toque, é só colar no direct de{" "}
+                &ldquo;Abrir no Instagram&rdquo; copia a sua apresentação (não a
+                mensagem acima) no mesmo toque, é só colar no direct de{" "}
                 <a
                   href={instagramProfileUrl(instagram)}
                   target="_blank"
