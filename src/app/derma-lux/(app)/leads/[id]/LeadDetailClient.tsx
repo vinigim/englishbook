@@ -55,6 +55,7 @@ import {
   updateLeadTemperature,
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
+import { BuscarInstagram } from "./BuscarInstagram";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -384,7 +385,9 @@ export function LeadDetailClient({
                   @{instagram}
                 </a>
               </p>
-            ) : null}
+            ) : (
+              <BuscarInstagram leadId={lead.id} />
+            )}
             <p className="text-muted">
               {[lead.specialty, lead.city].filter(Boolean).join(" · ") ||
                 "Especialidade e cidade não informadas"}

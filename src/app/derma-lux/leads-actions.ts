@@ -8,6 +8,7 @@ import { isAiConfigured } from "@/lib/ai/anthropic";
 import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
 import { isDraftModel } from "@/lib/ai/models";
+import { toInstagramHandle } from "@/lib/leads/instagram";
 import {
   EFFECTIVE_TEMPERATURES,
   LEAD_STATUSES,
@@ -239,6 +240,39 @@ export async function marcarInstagramEnviado(
       needs_analysis: true,
       ...(enviado ? { temperature_manual: "frio_confirmado" as const } : {}),
     })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
+/**
+ * Grava o Instagram do lead — hoje, o perfil que o dono escolheu entre os
+ * candidatos da busca com IA.
+ *
+ * Passa pelo mesmo `toInstagramHandle` da importação, para a coluna guardar
+ * sempre só o handle. O Instagram entra no contexto da IA, então a análise
+ * vigente fica desatualizada.
+ */
+export async function definirInstagram(
+  id: string,
+  valor: string,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const handle = toInstagramHandle(valor);
+  if (!handle) return { ok: false, error: "Esse @ não parece um perfil do Instagram." };
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({ instagram: handle, needs_analysis: true })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
