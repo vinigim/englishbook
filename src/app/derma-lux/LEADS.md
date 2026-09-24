@@ -191,6 +191,25 @@ clique copia o rascunho para a área de transferência no mesmo gesto.
 Leads importados antes da 0015 não precisam de reimportação: quando a coluna
 está vazia, a tela procura o Instagram entre as colunas extras.
 
+### Buscar o Instagram com IA
+
+Lead sem Instagram mostra, na ficha, **"Buscar Instagram com IA"**
+(`/api/leads/[id]/buscar-instagram` → `src/lib/ai/buscar-instagram.ts`). O
+modelo da triagem pesquisa na web (ferramenta de pesquisa da própria API, até 4
+pesquisas) com nome, clínica, especialidade, cidade e telefone, e devolve até 3
+candidatos com confiança e motivo.
+
+- **Nada é salvo sozinho.** O dono abre o perfil e toca em "Usar este", que
+  chama `definirInstagram` e marca a análise como desatualizada.
+- **@ inventado é barrado no código:** só passa candidato cujo @ aparece na URL
+  ou no título de algum resultado da pesquisa.
+- **Custo:** tokens do modelo + US$ 0,01 por pesquisa, mostrado na tela a cada
+  busca. Só gasta quando o dono clica.
+- Coluna extra da planilha só vai para a pesquisa se for curta (até 80
+  caracteres): observação longa pode falar de paciente.
+- Se a pesquisa na web estiver desligada na organização da Anthropic, a tela
+  diz para ativar no console.
+
 ### Sincronização do direct (parada: depende da revisão da Meta)
 
 **Estado atual:** o código existe, mas os botões foram tirados do radar. Com o
