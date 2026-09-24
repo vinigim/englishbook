@@ -270,9 +270,14 @@ export function LeadDetailClient({
    * como se fosse estragaria a medida de quanto as mensagens da IA são usadas.
    */
   function aoAbrirInstagram() {
-    // Sem await: segurar aqui adiaria a navegação, e a cópia precisa
-    // acontecer dentro do gesto do toque para o navegador permitir.
-    void navigator.clipboard.writeText(apresentacaoInstagram(tratamento)).catch(() => {
+    const texto = apresentacaoInstagram(tratamento);
+    // Primeiro a cópia síncrona. No iPhone, o link leva direto para o app do
+    // Instagram e a página vai para o fundo antes de a Clipboard API (que é
+    // assíncrona) terminar — a cópia falhava calada e o direct abria sem nada
+    // para colar. A síncrona acaba antes de o toque seguir o link.
+    if (copiarNaHora(texto)) return;
+    // Reserva, sem await: segurar aqui adiaria a navegação.
+    void navigator.clipboard.writeText(texto).catch(() => {
       setFeedback({
         onde: "mensagem",
         tipo: "erro",
@@ -374,6 +379,7 @@ export function LeadDetailClient({
                   href={instagramProfileUrl(instagram)}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={aoAbrirInstagram}
                   className="underline"
                 >
                   @{instagram}
@@ -830,6 +836,7 @@ export function LeadDetailClient({
                   href={instagramProfileUrl(instagram)}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={aoAbrirInstagram}
                   className="underline"
                 >
                   @{instagram}
@@ -901,4 +908,34 @@ function MessageBubble({ msg }: { msg: WaMessage }) {
       </div>
     </li>
   );
+}
+
+/**
+ * Cópia síncrona, pelo caminho antigo (textarea + execCommand).
+ *
+ * Obsoleto no papel, mas é o único que termina DENTRO do toque em qualquer
+ * navegador, inclusive o Safari do iPhone. Devolve falso quando o navegador
+ * recusa, para quem chamou tentar a Clipboard API.
+ */
+function copiarNaHora(texto: string): boolean {
+  if (typeof document === "undefined") return false;
+  const campo = document.createElement("textarea");
+  campo.value = texto;
+  campo.setAttribute("readonly", "");
+  // Fora da tela, e com fonte de 16px para o iOS não dar zoom ao focar.
+  campo.style.position = "fixed";
+  campo.style.top = "0";
+  campo.style.left = "-9999px";
+  campo.style.fontSize = "16px";
+  document.body.appendChild(campo);
+  try {
+    campo.focus();
+    campo.select();
+    campo.setSelectionRange(0, texto.length);
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(campo);
+  }
 }
