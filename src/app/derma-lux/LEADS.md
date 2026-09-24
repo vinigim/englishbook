@@ -191,13 +191,45 @@ clique copia o rascunho para a área de transferência no mesmo gesto.
 Leads importados antes da 0015 não precisam de reimportação: quando a coluna
 está vazia, a tela procura o Instagram entre as colunas extras.
 
-### "Já enviei pelo Instagram" é manual, e tem que ser
+### Sincronização do direct
+
+"Sincronizar Instagram", no radar, lê o direct do @luxderma.lasers pela API
+oficial da Meta (Instagram API com login do Instagram; app "Lux Derma Radar",
+portfólio luxderma.lasers, em modo desenvolvimento). Código em
+`src/lib/instagram/` e `/api/instagram/sync`.
+
+- **Onde cai:** em `wa_messages`, com `provider = 'instagram'` e
+  `chat_id = 'ig:<id da pessoa>'`. A conversa é colada no lead cujo
+  `wa_leads.instagram` é o @ da pessoa. Perfil que não é de nenhum lead **não**
+  cria lead (lead nasce de telefone) — a tela lista essas conversas para o dono
+  pôr o @ no lead certo. Dois leads com o mesmo @ também ficam de fora.
+- **Datas:** resposta dele vai para `last_inbound_at` (e marca
+  `needs_analysis`); mensagem nossa vai para `instagram_sent_at`, a mesma
+  coluna do botão manual.
+- **Limite da Meta:** só as 20 mensagens mais recentes de cada conversa.
+- **Incremental:** `ig_conta.ultima_sync_em` (migração 0018) guarda a última
+  leitura completa; a próxima para na primeira conversa mais velha que ela.
+  "Reler Instagram" ignora a marca.
+- **Sem estado no servidor:** cada chamada devolve o cursor `after` e a tela
+  encadeia, como no "Analisar pendentes".
+- **Token:** `INSTAGRAM_ACCESS_TOKEN` na Vercel, 60 dias. Cada sincronização o
+  renova (a partir de 3 dias de idade) e guarda o novo em `ig_conta`, que tem
+  RLS sem policy — só o service role lê. Trocar a variável na Vercel invalida o
+  guardado (compara um hash). Basta sincronizar pelo menos uma vez a cada 60
+  dias.
+- **Sem tempo real:** o webhook da Meta exige o app publicado, o que passa por
+  revisão. Por isso a leitura é sob demanda.
+- "Testar Instagram" mostra a conta conectada e a resposta crua das 3 conversas
+  mais recentes, sem gravar nada.
+
+### "Já enviei pelo Instagram" continua existindo
 
 Mensagem que sai pelo WhatsApp **volta** na sincronização: o `last_outbound_at`
-do lead se atualiza sozinho e o painel sabe. Pelo direct não volta nada, nunca.
+do lead se atualiza sozinho e o painel sabe. Pelo direct, até a migração 0018,
+não voltava nada; hoje volta quando o dono sincroniza o Instagram.
 
-Por isso `wa_leads.instagram_sent_at` (migração 0016) é preenchido por um botão
-na ficha, e não por um evento. É data e não booleano porque "mandei há três
+Por isso `wa_leads.instagram_sent_at` (migração 0016) nasceu como um botão
+na ficha, e não como um evento. O botão fica: marca na hora, sem sincronizar. É data e não booleano porque "mandei há três
 meses e não respondeu" é outra situação que "mandei ontem".
 
 O clique em "Abrir no Instagram" **não** marca sozinho: abrir não é enviar, e um
@@ -228,8 +260,12 @@ Abrir o app não é ter enviado, e foi decisão do dono que só o fato conte. O 
 é o atraso: mensagem mandada pelo WhatsApp só entra no painel quando volta do
 celular, em "Sincronizar histórico". A ficha avisa isso em quem está como
 `nunca_abordado` e tem telefone — sem o aviso, o primeiro lead abordado e ainda
-não sincronizado parece defeito. No Instagram não há atraso, porque lá quem
-marca é ele.
+não sincronizado parece defeito. No Instagram vale o botão manual ou a
+sincronização do direct.
+
+"Ele falou por último" compara `last_inbound_at` com a nossa saída mais recente
+por **qualquer** canal (`last_outbound_at` ou `instagram_sent_at`). Sem isso,
+uma resposta dada no direct deixava o lead em "Devo responder".
 
 O chip da barra ainda se chama `aguardando_resposta` no código — é o `id`
 original, usado como chave de `Record` em vários pontos. O rótulo na tela virou

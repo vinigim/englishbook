@@ -92,7 +92,9 @@ export function buildTranscript(messages: WaMessage[]): string {
   const recentes = messages.slice(-MAX_MESSAGES);
 
   const linhas = recentes.map((m) => {
-    const quem = m.direction === "in" ? "CLIENTE" : "LUX DERMA";
+    // O canal importa para a IA: resposta no direct pede resposta no direct.
+    const canal = m.provider === "instagram" ? " (Instagram)" : "";
+    const quem = (m.direction === "in" ? "CLIENTE" : "LUX DERMA") + canal;
     const quando = m.sent_at.slice(0, 10);
 
     let texto = m.body ?? "";

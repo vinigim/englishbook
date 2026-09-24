@@ -66,6 +66,9 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 
 1. **Ingest** — `/api/whatsapp/webhook` (new messages) and `/api/whatsapp/backfill`
    (history, NDJSON, resumable). Both funnel through `src/lib/whatsapp/ingest.ts`.
+   Instagram DMs come from `/api/instagram/sync` (official Meta API, on demand,
+   `src/lib/instagram/`) into the same `wa_messages` with `provider = 'instagram'`,
+   matched to leads by `wa_leads.instagram`.
 2. **Provider adapter** — `src/lib/whatsapp/provider.ts` is the interface;
    `evolution.ts` talks to a self-hosted Evolution API; `mock.ts` replays fixtures
    through the *same parser*, so tests exercise production code.
@@ -75,7 +78,8 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 5. **Whose turn** — `estadoContato()` in `leads-shared.ts` reduces each lead to one
    of three exclusive states (`devo_responder`, `aguardando_ele`, `nunca_abordado`),
    which drive a badge and three filter chips. Only facts count as "sent": the sync
-   bringing our own WhatsApp message back, or the manual Instagram marker. Copying
+   bringing our own WhatsApp message back, the Instagram DM sync, or the manual Instagram
+   marker (both fill `instagram_sent_at`). Copying
    the draft and opening `wa.me` do not.
 
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
