@@ -285,7 +285,8 @@ com o total da carteira:
 |---|---|---|
 | `devo_responder` | ele falou por último | selo `responder ele` |
 | `aguardando_ele` | a última saída foi nossa (WhatsApp ou Instagram) | `✓ mandei no <canal> há N dias` |
-| `nunca_abordado` | nenhuma saída registrada | nada — a ausência é o sinal |
+| `aguardando_ele` (sem canal) | nenhuma saída registrada, mas o dono marcou a situação como em conversa, cliente ou inativo | nada |
+| `nunca_abordado` | nenhuma saída registrada e nenhuma dessas marcações | nada — a ausência é o sinal |
 
 A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estava
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham

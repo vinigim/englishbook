@@ -109,7 +109,10 @@ export type EstadoContato = {
 };
 
 export function estadoContato(
-  lead: Pick<Lead, "last_inbound_at" | "last_outbound_at" | "instagram_sent_at">,
+  lead: Pick<
+    Lead,
+    "last_inbound_at" | "last_outbound_at" | "instagram_sent_at" | "status"
+  >,
 ): EstadoContato {
   const { last_inbound_at, last_outbound_at, instagram_sent_at } = lead;
 
@@ -145,6 +148,19 @@ export function estadoContato(
           : null;
 
   if (saida) return { estado: "aguardando_ele", ...saida };
+
+  // O dono disse que já fala com ele (ou que é cliente): então não é "nunca
+  // abordado", mesmo sem mensagem registrada — a conversa pode ter sido por
+  // ligação, visita ou um WhatsApp ainda não sincronizado. Sem registro, não
+  // há data nem canal. "Descartado" não entra: dá para descartar quem nunca
+  // foi abordado.
+  if (
+    lead.status === "em_conversa" ||
+    lead.status === "cliente" ||
+    lead.status === "inativo"
+  ) {
+    return { estado: "aguardando_ele", desde: null, canal: null };
+  }
 
   return { estado: "nunca_abordado", desde: null, canal: null };
 }
