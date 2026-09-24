@@ -191,12 +191,20 @@ clique copia o rascunho para a área de transferência no mesmo gesto.
 Leads importados antes da 0015 não precisam de reimportação: quando a coluna
 está vazia, a tela procura o Instagram entre as colunas extras.
 
-### Sincronização do direct
+### Sincronização do direct (parada: depende da revisão da Meta)
 
-"Sincronizar Instagram", no radar, lê o direct do @luxderma.lasers pela API
-oficial da Meta (Instagram API com login do Instagram; app "Lux Derma Radar",
-portfólio luxderma.lasers, em modo desenvolvimento). Código em
-`src/lib/instagram/` e `/api/instagram/sync`.
+**Estado atual:** o código existe, mas os botões foram tirados do radar. Com o
+app em modo desenvolvimento, a Meta aceita o token e responde, mas devolve
+**zero conversas** — em todas as variantes da consulta, inclusive com um perfil
+testador conversando com a conta. Ler o direct exige o acesso avançado de
+`instagram_business_manage_messages`, que passa pela revisão do app, e o dono
+decidiu não fazer. Para religar depois da revisão: devolver os botões de
+`InboxActions.tsx` (commit "Radar: sincronizar o direct do Instagram…" e o do
+diagnóstico com variantes) — a rota e a biblioteca continuam no lugar.
+
+O que o código faz: lê o direct do @luxderma.lasers pela API oficial da Meta
+(Instagram API com login do Instagram; app "Lux Derma Radar", portfólio
+luxderma.lasers). Código em `src/lib/instagram/` e `/api/instagram/sync`.
 
 - **Onde cai:** em `wa_messages`, com `provider = 'instagram'` e
   `chat_id = 'ig:<id da pessoa>'`. A conversa é colada no lead cujo
@@ -226,7 +234,7 @@ portfólio luxderma.lasers, em modo desenvolvimento). Código em
 
 Mensagem que sai pelo WhatsApp **volta** na sincronização: o `last_outbound_at`
 do lead se atualiza sozinho e o painel sabe. Pelo direct, até a migração 0018,
-não voltava nada; hoje volta quando o dono sincroniza o Instagram.
+não volta nada enquanto a sincronização estiver parada (ver acima).
 
 Por isso `wa_leads.instagram_sent_at` (migração 0016) nasceu como um botão
 na ficha, e não como um evento. O botão fica: marca na hora, sem sincronizar. É data e não booleano porque "mandei há três
@@ -260,8 +268,7 @@ Abrir o app não é ter enviado, e foi decisão do dono que só o fato conte. O 
 é o atraso: mensagem mandada pelo WhatsApp só entra no painel quando volta do
 celular, em "Sincronizar histórico". A ficha avisa isso em quem está como
 `nunca_abordado` e tem telefone — sem o aviso, o primeiro lead abordado e ainda
-não sincronizado parece defeito. No Instagram vale o botão manual ou a
-sincronização do direct.
+não sincronizado parece defeito. No Instagram vale o botão manual.
 
 "Ele falou por último" compara `last_inbound_at` com a nossa saída mais recente
 por **qualquer** canal (`last_outbound_at` ou `instagram_sent_at`). Sem isso,

@@ -55,7 +55,6 @@ import {
   updateLeadTemperature,
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
-import { DiagnosticoWhatsApp } from "./DiagnosticoWhatsApp";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -469,7 +468,6 @@ export function LeadDetailClient({
               ))}
             </ol>
           )}
-          <DiagnosticoWhatsApp leadId={lead.id} />
         </Card>
 
         {/* -------------------------------------------- análise e sugestão */}
