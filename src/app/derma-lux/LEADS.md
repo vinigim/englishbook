@@ -211,6 +211,13 @@ campo para colar o @ ou o link quando o dono já sabe qual é.
   caracteres): observação longa pode falar de paciente.
 - Se a pesquisa na web estiver desligada na organização da Anthropic, a tela
   diz para ativar no console.
+- **@ errado:** ao lado do @ na ficha, "perfil errado?" abre a mesma busca. O
+  @ atual vai como `excluir`: o prompt diz que ele está errado e o código o
+  descarta mesmo se voltar.
+- **O @ escolhido na ficha vale mais que a planilha.** `definirInstagram`
+  marca `instagram_escolhido_em` (migração 0019), e a importação não troca um
+  @ marcado, mesmo que a planilha traga outro. Sem a migração, as duas pontas
+  seguem funcionando com a regra antiga (a planilha manda).
 
 ### Sincronização do direct (parada: depende da revisão da Meta)
 

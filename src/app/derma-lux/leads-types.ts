@@ -35,6 +35,8 @@ export type Lead = {
   uf: string | null;
   /** Só o handle, sem @ e sem link — vem da planilha (0015). */
   instagram: string | null;
+  /** O dono escolheu o @ na ficha; a planilha não o troca. Nulo = veio da planilha. */
+  instagram_escolhido_em?: string | null;
   /**
    * Quando o dono marcou que mandou mensagem pelo direct (0016).
    *

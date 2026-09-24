@@ -253,7 +253,8 @@ export async function marcarInstagramEnviado(
  * candidatos da busca com IA.
  *
  * Passa pelo mesmo `toInstagramHandle` da importação, para a coluna guardar
- * sempre só o handle. O Instagram entra no contexto da IA, então a análise
+ * sempre só o handle. Marca `instagram_escolhido_em`: a partir daí uma
+ * planilha com outro @ não troca este (decisão do dono). O Instagram entra no contexto da IA, então a análise
  * vigente fica desatualizada.
  */
 export async function definirInstagram(
@@ -270,10 +271,24 @@ export async function definirInstagram(
   const handle = toInstagramHandle(valor);
   if (!handle) return { ok: false, error: "Esse @ não parece um perfil do Instagram." };
 
-  const { error } = await supabase
+  // A marca faz a importação de planilha não trocar este @ depois.
+  let { error } = await supabase
     .from("wa_leads")
-    .update({ instagram: handle, needs_analysis: true })
+    .update({
+      instagram: handle,
+      instagram_escolhido_em: new Date().toISOString(),
+      needs_analysis: true,
+    })
     .eq("id", id);
+
+  // Sem a migração 0019 a coluna não existe. Salvar o @ vale mais que a
+  // marca: grava sem ela (a planilha ainda poderá trocá-lo, como antes).
+  if (error && /instagram_escolhido_em/.test(error.message)) {
+    ({ error } = await supabase
+      .from("wa_leads")
+      .update({ instagram: handle, needs_analysis: true })
+      .eq("id", id));
+  }
 
   if (error) return { ok: false, error: error.message };
 

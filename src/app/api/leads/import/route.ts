@@ -115,6 +115,8 @@ type ExistingLead = {
   specialty: string | null;
   city: string | null;
   instagram: string | null;
+  /** Preenchido = o dono escolheu o @ na ficha, e a planilha não o troca. */
+  instagram_escolhido_em?: string | null;
   source: string;
   extra: Record<string, unknown> | null;
   // Estes dois não são usados no merge: são lidos só para poderem ser
@@ -264,19 +266,27 @@ async function handleCommit(request: NextRequest) {
 
   // 2) Busca o que já existe, para fazer o merge sem sobrescrever.
   const existing = new Map<string, ExistingLead>();
+  const COLUNAS =
+    "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra, phone_e164, first_seen_at";
+  // Sem a migração 0019 a coluna não existe; a importação não pode parar por
+  // isso — segue sem ela, com a regra antiga (a planilha manda no @).
+  let comEscolha = true;
   for (const chunk of chunked(keys, BATCH_SIZE)) {
-    const { data, error } = await admin
-      .from("wa_leads")
-      .select(
-        "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra, phone_e164, first_seen_at",
-      )
-      .in("phone_key", chunk);
+    const ler = (colunas: string) =>
+      admin.from("wa_leads").select(colunas).in("phone_key", chunk);
+    let { data, error } = await ler(
+      comEscolha ? `${COLUNAS}, instagram_escolhido_em` : COLUNAS,
+    );
+    if (error && comEscolha && /instagram_escolhido_em/.test(error.message)) {
+      comEscolha = false;
+      ({ data, error } = await ler(COLUNAS));
+    }
 
     if (error) {
       console.error("[leads-import] select error:", error);
       return NextResponse.json({ error: "import_failed" }, { status: 500 });
     }
-    for (const row of (data ?? []) as ExistingLead[]) {
+    for (const row of (data ?? []) as unknown as ExistingLead[]) {
       existing.set(row.phone_key, row);
     }
   }
@@ -321,11 +331,16 @@ async function handleCommit(request: NextRequest) {
       clinic_name: prev?.clinic_name ?? c.company ?? null,
       specialty: prev?.specialty ?? c.specialty ?? null,
       city: prev?.city ?? c.city ?? null,
-      // Único campo em que a planilha MANDA, e de propósito: ela é a única
-      // fonte de Instagram que existe — o WhatsApp não informa isso. Corrigir
-      // um handle errado na planilha tem que corrigir no painel também. Se a
-      // coluna vier vazia, o que já estava gravado é preservado.
-      instagram: c.instagram ?? prev?.instagram ?? null,
+      // Aqui a planilha MANDA: corrigir um handle errado nela tem que
+      // corrigir no painel também. Se a coluna vier vazia, o que já estava
+      // gravado é preservado.
+      //
+      // Exceção: o @ que o dono escolheu na ficha (busca com IA ou colado),
+      // marcado em instagram_escolhido_em. Ele conferiu o perfil na tela, e
+      // decidiu que essa escolha vale mais que a planilha.
+      instagram: prev?.instagram_escolhido_em
+        ? prev.instagram
+        : (c.instagram ?? prev?.instagram ?? null),
       lead_kind:
         nome && looksLikeCompanyName(nome) ? "clinica" : "desconhecido",
       source: prev

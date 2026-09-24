@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isAiConfigured } from "@/lib/ai/anthropic";
 import { buscarInstagram } from "@/lib/ai/buscar-instagram";
 import { extraFields, formatPhoneBR } from "@/app/derma-lux/leads-shared";
+import { toInstagramHandle } from "@/lib/leads/instagram";
 import type { Lead } from "@/app/derma-lux/leads-types";
 
 export const runtime = "nodejs";
@@ -13,7 +14,8 @@ export const maxDuration = 60;
 /**
  * "Buscar Instagram com IA", na ficha do lead.
  *
- * Só devolve candidatos; não grava nada. Salvar é outro toque, na action
+ * Só devolve candidatos; não grava nada. Também serve para trocar um @ que
+ * está errado: o corpo pode trazer `excluir`, o perfil que não serve. Salvar é outro toque, na action
  * `definirInstagram`, depois de o dono conferir o perfil.
  *
  * Route Handler e não Server Action porque a pesquisa na web leva dezenas de
@@ -22,14 +24,35 @@ export const maxDuration = 60;
 
 const idSchema = z.string().uuid();
 
+const bodySchema = z.object({
+  /** O @ atual, que o dono marcou como errado: a busca não pode devolvê-lo. */
+  excluir: z.string().max(200).nullish(),
+});
+
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   if (!idSchema.safeParse(id).success) {
     return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   }
+
+  let body: unknown = {};
+  try {
+    const texto = await request.text();
+    if (texto.trim()) body = JSON.parse(texto);
+  } catch {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "invalid_body", message: parsed.error.issues[0]?.message },
+      { status: 400 },
+    );
+  }
+  const excluir = toInstagramHandle(parsed.data.excluir);
 
   const supabase = await createClient();
   const {
@@ -87,6 +110,7 @@ export async function POST(
       uf: lead.uf,
       telefone: lead.phone_e164 ? formatPhoneBR(lead.phone_e164) : null,
       extras,
+      excluir,
     });
     console.log(
       `[buscar-instagram] lead ${id}: ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,

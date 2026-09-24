@@ -258,6 +258,7 @@ export function LeadDetailClient({
   // área de transferência, copiado no mesmo toque que abre o direct — é o que
   // mais perto chega de "abrir já com a mensagem pronta".
   const instagram = instagramDoLead(lead);
+  const [trocarInstagram, setTrocarInstagram] = useState(false);
 
   const contato = estadoContato(lead);
   const tratamento = tratamentoDoMedico(lead.sheet_name, lead.display_name);
@@ -384,10 +385,27 @@ export function LeadDetailClient({
                 >
                   @{instagram}
                 </a>
+                {/* O @ da planilha às vezes não existe mais, ou é de outra
+                    pessoa. Daqui o dono busca outro (a IA evita o atual) ou
+                    cola o certo. */}
+                <button
+                  type="button"
+                  onClick={() => setTrocarInstagram((v) => !v)}
+                  className="ml-2 text-xs text-muted underline"
+                >
+                  {trocarInstagram ? "cancelar" : "perfil errado?"}
+                </button>
               </p>
             ) : (
               <BuscarInstagram leadId={lead.id} />
             )}
+            {instagram && trocarInstagram ? (
+              <BuscarInstagram
+                leadId={lead.id}
+                atual={instagram}
+                onSalvo={() => setTrocarInstagram(false)}
+              />
+            ) : null}
             <p className="text-muted">
               {[lead.specialty, lead.city].filter(Boolean).join(" · ") ||
                 "Especialidade e cidade não informadas"}
