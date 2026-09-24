@@ -9,6 +9,7 @@ import {
   ACTION_LABEL,
   EFFECTIVE_TEMPERATURES,
   isConfirmada,
+  LEAD_STATUS_LABEL,
   STAGE_LABEL,
   TEMPERATURE_LABEL,
   type EffectiveTemperature,
@@ -381,12 +382,16 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
               {TEMPERATURE_LABEL[temperatura]}
             </Badge>
           ) : null}
-          {analysis ? (
-            <>
-              <Badge variant="neutral" className="whitespace-nowrap">
-                {STAGE_LABEL[analysis.stage]}
-              </Badge>
-            </>
+          {/* Situação marcada pelo dono no lugar da etapa da IA, com ✓ —
+              ver o mesmo selo na ficha do lead. */}
+          {lead.status ? (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              ✓ {LEAD_STATUS_LABEL[lead.status]}
+            </Badge>
+          ) : analysis ? (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              {STAGE_LABEL[analysis.stage]}
+            </Badge>
           ) : (
             <Badge variant="neutral" className="whitespace-nowrap">
               sem análise
