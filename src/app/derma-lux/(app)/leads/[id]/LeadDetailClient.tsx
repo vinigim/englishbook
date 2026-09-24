@@ -896,6 +896,7 @@ function MessageBubble({ msg }: { msg: WaMessage }) {
             hour: "2-digit",
             minute: "2-digit",
           })}
+          {msg.provider === "instagram" ? " · Instagram" : null}
         </p>
       </div>
     </li>

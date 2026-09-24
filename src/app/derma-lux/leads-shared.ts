@@ -98,7 +98,8 @@ export function temperaturaEfetiva(
  * Abrir o app não é ter enviado, e o dono preferiu que só o fato conte. O preço
  * dessa escolha é o atraso: mensagem mandada pelo WhatsApp só aparece depois de
  * sincronizar, quando ela volta do celular e preenche `last_outbound_at`. No
- * Instagram não há atraso, porque lá quem marca é ele.
+ * Instagram vale o botão "Já enviei pelo Instagram" ou a sincronização do
+ * direct, que preenchem a mesma coluna, `instagram_sent_at`.
  */
 export type EstadoContato = {
   estado: "nunca_abordado" | "devo_responder" | "aguardando_ele";
@@ -115,10 +116,18 @@ export function estadoContato(
 
   // Ele falou por último: a bola é nossa. Mesma regra de sempre, agora num
   // lugar só — ela estava copiada na lista, no priorityScore e no prompt da IA.
+  //
+  // "Por último" compara com a nossa saída mais recente por QUALQUER canal.
+  // Com o direct sincronizado, a resposta dele pelo Instagram cai em
+  // last_inbound_at e a nossa em instagram_sent_at; olhando só o WhatsApp, o
+  // lead ficaria em "Devo responder" mesmo depois de respondido no direct.
+  const nossaUltima = [last_outbound_at, instagram_sent_at]
+    .filter((d): d is string => d != null)
+    .map((d) => new Date(d).getTime());
   if (
     last_inbound_at != null &&
-    (last_outbound_at == null ||
-      new Date(last_inbound_at) > new Date(last_outbound_at))
+    (nossaUltima.length === 0 ||
+      new Date(last_inbound_at).getTime() > Math.max(...nossaUltima))
   ) {
     return { estado: "devo_responder", desde: last_inbound_at, canal: null };
   }
