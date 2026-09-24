@@ -29,12 +29,23 @@ const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
 };
 
 /**
- * "Buscar Instagram com IA", para lead sem Instagram.
+ * "Buscar Instagram com IA", para lead sem Instagram — ou com um @ que o
+ * dono marcou como errado (`atual`), que a busca então evita.
  *
  * Nada é salvo sem o toque em "Usar este": a IA acha candidatos, o dono abre
  * o perfil, confere e escolhe.
  */
-export function BuscarInstagram({ leadId }: { leadId: string }) {
+export function BuscarInstagram({
+  leadId,
+  atual = null,
+  onSalvo,
+}: {
+  leadId: string;
+  /** @ que o lead já tem e que o dono diz estar errado. A busca o evita. */
+  atual?: string | null;
+  /** Chamado depois de salvar, para quem abriu o painel poder fechá-lo. */
+  onSalvo?: () => void;
+}) {
   const router = useRouter();
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -47,7 +58,11 @@ export function BuscarInstagram({ leadId }: { leadId: string }) {
     setErro(null);
     setResultado(null);
     try {
-      const res = await fetch(`/api/leads/${leadId}/buscar-instagram`, { method: "POST" });
+      const res = await fetch(`/api/leads/${leadId}/buscar-instagram`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(atual ? { excluir: atual } : {}),
+      });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErro(json.message ?? json.error ?? "A busca falhou.");
@@ -69,6 +84,7 @@ export function BuscarInstagram({ leadId }: { leadId: string }) {
         setErro(r.error ?? "Não consegui salvar.");
         return;
       }
+      onSalvo?.();
       router.refresh();
     });
   }
