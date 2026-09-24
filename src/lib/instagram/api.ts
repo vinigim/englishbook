@@ -278,3 +278,42 @@ export async function paginaDeConversas(
     after: conversas.length > 0 && r.paging?.next ? (r.paging.cursors?.after ?? null) : null,
   };
 }
+
+export type VarianteConversas = {
+  consulta: string;
+  conversas?: number;
+  erro?: string;
+};
+
+/**
+ * A mesma listagem de conversas, pedida de jeitos diferentes.
+ *
+ * Só para o diagnóstico. Quando a listagem normal vem vazia sem erro, a
+ * variante que devolver alguma coisa diz qual é o problema: o caminho
+ * (`me` ou o id da conta), o `platform` ou a expansão das mensagens. Se todas
+ * vierem vazias, a causa não é a consulta, e sim o acesso do app.
+ */
+export async function variantesDeConversas(
+  token: string,
+  conta: ContaInstagram,
+): Promise<VarianteConversas[]> {
+  const tentativas: [string, string, Record<string, string>][] = [
+    ["me · platform=instagram", "/me/conversations", { platform: "instagram", fields: "id,updated_time" }],
+    ["me · sem platform", "/me/conversations", { fields: "id,updated_time" }],
+    [`id da conta (${conta.userId}) · platform=instagram`, `/${conta.userId}/conversations`, { platform: "instagram", fields: "id,updated_time" }],
+    [`id do app (${conta.idApp}) · platform=instagram`, `/${conta.idApp}/conversations`, { platform: "instagram", fields: "id,updated_time" }],
+    ["me · folder=general", "/me/conversations", { platform: "instagram", folder: "general", fields: "id,updated_time" }],
+    ["me · folder=other (pedidos)", "/me/conversations", { platform: "instagram", folder: "other", fields: "id,updated_time" }],
+  ];
+
+  const resultado: VarianteConversas[] = [];
+  for (const [consulta, caminho, params] of tentativas) {
+    try {
+      const r = await graphGet<{ data?: unknown[] }>(caminho, { ...params, limit: "25" }, token);
+      resultado.push({ consulta, conversas: r.data?.length ?? 0 });
+    } catch (err) {
+      resultado.push({ consulta, erro: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return resultado;
+}

@@ -69,6 +69,9 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         }
         setStatus(
           `Conectado como @${json.conta?.username} · ${json.amostra?.length ?? 0} conversa(s) na amostra` +
+            ((json.variantes ?? []) as { consulta: string; conversas?: number; erro?: string }[])
+              .map((v) => ` · ${v.consulta}: ${v.erro ? `erro (${v.erro})` : v.conversas}`)
+              .join("") +
             (json.podeGuardar ? "" : " · rode a migration 0018 para o token se renovar sozinho"),
         );
         setAmostraIg(JSON.stringify(json, null, 2));
