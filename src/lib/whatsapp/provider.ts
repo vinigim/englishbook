@@ -161,19 +161,6 @@ export interface WhatsAppProvider {
 
   listChats(opts?: { limit?: number }): Promise<WaChat[]>;
 
-  /**
-   * O que o provedor sabe sobre UM telefone: se existe no WhatsApp, qual LID
-   * corresponde a ele e quantas mensagens do histórico apontam para ele.
-   *
-   * Só diagnóstico — não grava nada. Existe para descobrir por que um lead
-   * da planilha, que sabidamente recebeu mensagem, aparece sem conversa.
-   */
-  diagnosticarTelefone?(
-    phoneE164: string,
-    /** LIDs já vinculados à mão a este lead: entram na varredura também. */
-    lidsExtras?: string[],
-  ): Promise<DiagnosticoTelefone>;
-
   fetchChatHistory(
     chatId: string,
     opts?: { limit?: number; before?: string },
@@ -297,37 +284,3 @@ export function toIsoDate(value: unknown): string {
   return new Date().toISOString();
 }
 
-export type DiagnosticoTelefone = {
-  /** As formas do número testadas: com e sem o 9º dígito. */
-  variantes: string[];
-  /** Resposta crua de "esse número tem WhatsApp?", ou o erro. */
-  numeros: { ok: boolean; resposta?: unknown; erro?: string };
-  /** Contatos da agenda do WhatsApp que batem com o número. */
-  contatos: {
-    ok: boolean;
-    totalRecebidos?: number;
-    encontrados?: unknown[];
-    erro?: string;
-  };
-  /** LIDs achados nas duas respostas acima. */
-  lids: string[];
-  /** Varredura do histórico: mensagens que apontam para o número ou o LID. */
-  mensagens: {
-    ok: boolean;
-    paginasLidas: number;
-    mensagensLidas: number;
-    chegouAoFim: boolean;
-    pelotelefone: number;
-    peloLid: number;
-    /** Só endereçamento e data — o conteúdo não sai daqui. */
-    amostra: {
-      id: string | null;
-      fromMe: boolean | null;
-      remoteJid: string | null;
-      remoteJidAlt: string | null;
-      tipo: string | null;
-      data: string | null;
-    }[];
-    erro?: string;
-  };
-};

@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/Button";
 
 type Etapa = { nome: string; ok: boolean; detalhe?: string };
 
-type ConversaSemLead = {
-  username: string;
-  ultimaEm: string;
-  respondeu: boolean;
-  trecho: string | null;
-};
-
 type PreviaLimpeza = {
   invalidos: number;
   amostra: { phoneKey: string; nome: string | null; jid: string | null }[];
@@ -29,119 +22,12 @@ type PreviaLimpeza = {
 export function InboxActions({ pendentes }: { pendentes: number }) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState<
-    "analise" | "sync" | "teste" | "limpeza" | "instagram" | null
+    "analise" | "sync" | "teste" | "limpeza" | null
   >(null);
   const [status, setStatus] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [diagnostico, setDiagnostico] = useState<Etapa[] | null>(null);
   const [previa, setPrevia] = useState<PreviaLimpeza | null>(null);
-  const [semLead, setSemLead] = useState<ConversaSemLead[] | null>(null);
-  const [amostraIg, setAmostraIg] = useState<string | null>(null);
-
-  /** Teto de rodadas do Instagram, pelo mesmo motivo do da análise. */
-  const MAX_RODADAS_INSTAGRAM = 30;
-
-  /**
-   * Traz o direct do Instagram, encadeando rodadas pelo cursor `after`.
-   *
-   * `diagnostico` não grava nada: mostra a conta conectada e a resposta crua
-   * das 3 conversas mais recentes, para conferir o formato da Meta.
-   */
-  async function sincronizarInstagram(modo: "normal" | "completo" | "diagnostico") {
-    setOcupado("instagram");
-    setErro(null);
-    setDiagnostico(null);
-    setSemLead(null);
-    setAmostraIg(null);
-    setStatus("Conectando ao Instagram…");
-    try {
-      if (modo === "diagnostico") {
-        const res = await fetch("/api/instagram/sync", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ diagnostico: true }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setErro(json.message ?? json.error ?? "Falha ao testar o Instagram.");
-          setStatus(null);
-          return;
-        }
-        setStatus(
-          `Conectado como @${json.conta?.username} · ${json.amostra?.length ?? 0} conversa(s) na amostra` +
-            ((json.variantes ?? []) as { consulta: string; conversas?: number; erro?: string }[])
-              .map((v) => ` · ${v.consulta}: ${v.erro ? `erro (${v.erro})` : v.conversas}`)
-              .join("") +
-            (json.podeGuardar ? "" : " · rode a migration 0018 para o token se renovar sozinho"),
-        );
-        setAmostraIg(JSON.stringify(json, null, 2));
-        return;
-      }
-
-      let after: string | null = null;
-      let iniciadaEm: string | undefined;
-      const totais = { conversas: 0, comLead: 0, mensagensNovas: 0, respostasNovas: 0 };
-      const foraDoRadar: ConversaSemLead[] = [];
-
-      for (let rodada = 1; ; rodada += 1) {
-        const res: Response = await fetch("/api/instagram/sync", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            after,
-            iniciadaEm,
-            completo: modo === "completo",
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setErro(json.message ?? json.error ?? "Falha ao sincronizar o Instagram.");
-          setStatus(null);
-          return;
-        }
-
-        totais.conversas += Number(json.conversas) || 0;
-        totais.comLead += Number(json.comLead) || 0;
-        totais.mensagensNovas += Number(json.mensagensNovas) || 0;
-        totais.respostasNovas += Number(json.respostasNovas) || 0;
-        foraDoRadar.push(...((json.semLead ?? []) as ConversaSemLead[]));
-        after = json.after ?? null;
-        iniciadaEm = json.iniciadaEm;
-
-        const partes = [
-          `${totais.conversas} conversa(s) lida(s)`,
-          `${totais.comLead} de lead(s) do radar`,
-          `${totais.mensagensNovas} mensagem(ns) nova(s)`,
-          totais.respostasNovas > 0
-            ? `${totais.respostasNovas} resposta(s) nova(s) — rode "Analisar pendentes"`
-            : null,
-          json.podeGuardar === false
-            ? "rode a migration 0018 para o token se renovar sozinho"
-            : null,
-        ].filter(Boolean);
-
-        if (!json.continuar || !after || rodada >= MAX_RODADAS_INSTAGRAM) {
-          if (json.continuar) partes.push("ainda há conversas — clique de novo");
-          setStatus(partes.join(" · "));
-          // Quem respondeu primeiro: é a conversa que vale procurar o lead.
-          foraDoRadar.sort(
-            (a, b) =>
-              Number(b.respondeu) - Number(a.respondeu) ||
-              b.ultimaEm.localeCompare(a.ultimaEm),
-          );
-          setSemLead(foraDoRadar);
-          router.refresh();
-          return;
-        }
-        setStatus(`${partes.join(" · ")} · continuando…`);
-      }
-    } catch {
-      setErro("Falha de rede ao sincronizar o Instagram.");
-      setStatus(null);
-    } finally {
-      setOcupado(null);
-    }
-  }
 
   /**
    * Remove os leads cujo "telefone" não é telefone.
@@ -467,38 +353,6 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => sincronizarInstagram("normal")}
-          loading={ocupado === "instagram"}
-          disabled={ocupado !== null}
-          title="Traz o direct do @luxderma.lasers para os leads com o mesmo Instagram da planilha"
-        >
-          Sincronizar Instagram
-        </Button>
-
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => sincronizarInstagram("completo")}
-          loading={ocupado === "instagram"}
-          disabled={ocupado !== null}
-          title="Relê todas as conversas do direct, inclusive as que não mudaram"
-        >
-          Reler Instagram
-        </Button>
-
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => sincronizarInstagram("diagnostico")}
-          loading={ocupado === "instagram"}
-          disabled={ocupado !== null}
-        >
-          Testar Instagram
-        </Button>
-
-        <Button
-          size="sm"
-          variant="secondary"
           onClick={testarConexao}
           loading={ocupado === "teste"}
           disabled={ocupado !== null}
@@ -580,50 +434,6 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {semLead && semLead.length > 0 ? (
-        <details className="text-xs border border-line p-3">
-          <summary className="cursor-pointer">
-            {semLead.length} conversa(s) do direct sem lead no radar
-            {semLead.some((c) => c.respondeu)
-              ? ` · ${semLead.filter((c) => c.respondeu).length} com mensagem da pessoa`
-              : ""}
-          </summary>
-          <p className="text-muted mt-2">
-            Nenhum lead tem este Instagram na planilha. Para trazer a conversa,
-            coloque o @ no lead certo e sincronize de novo.
-          </p>
-          <ul className="mt-2 space-y-1">
-            {semLead.map((c) => (
-              <li key={c.username}>
-                <a
-                  href={`https://www.instagram.com/${c.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  @{c.username}
-                </a>
-                <span className="text-muted">
-                  {" · "}
-                  {new Date(c.ultimaEm).toLocaleDateString("pt-BR")}
-                  {c.respondeu ? " · respondeu" : ""}
-                  {c.trecho ? ` · “${c.trecho}”` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      {amostraIg ? (
-        <details className="text-xs border border-line p-3">
-          <summary className="cursor-pointer">Resposta da API do Instagram</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-all max-h-96 overflow-auto">
-            {amostraIg}
-          </pre>
-        </details>
       ) : null}
 
       {status ? <p className="text-xs text-muted">{status}</p> : null}

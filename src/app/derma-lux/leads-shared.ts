@@ -98,8 +98,7 @@ export function temperaturaEfetiva(
  * Abrir o app não é ter enviado, e o dono preferiu que só o fato conte. O preço
  * dessa escolha é o atraso: mensagem mandada pelo WhatsApp só aparece depois de
  * sincronizar, quando ela volta do celular e preenche `last_outbound_at`. No
- * Instagram vale o botão "Já enviei pelo Instagram" ou a sincronização do
- * direct, que preenchem a mesma coluna, `instagram_sent_at`.
+ * Instagram vale o botão "Já enviei pelo Instagram" (`instagram_sent_at`).
  */
 export type EstadoContato = {
   estado: "nunca_abordado" | "devo_responder" | "aguardando_ele";
