@@ -790,7 +790,9 @@ export function LeadDetailClient({
               <p className="text-xs text-muted mt-3">
                 {contato.estado === "devo_responder"
                   ? `Ele falou por último ${relativeDays(contato.desde)} — responder é com você.`
-                  : contato.estado === "aguardando_ele"
+                  : contato.estado === "aguardando_ele" && !contato.canal
+                    ? `Você marcou este lead como ${LEAD_STATUS_LABEL[lead.status ?? "em_conversa"]}, então ele não conta como nunca abordado — mas nenhuma mensagem sua está registrada aqui.`
+                    : contato.estado === "aguardando_ele"
                     ? `Você mandou pelo WhatsApp ${relativeDays(contato.desde)} e ele ainda não respondeu.`
                     : lead.phone_e164
                       ? // Sem esta ressalva, o primeiro lead que ele abordar e
