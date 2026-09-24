@@ -423,7 +423,13 @@ export function LeadDetailClient({
                 {TEMPERATURE_LABEL[temperatura]}
               </Badge>
             ) : null}
-            {analysis ? (
+            {/* A situação marcada pelo dono ocupa o lugar da etapa lida pela
+                IA, com ✓ como na temperatura. As duas usam "Novo", e mostrar
+                a da IA depois de o dono marcar "Em conversa" parecia que a
+                marcação não tinha pegado. */}
+            {lead.status ? (
+              <Badge variant="neutral">✓ {LEAD_STATUS_LABEL[lead.status]}</Badge>
+            ) : analysis ? (
               <Badge variant="neutral">{STAGE_LABEL[analysis.stage]}</Badge>
             ) : (
               <Badge variant="neutral">sem análise</Badge>
