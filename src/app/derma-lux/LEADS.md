@@ -195,9 +195,11 @@ está vazia, a tela procura o Instagram entre as colunas extras.
 
 Lead sem Instagram mostra, na ficha, **"Buscar Instagram com IA"**
 (`/api/leads/[id]/buscar-instagram` → `src/lib/ai/buscar-instagram.ts`). O
-modelo da triagem pesquisa na web (ferramenta de pesquisa da própria API, até 4
-pesquisas) com nome, clínica, especialidade, cidade e telefone, e devolve até 3
-candidatos com confiança e motivo.
+modelo da triagem pesquisa (ferramenta de pesquisa da própria API, até 3
+pesquisas, **restrita ao instagram.com**) com nome, clínica, especialidade,
+cidade e telefone, e devolve até 3 candidatos com confiança e motivo. Na web
+aberta o perfil sumia atrás de site de clínica e Doctoralia. Ao lado há um
+campo para colar o @ ou o link quando o dono já sabe qual é.
 
 - **Nada é salvo sozinho.** O dono abre o perfil e toca em "Usar este", que
   chama `definirInstagram` e marca a análise como desatualizada.

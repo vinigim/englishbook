@@ -71,8 +71,11 @@ export async function POST(
 
   // Coluna extra só se for curta: observação longa pode ter anotação sobre
   // paciente, e não há motivo para ela ir para a pesquisa.
+  //
+  // Coluna de Instagram também fica de fora: se o lead chegou aqui, o que ela
+  // tem não é perfil ("Não encontrado"), e isso induzia a IA a desistir.
   const extras = extraFields(lead.extra)
-    .filter(([, v]) => v.length <= 80)
+    .filter(([k, v]) => v.length <= 80 && !/instagram|insta|^ig$/i.test(k))
     .slice(0, 6);
 
   try {
