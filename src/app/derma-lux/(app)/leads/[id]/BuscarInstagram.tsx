@@ -40,6 +40,7 @@ export function BuscarInstagram({ leadId }: { leadId: string }) {
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSalvar] = useTransition();
+  const [manual, setManual] = useState("");
 
   async function buscar() {
     setBuscando(true);
@@ -74,15 +75,45 @@ export function BuscarInstagram({ leadId }: { leadId: string }) {
 
   return (
     <div className="space-y-2 pt-1">
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={buscar}
-        loading={buscando}
-        disabled={buscando || salvando}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={buscar}
+          loading={buscando}
+          disabled={buscando || salvando}
+        >
+          {resultado ? "Buscar de novo" : "Buscar Instagram com IA"}
+        </Button>
+      </div>
+
+      {/* Quando o dono já sabe o perfil — a IA não acha todos. Aceita o @, o
+          nome solto ou o link inteiro: o toInstagramHandle da action limpa. */}
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (manual.trim()) usar(manual.trim());
+        }}
       >
-        {resultado ? "Buscar de novo" : "Buscar Instagram com IA"}
-      </Button>
+        <input
+          value={manual}
+          onChange={(e) => setManual(e.target.value)}
+          placeholder="ou cole o @ / link do perfil"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 border border-line bg-paper px-2 py-1 text-base sm:text-sm"
+        />
+        <Button
+          size="sm"
+          type="submit"
+          loading={salvando}
+          disabled={salvando || !manual.trim()}
+        >
+          Salvar
+        </Button>
+      </form>
 
       {buscando ? (
         <p className="text-xs text-muted">Pesquisando na internet… leva uns 20 segundos.</p>

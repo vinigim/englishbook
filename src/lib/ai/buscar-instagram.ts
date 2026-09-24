@@ -24,7 +24,7 @@ import { estimateCostUsd } from "./cost";
 const PRECO_PESQUISA_USD = 0.01;
 
 /** Pesquisas por busca. Teto de gasto e de tempo. */
-const MAX_PESQUISAS = 4;
+const MAX_PESQUISAS = 3;
 
 /** Rodadas de continuação quando a API pausa um turno longo. */
 const MAX_CONTINUACOES = 3;
@@ -58,7 +58,13 @@ export type ResultadoBusca = {
 
 const SISTEMA = `Você ajuda a Lux Derma, empresa que aluga lasers para médicos e clínicas de estética no Brasil, a achar o perfil do Instagram de um lead.
 
-Use a ferramenta de pesquisa na web. Boas buscas combinam o nome da pessoa ou da clínica com a cidade, a especialidade e a palavra "instagram". Se a primeira busca não achar, tente outra combinação (só a clínica, o nome sem "Dra.", o telefone).
+Use a ferramenta de pesquisa na web. Ela está restrita ao instagram.com, então cada resultado já é um perfil ou post, com o nome e o @ no título (ex.: "Dr. Fulano (@drfulano) • Instagram").
+
+Como pesquisar:
+1. Primeiro, só o nome da pessoa, SEM "Clínica", "Dr." ou "Dra." (ex.: "Victor Guida França"). Médico costuma ter perfil próprio com o nome completo.
+2. Se não achar, o nome com a especialidade ou a cidade.
+3. Depois, o nome da clínica, se ele for diferente do nome da pessoa.
+Um nome que aparece no título de um perfil com a especialidade compatível já é um bom candidato.
 
 Regras:
 - Só proponha perfis que APARECERAM nos resultados da pesquisa (instagram.com/<perfil> na URL ou @perfil no título/trecho). Nunca complete ou adivinhe um @.
@@ -138,6 +144,11 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
           type: "web_search_20250305",
           name: "web_search",
           max_uses: MAX_PESQUISAS,
+          // Só o instagram.com: na web inteira, o perfil some atrás de site
+          // de clínica, Doctoralia e notícia, e a IA desistia com o perfil
+          // existindo (caso real: @drvictorguidafranca, verificado, 13 mil
+          // seguidores, não encontrado em 4 pesquisas abertas).
+          allowed_domains: ["instagram.com"],
           user_location: { type: "approximate", country: "BR", timezone: "America/Sao_Paulo" },
         },
       ],
