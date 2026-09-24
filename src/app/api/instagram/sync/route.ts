@@ -9,6 +9,7 @@ import {
   obterToken,
   paginaDeConversas,
   registrarSync,
+  variantesDeConversas,
 } from "@/lib/instagram/api";
 import {
   gravarConversas,
@@ -113,7 +114,9 @@ export async function POST(request: NextRequest) {
 
     if (diagnostico) {
       const { conversas } = await paginaDeConversas(token, null, 3);
+      const variantes = await variantesDeConversas(token, conta);
       return NextResponse.json({
+        variantes,
         conta: { username: conta.username, userId: conta.userId, idApp: conta.idApp },
         ultimaSyncEm,
         podeGuardar,
