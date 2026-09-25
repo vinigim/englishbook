@@ -44,6 +44,12 @@ export type Lead = {
    * ao contrário do WhatsApp, que atualiza `last_outbound_at` sozinho.
    */
   instagram_sent_at: string | null;
+  /**
+   * O WhatsApp respondeu que este telefone tem conta? (0020)
+   * Nulo = não verificado. Opcional para não quebrar antes da migração rodar.
+   */
+  whatsapp_existe?: boolean | null;
+  whatsapp_verificado_em?: string | null;
   lead_kind: LeadKind;
   source: LeadSource;
   /** Marcado pelo dono. Prevalece sobre a derivação da agenda. Nulo = derivar. */

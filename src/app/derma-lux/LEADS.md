@@ -308,6 +308,28 @@ original, usado como chave de `Record` em vários pontos. O rótulo na tela viro
 **"Devo responder"** porque "Esperando resposta" dizia o contrário do que o
 filtro faz.
 
+## Fixo tem WhatsApp?
+
+Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não — e
+o aplicativo só conta depois do toque, com o aviso "isn't on WhatsApp". O painel
+pergunta antes, ao próprio WhatsApp, pela rota `/chat/whatsappNumbers` da
+Evolution (o `onWhatsApp` do Baileys, a mesma consulta que o app faz). É a
+resposta de verdade, não um palpite pelo formato do número.
+
+- **Fixo** = 55 + DDD + 8 dígitos começando em 2–5 (`ehFixoBR()`). Celular
+  antigo sem o 9º dígito também tem 12 dígitos, mas começa em 6–9.
+- **A ficha verifica sozinha** ao abrir um fixo ainda não verificado. Sem
+  WhatsApp, o botão "Abrir no WhatsApp" some e entra "Ligar". "Verificar de
+  novo" refaz a consulta.
+- **"Verificar fixos no WhatsApp"**, na caixa de entrada, faz a carteira toda:
+  lotes de 25, no máximo 100 por clique. Card de fixo sem WhatsApp ganha o selo
+  "fixo sem WhatsApp".
+- **Uma consulta por número.** A resposta fica em `wa_leads.whatsapp_existe` /
+  `whatsapp_verificado_em` (migração 0020). Lead com conversa sincronizada nem é
+  consultado: a conversa já prova a conta.
+- Celular não é verificado: quase todo celular tem, e consultar a carteira
+  inteira seria volume à toa (ver "Risco de banimento").
+
 ## Privacidade
 
 - **Mídia não é baixada.** Guardamos url e mimetype; o binário nunca entra no
@@ -328,6 +350,9 @@ A Evolution API não é oficial e contraria os termos da Meta. Onde isso morde:
 - **Enviar em volume é o que derruba número.** Por isso `sendText()` existe no
   adaptador mas **não tem botão no painel**: a mensagem sai pelo `wa.me`, ou
   seja, pelo seu WhatsApp de verdade.
+- **Verificar número também é consulta.** Muitas consultas de número
+  desconhecido parecem raspagem de lista. Por isso a verificação só pega fixos,
+  guarda a resposta e vai em lotes pequenos.
 - **Use um chip dedicado.** Se o número cair, você perde o número comercial e o
   histórico junto — e o banco passa a ser a sua cópia de segurança dele.
 

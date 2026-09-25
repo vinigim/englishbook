@@ -253,6 +253,36 @@ export function instagramDoLead(
   return null;
 }
 
+/**
+ * Telefone fixo brasileiro: 55 + DDD + 8 dígitos começando em 2–5.
+ *
+ * Celular antigo, sem o 9º dígito, também tem 12 dígitos — é o formato em que
+ * o WhatsApp devolve muitos JIDs. O que separa os dois é o primeiro dígito
+ * depois do DDD: 6–9 é celular, 2–5 é fixo (plano de numeração da Anatel).
+ */
+export function ehFixoBR(phoneE164: string | null): boolean {
+  const d = String(phoneE164 ?? "").replace(/\D/g, "");
+  return d.length === 12 && d.startsWith("55") && /[2-5]/.test(d[4]);
+}
+
+/**
+ * O lead tem WhatsApp? `true`/`false` quando se sabe, `null` quando não.
+ *
+ * Conversa sincronizada é prova: se ele mandou ou recebeu pelo WhatsApp, a
+ * conta existe, e não há o que perguntar. Fora isso vale a última verificação
+ * (0020). Celular sem verificação fica `null` — na prática quase todo celular
+ * tem, e a tela só insiste na pergunta para fixo.
+ */
+export function temWhatsApp(
+  lead: Pick<
+    Lead,
+    "wa_jid" | "last_inbound_at" | "last_outbound_at" | "whatsapp_existe"
+  >,
+): boolean | null {
+  if (lead.wa_jid || lead.last_inbound_at || lead.last_outbound_at) return true;
+  return lead.whatsapp_existe ?? null;
+}
+
 /** "5535988887777" -> "+55 35 98888-7777" (formatação leve, sem dependência). */
 export function formatPhoneBR(phoneE164: string): string {
   const d = String(phoneE164 ?? "").replace(/\D/g, "");

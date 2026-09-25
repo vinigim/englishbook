@@ -82,6 +82,11 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
    (`instagram_sent_at`). Copying
    the draft and opening `wa.me` do not.
 
+6. **Landline check** — `verificarWhatsApp()` asks WhatsApp (Evolution
+   `/chat/whatsappNumbers`) whether a Brazilian landline (`ehFixoBR()`) has an
+   account, once per number, stored in `wa_leads.whatsapp_existe` (`0020`). The lead
+   page runs it on open; the inbox has a batch button.
+
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
 button calls it: bulk sending through an unofficial provider is what gets numbers
 banned, so messages go out through the owner's own WhatsApp.
@@ -102,7 +107,7 @@ Every analysis records model, tokens and `cost_usd`. Prices live in `src/lib/ai/
 Migrations are numbered `NNNN_snake_case.sql` and **applied by hand in the Supabase SQL
 Editor** — there is no Supabase CLI setup and no `config.toml`.
 
-`0004`–`0009` are the agenda. `0010` is the Radar. `0001`–`0003` are dead EnglishBook
+`0004`–`0009` are the agenda. `0010` onward is the Radar. `0001`–`0003` are dead EnglishBook
 schema kept as documentation.
 
 Style (follow `0004` and `0010`): `create table if not exists public.x`,

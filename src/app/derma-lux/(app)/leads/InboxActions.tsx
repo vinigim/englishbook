@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { verificarWhatsApp } from "../../leads-actions";
 
 type Etapa = { nome: string; ok: boolean; detalhe?: string };
 
@@ -22,7 +23,7 @@ type PreviaLimpeza = {
 export function InboxActions({ pendentes }: { pendentes: number }) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState<
-    "analise" | "sync" | "teste" | "limpeza" | null
+    "analise" | "sync" | "teste" | "limpeza" | "whatsapp" | null
   >(null);
   const [status, setStatus] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -196,6 +197,54 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
   }
 
   /**
+   * Pergunta ao WhatsApp quais fixos têm conta, em lotes de 25.
+   *
+   * Para em 4 lotes por clique: consultar número desconhecido em volume é
+   * padrão de spam para o WhatsApp, e o dono decide se continua.
+   */
+  async function verificarFixos() {
+    setOcupado("whatsapp");
+    setErro(null);
+    setStatus("Verificando fixos no WhatsApp…");
+    try {
+      let com = 0;
+      let sem = 0;
+      let restantes = 0;
+      for (let rodada = 1; rodada <= 4; rodada++) {
+        const r = await verificarWhatsApp();
+        if (!r.ok) {
+          setErro(r.error ?? "Falha ao verificar.");
+          setStatus(null);
+          return;
+        }
+        com += r.comWhatsApp ?? 0;
+        sem += r.semWhatsApp ?? 0;
+        restantes = r.restantes ?? 0;
+        // Lote sem nenhuma resposta: repetir traria os mesmos números.
+        if (restantes === 0 || (r.verificados ?? 0) === 0) break;
+        setStatus(`${com} com WhatsApp · ${sem} sem · ${restantes} na fila…`);
+      }
+      setStatus(
+        restantes === 0 && com + sem === 0
+          ? "Nenhum fixo por verificar."
+          : [
+              `${com} fixo(s) com WhatsApp`,
+              `${sem} sem`,
+              restantes > 0 ? `${restantes} ainda na fila — clique de novo` : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+      );
+      router.refresh();
+    } catch {
+      setErro("Falha de rede ao verificar.");
+      setStatus(null);
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  /**
    * Importa o histórico.
    *
    * `force` percorre todas as páginas; sem ele, para na primeira página já
@@ -348,6 +397,17 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
           title="Relê todas as conversas, inclusive as já sincronizadas"
         >
           Reler tudo
+        </Button>
+
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={verificarFixos}
+          loading={ocupado === "whatsapp"}
+          disabled={ocupado !== null}
+          title="Pergunta ao WhatsApp quais telefones fixos têm conta"
+        >
+          Verificar fixos no WhatsApp
         </Button>
 
         <Button
