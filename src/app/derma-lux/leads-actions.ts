@@ -9,6 +9,7 @@ import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
 import { isDraftModel } from "@/lib/ai/models";
 import { toInstagramHandle } from "@/lib/leads/instagram";
+import { getWhatsAppProvider } from "@/lib/whatsapp";
 import {
   EFFECTIVE_TEMPERATURES,
   LEAD_STATUSES,
@@ -386,4 +387,136 @@ export async function registerDraftCopied(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+// ============================================================================
+//  Tem WhatsApp?
+// ============================================================================
+
+/** Fixo brasileiro no formato do banco: 55 + DDD + 8 dígitos começando em 2–5. */
+const FIXO_BR_REGEX = "^55[0-9]{2}[2-5][0-9]{7}$";
+
+/**
+ * Por clique do "Verificar fixos". Baixo de propósito: consultar muito número
+ * desconhecido de uma vez é padrão de spam para o WhatsApp — ver LEADS.md,
+ * "Risco de banimento".
+ */
+const LOTE_VERIFICACAO = 25;
+
+export type VerificacaoResult = ActionResult & {
+  verificados?: number;
+  comWhatsApp?: number;
+  semWhatsApp?: number;
+  /** Fixos ainda sem verificação, depois deste lote. */
+  restantes?: number;
+  /** Só no modo de um lead: a resposta para ele. */
+  existe?: boolean;
+};
+
+const verificacaoSchema = z.object({ id: z.string().uuid("ID inválido").optional() });
+
+function erroDeVerificacao(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("whatsapp_existe") || msg.includes("whatsapp_verificado_em")) {
+    return "Falta rodar a migração 0020_whatsapp_verificado.sql no Supabase.";
+  }
+  return msg;
+}
+
+/**
+ * Pergunta ao WhatsApp se o telefone tem conta e grava a resposta.
+ *
+ * Com `id`: verifica aquele lead, mesmo que já verificado (é o "Verificar de
+ * novo" da ficha). Sem `id`: o próximo lote de fixos nunca verificados e sem
+ * conversa — conversa sincronizada já prova que a conta existe.
+ *
+ * Número que o provedor não respondeu fica como estava: gravar "não tem" por
+ * falta de resposta esconderia o botão do WhatsApp de quem tem.
+ */
+export async function verificarWhatsApp(
+  input: { id?: string } = {},
+): Promise<VerificacaoResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  const parsed = verificacaoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message };
+  }
+  const { id } = parsed.data;
+
+  const provider = getWhatsAppProvider();
+  if (!provider.checkNumbers) {
+    return { ok: false, error: "O provedor de WhatsApp não sabe verificar números." };
+  }
+
+  const pendentes = () =>
+    supabase
+      .from("wa_leads")
+      .select("id, phone_e164", { count: "exact" })
+      .eq("archived", false)
+      .eq("is_group", false)
+      .is("whatsapp_verificado_em", null)
+      .is("wa_jid", null)
+      .is("last_inbound_at", null)
+      .is("last_outbound_at", null)
+      .filter("phone_e164", "match", FIXO_BR_REGEX);
+
+  try {
+    const { data, error } = id
+      ? await supabase.from("wa_leads").select("id, phone_e164").eq("id", id)
+      : await pendentes().order("created_at").limit(LOTE_VERIFICACAO);
+    if (error) throw new Error(error.message);
+
+    const leads = (data ?? []).filter((l) => l.phone_e164);
+    if (id && leads.length === 0) return { ok: false, error: "Lead não encontrado." };
+
+    const respostas =
+      leads.length > 0
+        ? await provider.checkNumbers([...new Set(leads.map((l) => l.phone_e164))])
+        : {};
+
+    const agora = new Date().toISOString();
+    const porResposta = { true: [] as string[], false: [] as string[] };
+    for (const l of leads) {
+      const existe = respostas[l.phone_e164];
+      if (typeof existe === "boolean") porResposta[`${existe}`].push(l.id);
+    }
+
+    for (const existe of [true, false] as const) {
+      const ids = porResposta[`${existe}`];
+      if (ids.length === 0) continue;
+      const { error: erroUpdate } = await supabase
+        .from("wa_leads")
+        .update({ whatsapp_existe: existe, whatsapp_verificado_em: agora })
+        .in("id", ids);
+      if (erroUpdate) throw new Error(erroUpdate.message);
+    }
+
+    const verificados = porResposta.true.length + porResposta.false.length;
+    if (id && verificados === 0) {
+      return { ok: false, error: "O WhatsApp não respondeu sobre este número. Tente de novo." };
+    }
+
+    let restantes = 0;
+    if (!id) {
+      const { count } = await pendentes().limit(1);
+      restantes = count ?? 0;
+    }
+
+    if (id) revalidateLead(id);
+    else revalidatePath("/derma-lux/leads");
+
+    return {
+      ok: true,
+      verificados,
+      comWhatsApp: porResposta.true.length,
+      semWhatsApp: porResposta.false.length,
+      restantes,
+      existe: id ? porResposta.true.length > 0 : undefined,
+    };
+  } catch (err) {
+    console.error("[verificar-whatsapp]", err);
+    return { ok: false, error: erroDeVerificacao(err) };
+  }
 }

@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { waPhoneKey } from "@/lib/leads/phone";
 import {
   isGroupJid,
   isLidJid,
@@ -25,6 +26,7 @@ import {
  *   POST /message/sendText/{instance}
  *   POST /chat/findMessages/{instance}
  *   POST /chat/findChats/{instance}
+ *   POST /chat/whatsappNumbers/{instance}
  *   GET  /instance/connectionState/{instance}
  */
 
@@ -808,6 +810,41 @@ export function createEvolutionProvider(): WhatsAppProvider {
         { fonte: "findContacts", ...(contatos as object) },
         { fonte: "findChats", ...(chats as object) },
       ];
+    },
+
+    /**
+     * `/chat/whatsappNumbers` é o `onWhatsApp` do Baileys: a mesma consulta
+     * que o aplicativo faz antes de mostrar "isn't on WhatsApp". A resposta
+     * é uma lista `{ exists, jid, number }`.
+     *
+     * A resposta é casada pelo número, nunca pela posição: a Evolution pode
+     * reescrever o celular brasileiro (com e sem o 9º dígito) e a ordem não é
+     * garantida. Comparar pela `waPhoneKey`, que ignora o 9º dígito, cobre
+     * as duas grafias.
+     */
+    async checkNumbers(phonesE164) {
+      const cfg = readConfig();
+      if (phonesE164.length === 0) return {};
+
+      const data = await call<unknown>(`/chat/whatsappNumbers/${cfg.instance}`, {
+        method: "POST",
+        body: { numbers: phonesE164 },
+      });
+
+      const pedidos = new Map(phonesE164.map((p) => [waPhoneKey(p), p]));
+
+      const resultado: Record<string, boolean> = {};
+      for (const item of listaDe(data, "numbers")) {
+        if (typeof item.exists !== "boolean") continue;
+        const candidatos = [str(item.number), str(item.jid)]
+          .filter((v): v is string => v !== null)
+          .map((v) => waPhoneKey(jidToPhone(v)));
+        const pedido = candidatos.map((c) => pedidos.get(c)).find(Boolean);
+        if (!pedido) continue;
+        // Se duas grafias do mesmo número vierem, basta uma dizer que existe.
+        resultado[pedido] = resultado[pedido] === true || item.exists;
+      }
+      return resultado;
     },
 
     async connectionStatus(): Promise<WaConnection> {

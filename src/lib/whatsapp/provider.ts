@@ -200,6 +200,18 @@ export interface WhatsAppProvider {
   connectionStatus(): Promise<WaConnection>;
 
   /**
+   * Pergunta ao WhatsApp quais destes telefones (E.164 sem "+") têm conta.
+   *
+   * Devolve só os números que o provedor respondeu, com a chave igual à que
+   * foi pedida. Número ausente do resultado = não se sabe; quem chama não
+   * deve gravar "não tem" por falta de resposta.
+   *
+   * Poucos por vez, e cada número uma vez só: consultar muito número
+   * desconhecido é padrão de spam para o WhatsApp.
+   */
+  checkNumbers?(phonesE164: string[]): Promise<Record<string, boolean>>;
+
+  /**
    * Mapa LID → telefone E.164 montado a partir da agenda do provedor.
    *
    * O WhatsApp guarda a mesma pessoa duas vezes: a entrada do caderno de

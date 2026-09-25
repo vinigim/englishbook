@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { toWhatsAppNumber } from "../../../shared";
 import {
   ajustarSaudacao,
+  ehFixoBR,
   ehReacao,
   estadoContato,
   extraFields,
@@ -45,6 +46,7 @@ import {
   leadDisplayName,
   relativeDays,
   situacaoEfetiva,
+  temWhatsApp,
   temperaturaEfetiva,
 } from "../../../leads-shared";
 import {
@@ -53,6 +55,7 @@ import {
   reanalyzeLead,
   updateLeadStatus,
   updateLeadTemperature,
+  verificarWhatsApp,
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
 import { BuscarInstagram } from "./BuscarInstagram";
@@ -253,6 +256,40 @@ export function LeadDetailClient({
       : numero
         ? `https://wa.me/${numero}`
         : null;
+
+  /**
+   * Fixo pode ou não ter WhatsApp, e o aplicativo só conta depois do toque
+   * ("isn't on WhatsApp"). Então a ficha pergunta sozinha ao abrir, uma vez
+   * por número — a resposta fica gravada e as próximas aberturas não
+   * consultam de novo. Celular não é consultado: quase todo celular tem.
+   */
+  const fixo = ehFixoBR(lead.phone_e164);
+  const whatsapp = temWhatsApp(lead);
+  const [verificando, setVerificando] = useState(false);
+  const [erroWhatsApp, setErroWhatsApp] = useState<string | null>(null);
+  const autoVerificado = useRef(false);
+
+  async function verificar() {
+    setVerificando(true);
+    setErroWhatsApp(null);
+    try {
+      const r = await verificarWhatsApp({ id: lead.id });
+      if (!r.ok) setErroWhatsApp(r.error ?? "Não consegui verificar.");
+      else router.refresh();
+    } catch {
+      setErroWhatsApp("A resposta não chegou. Tente de novo.");
+    } finally {
+      setVerificando(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!fixo || whatsapp !== null || autoVerificado.current) return;
+    autoVerificado.current = true;
+    void verificar();
+    // Só na montagem: a nova resposta chega por props, e o ref impede uma
+    // segunda consulta automática se ela falhar.
+  }, [fixo, whatsapp]);
 
   // O ig.me não aceita texto na URL como o wa.me. Então o texto vai pela
   // área de transferência, copiado no mesmo toque que abre o direct — é o que
@@ -756,7 +793,8 @@ export function LeadDetailClient({
                 {copiado ? "Copiado!" : "Copiar mensagem"}
               </Button>
 
-              {linkWhatsApp ? (
+              {/* Sem WhatsApp confirmado, o botão só levaria ao aviso do app. */}
+              {linkWhatsApp && whatsapp !== false ? (
                 <a
                   href={linkWhatsApp}
                   target="_blank"
@@ -778,7 +816,53 @@ export function LeadDetailClient({
                   Abrir no Instagram
                 </a>
               ) : null}
+
+              {whatsapp === false ? (
+                <a
+                  href={`tel:+${lead.phone_e164}`}
+                  className="px-4 py-2 text-sm font-medium border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+                >
+                  Ligar
+                </a>
+              ) : null}
             </div>
+
+            {fixo ? (
+              <p className="text-xs text-muted mt-3">
+                {verificando ? (
+                  "Telefone fixo — verificando se tem WhatsApp…"
+                ) : erroWhatsApp ? (
+                  <>
+                    Não consegui verificar se este fixo tem WhatsApp:{" "}
+                    {erroWhatsApp}{" "}
+                  </>
+                ) : whatsapp === false ? (
+                  <>
+                    <strong className="text-ink">
+                      Este fixo não tem WhatsApp
+                    </strong>{" "}
+                    — o próprio WhatsApp respondeu,{" "}
+                    {relativeDays(lead.whatsapp_verificado_em ?? null)}.{" "}
+                  </>
+                ) : lead.whatsapp_existe && lead.whatsapp_verificado_em ? (
+                  <>
+                    Telefone fixo com WhatsApp — confirmado{" "}
+                    {relativeDays(lead.whatsapp_verificado_em)}.{" "}
+                  </>
+                ) : whatsapp ? (
+                  "Telefone fixo com WhatsApp — já há conversa por lá."
+                ) : null}
+                {!verificando && (erroWhatsApp || lead.whatsapp_verificado_em) ? (
+                  <button
+                    type="button"
+                    onClick={() => void verificar()}
+                    className="underline hover:text-ink"
+                  >
+                    Verificar de novo
+                  </button>
+                ) : null}
+              </p>
+            ) : null}
 
             {/*
               De quem é a bola, em uma linha. O caso do Instagram é o único que

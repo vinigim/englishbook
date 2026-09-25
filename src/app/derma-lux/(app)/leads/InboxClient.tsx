@@ -22,6 +22,7 @@ import {
   messagePreview,
   relativeDays,
   situacaoEfetiva,
+  temWhatsApp,
   temperaturaEfetiva,
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
@@ -411,6 +412,15 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
           ) : contato.estado === "aguardando_ele" && contato.canal ? (
             <Badge variant="success" className="whitespace-nowrap">
               ✓ mandei no {CANAL_LABEL[contato.canal]} {relativeDays(contato.desde)}
+            </Badge>
+          ) : null}
+
+          {/* Só o negativo ganha selo: é o que muda o que fazer (ligar ou
+              ir pelo Instagram), e poupa o toque que terminaria no aviso
+              "isn't on WhatsApp". */}
+          {temWhatsApp(lead) === false ? (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              fixo sem WhatsApp
             </Badge>
           ) : null}
         </div>

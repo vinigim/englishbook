@@ -154,6 +154,15 @@ export function createMockProvider(): WhatsAppProvider {
       return { providerMessageId: `mock-${Date.now()}` };
     },
 
+    /** Tem WhatsApp quem aparece nas fixtures; o resto, não. */
+    async checkNumbers(phonesE164) {
+      const historico = await loadHistory();
+      const conhecidos = new Set(
+        historico.map((m) => jidToPhone(String(m.key?.remoteJid ?? ""))),
+      );
+      return Object.fromEntries(phonesE164.map((p) => [p, conhecidos.has(p)]));
+    },
+
     async connectionStatus(): Promise<WaConnection> {
       const historico = await loadHistory();
       return {
