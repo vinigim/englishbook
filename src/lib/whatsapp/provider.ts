@@ -243,7 +243,32 @@ export interface WhatsAppProvider {
    * tem por que passar por uma rota de diagnóstico.
    */
   debugKeySample?(limit: number): Promise<unknown[]>;
+
+  /**
+   * Como o webhook está cadastrado no provedor. `null` = nenhum cadastrado.
+   *
+   * Opcional — só a Evolution implementa. Existe porque um webhook quebrado
+   * não dá erro em lugar nenhum: a conexão aparece "open", o histórico
+   * sincroniza, e só as mensagens novas deixam de chegar.
+   *
+   * Nunca devolve o segredo, só se ele confere.
+   */
+  webhookConfig?(): Promise<WebhookConfig | null>;
 }
+
+export type WebhookConfig = {
+  habilitado: boolean;
+  /** A URL sem a query string, que pode carregar o segredo. */
+  url: string | null;
+  eventos: string[];
+  /**
+   * "Webhook by events" ligado: a Evolution acrescenta o nome do evento ao
+   * caminho (…/webhook/messages-upsert), que não é a nossa rota.
+   */
+  porEvento: boolean;
+  /** O segredo cadastrado confere com WHATSAPP_WEBHOOK_SECRET? */
+  segredoOk: boolean;
+};
 
 // ============================================================================
 //  Utilidades compartilhadas entre adaptadores

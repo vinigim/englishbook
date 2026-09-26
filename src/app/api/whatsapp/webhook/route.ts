@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
-import { carregarVinculosLid } from "@/lib/whatsapp/lid-links";
+import { carregarVinculosLid, lidsAprendidos } from "@/lib/whatsapp/lid-links";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 
 export const runtime = "nodejs";
@@ -80,13 +80,18 @@ export async function POST(request: NextRequest) {
   try {
     const mensagens = provider.normalizeInbound(payload);
 
-    // Mensagem só com LID: entra se o dono já vinculou esse LID a um lead.
+    // Mensagem só com LID: entra se o dono já vinculou esse LID a um lead, ou
+    // se uma conversa anterior desse LID já foi identificada e está no banco.
     const pendentes = provider.pendentesInbound?.(payload) ?? [];
     if (pendentes.length > 0) {
       const vinculos = await carregarVinculosLid(admin);
+      const semVinculo = pendentes.map((p) => p.lid).filter((l) => !vinculos[l]);
+      const aprendidos =
+        semVinculo.length > 0 ? await lidsAprendidos(admin, semVinculo) : {};
       for (const p of pendentes) {
-        const telefone = vinculos[p.lid];
+        const telefone = vinculos[p.lid] ?? aprendidos[p.lid];
         if (telefone) mensagens.push(p.resolver(telefone));
+        else console.log(`[wa-webhook] LID sem vínculo: ${p.lid}`);
       }
     }
 

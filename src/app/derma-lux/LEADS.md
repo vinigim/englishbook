@@ -330,6 +330,27 @@ resposta de verdade, não um palpite pelo formato do número.
 - Celular não é verificado: quase todo celular tem, e consultar a carteira
   inteira seria volume à toa (ver "Risco de banimento").
 
+## Mensagens novas não aparecem
+
+"Testar conexão" verifica, além da conexão, os três elos por onde uma
+mensagem nova passa — e diz qual quebrou:
+
+1. **WhatsApp → Evolution**: a mensagem mais recente guardada na Evolution.
+   Com mais de um dia, nenhuma sincronização resolve: reinicie a instância.
+2. **Evolution → webhook**: como o webhook está cadastrado (`/webhook/find`)
+   e o último aviso gravado em `wa_webhook_events`.
+3. **Evolution → Radar**: a mensagem mais recente no Radar e quantos contatos
+   recentes chegaram só com LID sem ninguém saber quem são.
+
+Mensagem só com LID de um contato **já identificado antes** agora se resolve
+sozinha, no webhook e na sincronização: `lidsAprendidos()` procura o LID em
+`wa_leads.wa_jid` e `wa_messages.chat_id`. Antes, o mapa do `remoteJidAlt` só
+valia para as páginas lidas naquela rodada, e o webhook nem tinha esse mapa.
+
+"Sincronizar histórico" (incremental) lê até um dia antes da mensagem mais
+recente do Radar. O critério antigo — parar na primeira página sem nada novo
+gravado — só enxergava as mensagens com telefone e parava cedo demais.
+
 ## Privacidade
 
 - **Mídia não é baixada.** Guardamos url e mimetype; o binário nunca entra no

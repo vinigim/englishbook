@@ -28,6 +28,7 @@ import {
  *   POST /chat/findChats/{instance}
  *   POST /chat/whatsappNumbers/{instance}
  *   GET  /instance/connectionState/{instance}
+ *   GET  /webhook/find/{instance}
  */
 
 type EvolutionConfig = {
@@ -845,6 +846,39 @@ export function createEvolutionProvider(): WhatsAppProvider {
         resultado[pedido] = resultado[pedido] === true || item.exists;
       }
       return resultado;
+    },
+
+    async webhookConfig() {
+      const cfg = readConfig();
+      const d = obj(await call<unknown>(`/webhook/find/${cfg.instance}`));
+      if (!d) return null;
+      // Algumas versões embrulham em { webhook: {...} }.
+      const w = obj(d.webhook) ?? d;
+
+      const urlCompleta = str(w.url);
+      let url: string | null = null;
+      let segredoNaUrl = "";
+      if (urlCompleta) {
+        try {
+          const u = new URL(urlCompleta);
+          segredoNaUrl = u.searchParams.get("s") ?? "";
+          url = `${u.origin}${u.pathname}`;
+        } catch {
+          url = urlCompleta.split("?")[0];
+        }
+      }
+      const cabecalhos = obj(w.headers);
+      const segredoNoHeader = str(cabecalhos?.["x-webhook-token"]) ?? "";
+
+      return {
+        habilitado: w.enabled !== false,
+        url,
+        eventos: Array.isArray(w.events) ? w.events.map(String) : [],
+        porEvento: w.webhookByEvents === true || w.byEvents === true,
+        segredoOk:
+          secretsMatch(segredoNaUrl, cfg.webhookSecret) ||
+          secretsMatch(segredoNoHeader, cfg.webhookSecret),
+      };
     },
 
     async connectionStatus(): Promise<WaConnection> {
