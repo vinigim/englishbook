@@ -316,7 +316,7 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
               // Recuperadas pelo mapa e sem mapa são números diferentes: um
               // mede o que o truque salvou, o outro o que ficou mesmo de fora.
               Number(evento.recuperadas) > 0
-                ? `${evento.recuperadas} recuperada(s) (${evento.porAlt} pelo WhatsApp, ${evento.porNome} pelo nome na agenda)`
+                ? `${evento.recuperadas} recuperada(s) (${evento.porAlt} pelo WhatsApp, ${Number(evento.porBanco) || 0} por conversa já conhecida, ${Number(evento.porManual) || 0} por vínculo manual, ${evento.porNome} pelo nome na agenda)`
                 : null,
               Number(evento.semMapa) > 0
                 ? `${evento.semMapa} sem telefone em lugar nenhum`

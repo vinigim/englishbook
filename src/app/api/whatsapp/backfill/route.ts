@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
-import { carregarVinculosLid } from "@/lib/whatsapp/lid-links";
+import { carregarVinculosLid, lidsAprendidos } from "@/lib/whatsapp/lid-links";
 import { ingestMessages } from "@/lib/whatsapp/ingest";
 import type {
   NormalizedMessage,
@@ -149,6 +149,27 @@ export async function POST(request: NextRequest) {
         }
         let continuar = false;
 
+        // Até onde o modo incremental precisa voltar: a mensagem mais recente
+        // que já temos, com um dia de folga para relógio e ordenação.
+        //
+        // Antes o critério era "página sem nenhuma mensagem nova gravada", mas
+        // ele só enxerga as mensagens que chegam com telefone — 0,4% delas.
+        // As que chegam só com LID são resolvidas depois do laço, então uma
+        // página com UMA mensagem de telefone já conhecida encerrava a
+        // leitura, e as mensagens novas por LID das páginas seguintes nunca
+        // eram lidas.
+        let corte: number | null = null;
+        if (!force) {
+          const { data: ultima } = await admin
+            .from("wa_messages")
+            .select("sent_at")
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const t = ultima?.sent_at ? Date.parse(ultima.sent_at as string) : NaN;
+          if (Number.isFinite(t)) corte = t - 24 * 60 * 60 * 1000;
+        }
+
         for (;;) {
           if (Date.now() - inicio > LIMITE_MS) {
             continuar = true;
@@ -204,13 +225,19 @@ export async function POST(request: NextRequest) {
               gravadas: resultado.mensagensGravadas,
               vistas: mensagensVistas,
             });
+          }
 
-            // Modo incremental: a listagem vem da mais recente para a mais
-            // antiga, então uma página inteira já conhecida significa que
-            // chegamos ao que já tínhamos. "Reler tudo" (force) ignora isso,
-            // porque o histórico novo do WhatsApp chega pelo FIM da lista —
-            // é justamente o caso em que parar cedo esconderia tudo.
-            if (!force && resultado.mensagensGravadas === 0) break;
+          // Modo incremental: a listagem vem da mais recente para a mais
+          // antiga, então passar do corte significa que chegamos ao que já
+          // tínhamos. "Reler tudo" (force) ignora isso, porque o histórico
+          // novo do WhatsApp chega pelo FIM da lista — é justamente o caso em
+          // que parar cedo esconderia tudo.
+          if (corte != null) {
+            const datas = [
+              ...lote.mensagens.map((m) => Date.parse(m.sentAt)),
+              ...lote.pendentes.map((p) => Date.parse(p.resumo.sentAt)),
+            ].filter(Number.isFinite);
+            if (datas.length > 0 && Math.min(...datas) < corte) break;
           }
 
           if (ultimaPagina) break;
@@ -229,12 +256,30 @@ export async function POST(request: NextRequest) {
         let semMapa = 0;
         const resolvidas: NormalizedMessage[] = [];
 
+        // Quarto mapa: LIDs que o banco já aprendeu em rodadas anteriores.
+        // Sem ele, a sincronização incremental — que lê só as páginas novas —
+        // não reencontra o remoteJidAlt que identificou o contato semanas
+        // atrás, e a mensagem nova dele ficava sem dono.
+        const lidsSemMapa = [
+          ...new Set(
+            pendentes
+              .map((p) => p.lid)
+              .filter((l) => !lidMapAlt[l] && !lidMapManual[l]),
+          ),
+        ];
+        const lidMapBanco =
+          lidsSemMapa.length > 0 ? await lidsAprendidos(admin, lidsSemMapa) : {};
+
         // Verdade conhecida primeiro, inferência depois.
         const resolverLid = (lid: string) =>
-          lidMapAlt[lid] ?? lidMapManual[lid] ?? lidMapNome[lid];
+          lidMapAlt[lid] ??
+          lidMapManual[lid] ??
+          lidMapBanco[lid] ??
+          lidMapNome[lid];
         let porAlt = 0;
         let porNome = 0;
         let porManual = 0;
+        let porBanco = 0;
 
         for (const p of pendentes) {
           const telefone = resolverLid(p.lid);
@@ -244,6 +289,7 @@ export async function POST(request: NextRequest) {
           }
           if (lidMapAlt[p.lid]) porAlt += 1;
           else if (lidMapManual[p.lid]) porManual += 1;
+          else if (lidMapBanco[p.lid]) porBanco += 1;
           else porNome += 1;
           resolvidas.push(p.resolver(telefone));
         }
@@ -304,6 +350,7 @@ export async function POST(request: NextRequest) {
           porAlt,
           porNome,
           porManual,
+          porBanco,
           nomeUnicos,
           nomeAmbiguos,
           descartadasOutras,
