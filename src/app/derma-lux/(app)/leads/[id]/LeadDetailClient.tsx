@@ -59,6 +59,7 @@ import {
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
 import { BuscarInstagram } from "./BuscarInstagram";
+import { urlDoRadar } from "../filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -341,6 +342,12 @@ export function LeadDetailClient({
           tipo: "erro",
           texto: r.error ?? "Não consegui salvar a marcação.",
         };
+      }
+      // Marcar como enviado encerra o trabalho neste lead: volta direto ao
+      // radar, com os filtros de antes, para seguir para o próximo.
+      if (enviado) {
+        router.push(urlDoRadar());
+        return null;
       }
       router.refresh();
       return {
