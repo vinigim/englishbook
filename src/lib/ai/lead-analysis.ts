@@ -222,6 +222,22 @@ ${extras
 </ficha_da_planilha>`
       : "";
 
+  // Instrução escrita pelo dono na tela do lead. Vai no contexto (mensagem do
+  // usuário), e não no system, para não quebrar o prefixo em cache nem exigir
+  // subir o PROMPT_VERSION — que reanalisaria a base inteira.
+  const notas = lead.notes?.trim();
+  const blocoNotas = notas
+    ? `\n\n<instrucoes_do_dono>
+O dono da Lux Derma escreveu isto sobre este lead. Ele conhece o contato melhor
+do que a conversa mostra: siga estas instruções na leitura, na escolha da ação e
+na mensagem, acima de qualquer inferência sua. Só não valem contra a regra de
+privacidade, a de nunca inventar preço, nem contra um pedido da pessoa para não
+receber mensagens.
+
+${notas}
+</instrucoes_do_dono>`
+    : "";
+
   return `<contato>
 ${contato}
 </contato>
@@ -232,7 +248,7 @@ ${historico}
 
 <conversa>
 ${transcricao}
-</conversa>`;
+</conversa>${blocoNotas}`;
 }
 
 /**
@@ -259,6 +275,9 @@ export function contentHash(input: AnalysisInput): string {
     // canal a mais no contexto é que ficam desatualizadas — que são exatamente
     // as que o modelo leria diferente.
     ...(input.lead.instagram ? [`ig=${input.lead.instagram}`] : []),
+    // Mesma lógica: só quem tem instrução do dono ganha a marca, e editá-la
+    // invalida a análise vigente daquele lead.
+    ...(input.lead.notes?.trim() ? [`notas=${input.lead.notes.trim()}`] : []),
     ...(input.lead.instagram_sent_at
       ? [`igenv=${input.lead.instagram_sent_at}`]
       : []),

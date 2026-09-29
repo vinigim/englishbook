@@ -109,6 +109,9 @@ export function LeadDetailClient({
   // A escolha vale por clique e não é gravada em lugar nenhum: assim não
   // existe jeito de ela ficar esquecida ligada no modelo caro.
   const [modelo, setModelo] = useState<DraftModel>(MODELO_PADRAO);
+  // Instruções do dono para a IA. Ao contrário do modelo, ficam gravadas no
+  // lead: toda análise dele passa a lê-las, inclusive a do lote.
+  const [notas, setNotas] = useState(lead.notes ?? "");
   // Mesma normalização que alimenta a IA, para a tela mostrar exatamente o que
   // o modelo leu — nem mais, nem menos.
   const extras = extraFields(lead.extra);
@@ -367,6 +370,8 @@ export function LeadDetailClient({
         gerarRascunho,
         exigirMensagem,
         draftModel: modelo,
+        // Só regrava quando mudou, para não tocar no lead à toa.
+        ...(notas.trim() !== (lead.notes ?? "").trim() ? { notas } : {}),
       });
 
       if (!r.ok) {
@@ -554,6 +559,28 @@ export function LeadDetailClient({
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
+            </div>
+
+            {/* ------------------------------ instruções para a IA */}
+            <div className="mb-4 pb-4 border-b border-line">
+              <label className="block">
+                <span className="block text-xs uppercase tracking-wide text-muted mb-2">
+                  Instruções para a IA
+                </span>
+                <textarea
+                  value={notas}
+                  disabled={pendente}
+                  onChange={(e) => setNotas(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder={'Ex.: "Já é cliente, alugou CO2 em março — ofereça data em outubro." ou "Seja direto e proponha fechar esta semana."'}
+                  className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none resize-y disabled:opacity-50"
+                />
+              </label>
+              <p className="text-xs text-muted mt-1.5">
+                Fica gravado neste lead e vale para toda análise dele, inclusive
+                a do lote. É salvo quando você toca em Reanalisar.
+              </p>
             </div>
 
             {/* ------------------------------------ quem escreve */}

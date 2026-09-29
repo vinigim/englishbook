@@ -51,6 +51,12 @@ export type ReanalyzeResult = ActionResult & {
   acao?: RecommendedAction | null;
 };
 
+const notasSchema = z
+  .string()
+  .trim()
+  .max(2000, "Instruções muito longas (máx. 2000 caracteres).")
+  .nullable();
+
 export async function reanalyzeLead(
   id: string,
   opts: {
@@ -60,6 +66,11 @@ export async function reanalyzeLead(
     draftModel?: string;
     /** "Gerar mensagem assim mesmo": a IA tem que devolver texto. */
     exigirMensagem?: boolean;
+    /**
+     * Instruções do dono para a IA, gravadas em `wa_leads.notes` antes de
+     * analisar. Ausente = não mexe; string vazia = apaga.
+     */
+    notas?: string | null;
   } = {},
 ): Promise<ReanalyzeResult> {
   const supabase = await requireSupabase();
@@ -74,6 +85,19 @@ export async function reanalyzeLead(
       ok: false,
       error: "ANTHROPIC_API_KEY não configurada — a análise não pode rodar.",
     };
+  }
+
+  if (opts.notas !== undefined) {
+    const notas = notasSchema.safeParse(opts.notas);
+    if (!notas.success) {
+      return { ok: false, error: notas.error.issues[0]?.message ?? "Instruções inválidas." };
+    }
+    // Pelo cliente do usuário: a allowlist da lux_staff vale aqui também.
+    const { error } = await supabase
+      .from("wa_leads")
+      .update({ notes: notas.data || null })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
   }
 
   try {
