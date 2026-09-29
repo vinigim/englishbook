@@ -126,6 +126,21 @@ O valor vem do navegador, então é validado contra a lista antes de virar o
 análise gravaria custo zero, e número errado num relatório de fatura é pior que
 número ausente.
 
+**Instruções para a IA.** Na tela do lead, acima da escolha de modelo, há um
+campo livre gravado em `wa_leads.notes`. Ele entra no contexto como
+`<instrucoes_do_dono>`, com peso acima da inferência do modelo (mas nunca acima
+da privacidade, da tabela de preços ou de um "não quero receber mensagens").
+É salvo por "Salvar sem analisar" (sem custo; marca o lead como pendente) ou
+junto com o Reanalisar, e vale para toda análise daquele lead, inclusive a do
+lote. Nenhum outro caminho escreve em `notes`: a sincronização e a importação
+fazem upsert sem essa coluna, então ela sobrevive a ambas. Vai na mensagem do usuário, e não no system, então editar
+não quebra o cache de prompt nem exige subir `PROMPT_VERSION`; entra no hash só
+quando existe, então só o lead editado fica desatualizado.
+
+Para mudar o comportamento de **todos** os leads (ser mais assertivo em geral,
+por exemplo), o lugar é `src/lib/ai/prompt.ts` — e aí é preciso subir
+`PROMPT_VERSION`, o que reanalisa a base inteira.
+
 **Cache por hash.** Antes de chamar a API, o sistema calcula um hash da
 conversa + dados do lead + versão do prompt. Se já existe análise com aquele
 hash, ela é reaproveitada e não se paga nada. Mudar `PROMPT_VERSION` em
