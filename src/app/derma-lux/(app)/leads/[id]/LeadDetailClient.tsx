@@ -53,6 +53,7 @@ import {
   marcarInstagramEnviado,
   registerDraftCopied,
   reanalyzeLead,
+  updateLeadNotes,
   updateLeadStatus,
   updateLeadTemperature,
   verificarWhatsApp,
@@ -112,6 +113,15 @@ export function LeadDetailClient({
   // Instruções do dono para a IA. Ao contrário do modelo, ficam gravadas no
   // lead: toda análise dele passa a lê-las, inclusive a do lote.
   const [notas, setNotas] = useState(lead.notes ?? "");
+  const notasAlteradas = notas.trim() !== (lead.notes ?? "").trim();
+
+  // Fechar ou recarregar a aba com instruções não salvas pede confirmação.
+  useEffect(() => {
+    if (!notasAlteradas) return;
+    const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [notasAlteradas]);
   // Mesma normalização que alimenta a IA, para a tela mostrar exatamente o que
   // o modelo leu — nem mais, nem menos.
   const extras = extraFields(lead.extra);
@@ -371,7 +381,7 @@ export function LeadDetailClient({
         exigirMensagem,
         draftModel: modelo,
         // Só regrava quando mudou, para não tocar no lead à toa.
-        ...(notas.trim() !== (lead.notes ?? "").trim() ? { notas } : {}),
+        ...(notasAlteradas ? { notas } : {}),
       });
 
       if (!r.ok) {
@@ -393,6 +403,25 @@ export function LeadDetailClient({
         };
       }
       return { onde, tipo: "info", texto: "Análise concluída." };
+    });
+  }
+
+  function salvarNotas() {
+    executar("analise", async () => {
+      const r = await updateLeadNotes(lead.id, notas);
+      if (!r.ok) {
+        return {
+          onde: "analise",
+          tipo: "erro",
+          texto: r.error ?? "Não consegui salvar as instruções.",
+        };
+      }
+      router.refresh();
+      return {
+        onde: "analise",
+        tipo: "info",
+        texto: "Instruções salvas. A IA lê na próxima análise deste lead.",
+      };
     });
   }
 
@@ -577,10 +606,22 @@ export function LeadDetailClient({
                   className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none resize-y disabled:opacity-50"
                 />
               </label>
-              <p className="text-xs text-muted mt-1.5">
-                Fica gravado neste lead e vale para toda análise dele, inclusive
-                a do lote. É salvo quando você toca em Reanalisar.
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <p className="text-xs text-muted flex-1 min-w-[12rem]">
+                  Fica gravado neste lead e vale para toda análise dele,
+                  inclusive a do lote. Reanalisar também salva.
+                </p>
+                {notasAlteradas ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={pendente}
+                    onClick={salvarNotas}
+                  >
+                    Salvar sem analisar
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
             {/* ------------------------------------ quem escreve */}

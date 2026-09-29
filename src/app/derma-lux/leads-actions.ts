@@ -321,6 +321,38 @@ export async function definirInstagram(
   return { ok: true };
 }
 
+/**
+ * Grava as instruções do dono para a IA sem analisar — salvar não pode custar
+ * uma chamada paga. Marca o lead como pendente, porque a análise vigente foi
+ * feita sem elas.
+ */
+export async function updateLeadNotes(
+  id: string,
+  notas: string | null,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const parsed = notasSchema.safeParse(notas);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Instruções inválidas." };
+  }
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({ notes: parsed.data || null, needs_analysis: true })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
 const detailsSchema = z.object({
   clinic_name: z.string().trim().max(200).nullish(),
   specialty: z.string().trim().max(120).nullish(),

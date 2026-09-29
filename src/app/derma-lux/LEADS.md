@@ -130,8 +130,10 @@ número ausente.
 campo livre gravado em `wa_leads.notes`. Ele entra no contexto como
 `<instrucoes_do_dono>`, com peso acima da inferência do modelo (mas nunca acima
 da privacidade, da tabela de preços ou de um "não quero receber mensagens").
-É salvo quando você toca em Reanalisar e vale para toda análise daquele lead,
-inclusive a do lote. Vai na mensagem do usuário, e não no system, então editar
+É salvo por "Salvar sem analisar" (sem custo; marca o lead como pendente) ou
+junto com o Reanalisar, e vale para toda análise daquele lead, inclusive a do
+lote. Nenhum outro caminho escreve em `notes`: a sincronização e a importação
+fazem upsert sem essa coluna, então ela sobrevive a ambas. Vai na mensagem do usuário, e não no system, então editar
 não quebra o cache de prompt nem exige subir `PROMPT_VERSION`; entra no hash só
 quando existe, então só o lead editado fica desatualizado.
 
