@@ -303,6 +303,11 @@ com o total da carteira:
 | `aguardando_ele` (sem canal) | nenhuma saída registrada, mas o dono marcou a situação como em conversa, cliente ou inativo | nada |
 | `nunca_abordado` | nenhuma saída registrada e nenhuma dessas marcações | nada — a ausência é o sinal |
 
+Na caixa de entrada, dois chips deixam de fora quem o dono já pôs de lado, sem
+mudar o estado: **frio confirmado** sai de "Devo responder" e **descartado** sai
+de "Nunca abordado". Por isso a soma dos três chips pode ficar abaixo do total.
+A ficha do lead continua mostrando o estado real.
+
 A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estava
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
 de concordar para a tela não mentir.
