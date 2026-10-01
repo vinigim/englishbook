@@ -123,6 +123,19 @@ function foraDoDevoResponder(row: LeadInboxRow): boolean {
   return temperaturaEfetiva(row.lead, row.analysis) === "frio_confirmado";
 }
 
+/**
+ * Descartado sai de "Nunca abordado".
+ *
+ * Mesma lógica do frio confirmado acima: o dono já decidiu não abordar, e
+ * deixá-lo na lista de primeiro contato só misturava quem ainda vale a pena
+ * com quem já foi posto de lado. O estado continua "nunca abordado" — dá para
+ * descartar quem nunca foi abordado, e a tela do lead mostra isso —, só não
+ * entra no chip. Usa a situação EFETIVA, a mesma do filtro "Descartado".
+ */
+function foraDoNuncaAbordado(row: LeadInboxRow): boolean {
+  return situacaoEfetiva(row.lead, row.rentals) === "descartado";
+}
+
 /** Desde quando ele espera resposta, para ordenar a fila. */
 function desdeMs(row: LeadInboxRow): number {
   const desde = estadoContato(row.lead).desde;
@@ -174,7 +187,8 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "sem_analise" && row.analysis) return false;
       // Os três estados de contato são excludentes, então um `switch` de
       // igualdade basta. A soma dos chips só não fecha com o total por causa
-      // dos frios confirmados tirados de "Devo responder".
+      // dos frios confirmados tirados de "Devo responder" e dos descartados
+      // tirados de "Nunca abordado".
       if (
         (filtro === "aguardando_resposta" ||
           filtro === "nunca_abordado" ||
@@ -184,6 +198,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         return false;
       }
       if (filtro === "aguardando_resposta" && foraDoDevoResponder(row)) {
+        return false;
+      }
+      if (filtro === "nunca_abordado" && foraDoNuncaAbordado(row)) {
         return false;
       }
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
@@ -251,7 +268,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (estado === "devo_responder") {
         if (!foraDoDevoResponder(row)) c.aguardando_resposta += 1;
       }
-      else if (estado === "nunca_abordado") c.nunca_abordado += 1;
+      else if (estado === "nunca_abordado") {
+        if (!foraDoNuncaAbordado(row)) c.nunca_abordado += 1;
+      }
       else c.aguardando_ele += 1;
     }
     return c;
