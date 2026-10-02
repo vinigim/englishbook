@@ -159,6 +159,12 @@ topo da caixa de entrada — você não vai ser surpreendido pela fatura.
 `src/app/derma-lux/leads-shared.ts`, determinística e conferível: temperatura,
 estágio, se o lead falou por último sem ser respondido, e há quanto tempo.
 
+**A ordem da caixa de entrada depende do filtro.** Sem nenhum chip ligado
+("Todos" e "Todas"), as conversas mais novas vêm primeiro. Com qualquer chip,
+as mais antigas primeiro — pela data da última mensagem, a mesma do card. "Devo
+responder" é a exceção: é uma fila, ordenada por há quanto tempo ele espera
+resposta. Lead sem mensagem vai para o fim; empates seguem a prioridade acima.
+
 ## Por que o RLS é diferente aqui
 
 As tabelas do derma-lux (`rentals`, `equipment`, `blocks`) usam
