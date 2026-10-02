@@ -143,6 +143,14 @@ function desdeMs(row: LeadInboxRow): number {
   return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
 }
 
+/** Data da última mensagem da conversa, a mesma que o card mostra. */
+function ultimaMensagemMs(row: LeadInboxRow): number | null {
+  const t = row.lead.last_message_at
+    ? new Date(row.lead.last_message_at).getTime()
+    : NaN;
+  return Number.isNaN(t) ? null : t;
+}
+
 export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   // Os filtros moram na URL. Antes moravam só no estado do componente, e abrir
   // um lead e voltar zerava tudo — o dono refazia a mesma filtragem a cada
@@ -235,13 +243,27 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
     });
 
     // "Devo responder" é uma fila: quem está esperando há mais tempo vem
-    // primeiro. Nos outros filtros vale a ordem de prioridade do servidor.
+    // primeiro.
     if (filtro === "aguardando_resposta") {
       return filtrados
         .slice()
         .sort((a, b) => desdeMs(a) - desdeMs(b));
     }
-    return filtrados;
+
+    // Com algum chip ligado, as conversas mais antigas vêm primeiro — filtrar
+    // é ir atrás de quem ficou para trás. Sem filtro ("Todos" e "Todas"), as
+    // mais novas primeiro, para ver o que acabou de chegar. A busca não conta
+    // como filtro. Lead sem mensagem vai para o fim nas duas ordens; empates
+    // mantêm a ordem de prioridade do servidor (o sort é estável).
+    const antigasPrimeiro = filtro !== "todos" || situacao !== "todas";
+    return filtrados.slice().sort((a, b) => {
+      const ta = ultimaMensagemMs(a);
+      const tb = ultimaMensagemMs(b);
+      if (ta === null || tb === null) {
+        return ta === tb ? 0 : ta === null ? 1 : -1;
+      }
+      return antigasPrimeiro ? ta - tb : tb - ta;
+    });
   }, [rows, filtro, situacao, busca]);
 
   const contagem = useMemo(() => {
