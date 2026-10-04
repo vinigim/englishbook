@@ -45,6 +45,7 @@ type Filtro =
   | "sem_analise"
   | "aguardando_resposta"
   | "nunca_abordado"
+  | "nunca_abordado_sem_whatsapp"
   | "aguardando_ele";
 
 // Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
@@ -64,6 +65,7 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "frio_confirmado", label: "Frio confirmado" },
   { id: "aguardando_resposta", label: "Devo responder" },
   { id: "nunca_abordado", label: "Nunca abordado" },
+  { id: "nunca_abordado_sem_whatsapp", label: "Nunca abordado sem WhatsApp" },
   { id: "aguardando_ele", label: "Aguardando ele" },
   { id: "sem_analise", label: "Sem análise" },
 ];
@@ -134,6 +136,23 @@ function foraDoDevoResponder(row: LeadInboxRow): boolean {
  */
 function foraDoNuncaAbordado(row: LeadInboxRow): boolean {
   return situacaoEfetiva(row.lead, row.rentals) === "descartado";
+}
+
+/**
+ * "Nunca abordado sem WhatsApp": a fila do Instagram.
+ *
+ * Um recorte de "Nunca abordado" (mesma regra, descartado fora) para quem o
+ * WhatsApp CONFIRMOU não ter conta (`temWhatsApp === false`, verificação da
+ * 0020). Fixo ainda não verificado fica de fora: muita clínica tem WhatsApp
+ * Business no fixo, e o botão de verificação em lote da caixa resolve a dúvida.
+ * Não entra na conta dos três chips de contato: é um subconjunto de um deles.
+ */
+function nuncaAbordadoSemWhatsApp(row: LeadInboxRow): boolean {
+  return (
+    estadoContato(row.lead).estado === "nunca_abordado" &&
+    !foraDoNuncaAbordado(row) &&
+    temWhatsApp(row.lead) === false
+  );
 }
 
 /** Desde quando ele espera resposta, para ordenar a fila. */
@@ -211,6 +230,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "nunca_abordado" && foraDoNuncaAbordado(row)) {
         return false;
       }
+      if (filtro === "nunca_abordado_sem_whatsapp" && !nuncaAbordadoSemWhatsApp(row)) {
+        return false;
+      }
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
       // que vale — senão o lead sumiria do chip que ele mesmo escolheu.
       if (
@@ -277,6 +299,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       sem_analise: 0,
       aguardando_resposta: 0,
       nunca_abordado: 0,
+      nunca_abordado_sem_whatsapp: 0,
       aguardando_ele: 0,
     };
     for (const row of rows) {
@@ -294,6 +317,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         if (!foraDoNuncaAbordado(row)) c.nunca_abordado += 1;
       }
       else c.aguardando_ele += 1;
+      if (nuncaAbordadoSemWhatsApp(row)) c.nunca_abordado_sem_whatsapp += 1;
     }
     return c;
   }, [rows]);
