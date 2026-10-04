@@ -234,6 +234,10 @@ perfil apareceu como resultado e rebaixar para confiança baixa o que só aparec
 citado ou tem cara de conta antiga. Atenção ao conferir: o Instagram no
 navegador, sem login, às vezes mostra "Something went wrong" para perfil que
 existe; perfil que não existe mostra "Esta página não está disponível".
+Cada candidato tem **"Não existe / não é ele"**: o @ sai da lista e vai no
+`excluir` das próximas buscas daquele lead (prompt e filtro), porque o índice
+devolve o mesmo perfil apagado toda vez. A lista fica no `localStorage` do
+navegador, por lead, até 20 perfis, com "limpar" na ficha.
 Conferir a existência pelo servidor não é confiável: o Instagram pede
 login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
 (Dr. A e Dra. B)") vira uma pesquisa por pessoa, e não é descartado.

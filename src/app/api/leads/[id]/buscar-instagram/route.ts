@@ -15,7 +15,7 @@ export const maxDuration = 60;
  * "Buscar Instagram com IA", na ficha do lead.
  *
  * Só devolve candidatos; não grava nada. Também serve para trocar um @ que
- * está errado: o corpo pode trazer `excluir`, o perfil que não serve. Salvar é outro toque, na action
+ * está errado: o corpo pode trazer `excluir`, os perfis que não servem. Salvar é outro toque, na action
  * `definirInstagram`, depois de o dono conferir o perfil.
  *
  * Route Handler e não Server Action porque a pesquisa na web leva dezenas de
@@ -25,8 +25,11 @@ export const maxDuration = 60;
 const idSchema = z.string().uuid();
 
 const bodySchema = z.object({
-  /** O @ atual, que o dono marcou como errado: a busca não pode devolvê-lo. */
-  excluir: z.string().max(200).nullish(),
+  /**
+   * Perfis que o dono marcou como errados — o @ atual, ou candidatos de
+   * buscas anteriores que não existem. A busca não pode devolvê-los.
+   */
+  excluir: z.array(z.string().max(200)).max(20).optional(),
 });
 
 export async function POST(
@@ -52,7 +55,13 @@ export async function POST(
       { status: 400 },
     );
   }
-  const excluir = toInstagramHandle(parsed.data.excluir);
+  const excluir = [
+    ...new Set(
+      (parsed.data.excluir ?? [])
+        .map((h) => toInstagramHandle(h))
+        .filter((h): h is string => Boolean(h)),
+    ),
+  ];
 
   const supabase = await createClient();
   const {
