@@ -110,6 +110,17 @@ export async function POST(
     .filter(([k, v]) => v.length <= 80 && !/instagram|insta|^ig$/i.test(k))
     .slice(0, 6);
 
+  // CRM vem do nome e de QUALQUER coluna, inclusive das observações longas que ficam
+  // fora de `extras`: é registro público do médico, não dado de paciente, e
+  // médico costuma pô-lo na bio do Instagram.
+  const crms = [
+    ...new Set(
+      [lead.sheet_name ?? "", ...extraFields(lead.extra).map(([, v]) => v)].flatMap((v) =>
+        [...v.matchAll(/CRM[\s-]*(?:[A-Z]{2})?[\s:.-]*(\d{4,7})/gi)].map((m) => m[1]),
+      ),
+    ),
+  ].slice(0, 4);
+
   try {
     const resultado = await buscarInstagram({
       nomes: unicos,
@@ -119,6 +130,7 @@ export async function POST(
       uf: lead.uf,
       telefone: lead.phone_e164 ? formatPhoneBR(lead.phone_e164) : null,
       extras,
+      crms,
       excluir,
     });
     console.log(
