@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { toInstagramHandle } from "@/lib/leads/instagram";
+import { conferirPerfil, type PerfilConferido } from "@/lib/leads/instagram-perfil";
 import { TRIAGE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd } from "./cost";
 
@@ -58,6 +59,12 @@ export type ResultadoBusca = {
   candidatos: CandidatoInstagram[];
   /** Candidatos que o modelo citou mas não estavam nos resultados. */
   descartados: number;
+  /** Candidatos tirados porque o Instagram disse que o perfil não existe. */
+  inexistentes: number;
+  /** @ prováveis conferidos direto no Instagram, e quantos responderam. */
+  conferidos: { total: number; responderam: number };
+  /** O que a IA pesquisou, para entender uma busca que não achou nada. */
+  consultas: string[];
   observacao: string | null;
   pesquisas: number;
   custoUsd: number;
@@ -160,8 +167,10 @@ function pessoasDoNome(nome: string): Pessoa[] {
   return pessoas.slice(0, 3);
 }
 
+type Pistas = { nomesCurtos: string[]; handles: string[]; pessoas: Pessoa[] };
+
 /** Pistas determinísticas: o modelo barato errava ao montá-las sozinho. */
-function pistas(d: DadosParaBusca): string[] {
+function montarPistas(d: DadosParaBusca): Pistas {
   const contexto = semAcento(`${d.especialidade ?? ""} ${d.nomes.join(" ")}`).toLowerCase();
   const sufixo = /dermat/.test(contexto)
     ? "dermato"
@@ -206,18 +215,45 @@ function pistas(d: DadosParaBusca): string[] {
   }
 
   const unicos = (l: string[]) => [...new Set(l.filter((h) => h.length >= 4))];
+  return {
+    nomesCurtos: unicos(nomesCurtos),
+    handles: unicos(handles)
+      .filter((h) => toInstagramHandle(h) === h && !d.excluir?.includes(h))
+      .slice(0, 15),
+    pessoas,
+  };
+}
+
+function pistas(d: DadosParaBusca, p: Pistas): string[] {
   const linhas: string[] = [];
-  if (nomesCurtos.length) linhas.push(`Nome curto: ${unicos(nomesCurtos).join(" / ")}`);
+  if (p.nomesCurtos.length) linhas.push(`Nome curto: ${p.nomesCurtos.join(" / ")}`);
   if (d.crms?.length) linhas.push(`CRM: ${d.crms.join(", ")}`);
-  if (handles.length) {
+  if (p.handles.length) {
     linhas.push(
-      `@ prováveis (palpites para PESQUISAR, não para propor): ${unicos(handles).slice(0, 15).join(", ")}`,
+      `@ prováveis (palpites para PESQUISAR, não para propor): ${p.handles.join(", ")}`,
     );
   }
   return linhas;
 }
 
-function descreverLead(d: DadosParaBusca): string {
+/** Quantos @ prováveis conferir direto no Instagram, por busca. */
+const MAX_CONFERIR = 8;
+
+/** O nome do perfil tem o primeiro nome e um sobrenome de alguma pessoa do lead? */
+function nomeBate(nomePerfil: string | null, pessoas: Pessoa[]): boolean {
+  if (!nomePerfil) return false;
+  const n = slug(nomePerfil);
+  return pessoas.some(
+    ({ partes }) =>
+      n.includes(slug(partes[0])) && partes.slice(1).some((p) => p.length >= 3 && n.includes(slug(p))),
+  );
+}
+
+function descreverPerfil(p: PerfilConferido & { existe: true }): string {
+  return [p.nome, p.seguidores ? `${p.seguidores} seguidores` : null].filter(Boolean).join(", ");
+}
+
+function descreverLead(d: DadosParaBusca, p: Pistas): string {
   const linhas = [
     d.nomes.length ? `Nome(s): ${d.nomes.join(" / ")}` : null,
     d.clinica ? `Clínica: ${d.clinica}` : null,
@@ -230,7 +266,7 @@ function descreverLead(d: DadosParaBusca): string {
   const aviso = excluir.length
     ? `\n\nEstes perfis estão ERRADOS (não existem ou não são deste lead): ${excluir.map((h) => `@${h}`).join(", ")}. Não os proponha, mesmo que voltem na pesquisa; procure outro.`
     : "";
-  const dicas = pistas(d);
+  const dicas = pistas(d, p);
   const blocoPistas = dicas.length ? `\n\nPistas para a pesquisa:\n${dicas.join("\n")}` : "";
   return `Ache o Instagram deste lead:\n${linhas.join("\n")}${blocoPistas}${aviso}`;
 }
@@ -269,9 +305,15 @@ function apareceNosResultados(handle: string, resultados: string): boolean {
 
 export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoBusca> {
   const client = getAnthropic();
+  const p = montarPistas(dados);
   const mensagens: Anthropic.MessageParam[] = [
-    { role: "user", content: descreverLead(dados) },
+    { role: "user", content: descreverLead(dados, p) },
   ];
+
+  // Em paralelo com a IA: confere direto no Instagram os @ mais prováveis. A
+  // pesquisa não acha perfil pequeno; a prévia da página acha, se ele existir.
+  const aConferir = p.handles.slice(0, MAX_CONFERIR);
+  const conferenciaPalpites = Promise.all(aConferir.map((h) => conferirPerfil(h)));
 
   const conteudo: Anthropic.ContentBlock[] = [];
   let entrada = 0;
@@ -325,6 +367,12 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
   const candidatos: CandidatoInstagram[] = [];
   let descartados = 0;
 
+  const consultas = conteudo
+    .filter((b): b is Anthropic.ServerToolUseBlock => b.type === "server_tool_use")
+    .map((b) => (b.input as { query?: unknown }).query)
+    .filter((q): q is string => typeof q === "string")
+    .slice(0, 8);
+
   for (const c of json?.candidatos ?? []) {
     const handle = toInstagramHandle(typeof c.handle === "string" ? c.handle : null);
     if (!handle || vistos.has(handle) || dados.excluir?.includes(handle)) continue;
@@ -344,6 +392,44 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
     if (candidatos.length >= 3) break;
   }
 
+  // Confere também os candidatos da IA: o índice da pesquisa guarda perfil
+  // apagado. "Não existe" sai da lista; "não deu para saber" fica como estava.
+  const [doPalpite, daIa] = await Promise.all([
+    conferenciaPalpites,
+    Promise.all(candidatos.map((c) => conferirPerfil(c.handle))),
+  ]);
+  let inexistentes = 0;
+  const lidos: CandidatoInstagram[] = [];
+  const naoLidos: CandidatoInstagram[] = [];
+  candidatos.forEach((c, i) => {
+    const perfil = daIa[i];
+    if (perfil?.existe === false) inexistentes += 1;
+    else if (perfil?.existe) {
+      lidos.push({ ...c, motivo: `${c.motivo} · Perfil confirmado no Instagram: ${descreverPerfil(perfil)}.` });
+    } else naoLidos.push(c);
+  });
+
+  // Palpite que existe E tem o nome do lead no perfil entra mesmo sem ter
+  // aparecido na pesquisa: a página dele foi lida, o que vale mais que um
+  // título de resultado. Homônimo continua possível — por isso "média".
+  const jaListados = new Set(candidatos.map((c) => c.handle));
+  const dosPalpites: CandidatoInstagram[] = [];
+  aConferir.forEach((handle, i) => {
+    const perfil = doPalpite[i];
+    if (!perfil?.existe || jaListados.has(handle) || !nomeBate(perfil.nome, p.pessoas)) return;
+    jaListados.add(handle);
+    dosPalpites.push({
+      handle,
+      confianca: "media",
+      motivo: `Perfil existe no Instagram com o nome do lead (${descreverPerfil(perfil)}). Achado pelo @ provável, não pela pesquisa: confira a cidade e a especialidade.`,
+      fonte: `https://www.instagram.com/${handle}/`,
+    });
+  });
+
+  // Perfil lido primeiro: vale mais que um que só apareceu citado.
+  const finais = [...lidos, ...dosPalpites, ...naoLidos].slice(0, 3);
+  const responderam = [...doPalpite, ...daIa].filter((r) => r != null).length;
+
   const custoUsd =
     estimateCostUsd(TRIAGE_MODEL, {
       inputTokens: entrada,
@@ -353,8 +439,11 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
     pesquisas * PRECO_PESQUISA_USD;
 
   return {
-    candidatos,
+    candidatos: finais,
     descartados,
+    inexistentes,
+    conferidos: { total: aConferir.length + candidatos.length, responderam },
+    consultas,
     observacao:
       typeof json?.observacao === "string" && json.observacao.trim()
         ? json.observacao.slice(0, 300)
