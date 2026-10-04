@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { instagramProfileUrl } from "@/lib/leads/instagram";
+import { montarPalpites } from "@/lib/leads/instagram-palpites";
 import { definirInstagram } from "../../../leads-actions";
 
 type Candidato = {
@@ -17,8 +18,6 @@ type Candidato = {
 type Resultado = {
   candidatos: Candidato[];
   descartados: number;
-  inexistentes: number;
-  conferidos: { total: number; responderam: number };
   consultas: string[];
   observacao: string | null;
   pesquisas: number;
@@ -70,12 +69,20 @@ const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
  * Nada é salvo sem o toque em "Usar este": a IA acha candidatos, o dono abre
  * o perfil, confere e escolhe.
  */
+/** Quantos @ prováveis a ficha mostra como link. */
+const MAX_PALPITES = 8;
+
 export function BuscarInstagram({
   leadId,
+  nomes,
+  especialidade,
   atual = null,
   onSalvo,
 }: {
   leadId: string;
+  /** Nome da planilha e do WhatsApp, para os @ prováveis. */
+  nomes: string[];
+  especialidade: string | null;
   /** @ que o lead já tem e que o dono diz estar errado. A busca o evita. */
   atual?: string | null;
   /** Chamado depois de salvar, para quem abriu o painel poder fechá-lo. */
@@ -91,6 +98,18 @@ export function BuscarInstagram({
 
   // Lido depois de montar: no servidor não há localStorage.
   useEffect(() => setRejeitados(lerRejeitados(leadId)), [leadId]);
+
+  // Os @ prováveis como link, sem IA e sem custo. A pesquisa da IA não acha
+  // perfil pequeno, e o servidor não consegue abrir o Instagram (pede login
+  // para IP de datacenter: 0 de 8 responderam no teste). O Instagram do dono,
+  // logado no celular, abre na hora — e perfil que não existe diz que não existe.
+  const palpites = useMemo(() => {
+    const excluir = [...(atual ? [atual] : []), ...rejeitados];
+    return montarPalpites({ nomes, especialidade, excluir });
+  }, [nomes, especialidade, atual, rejeitados]);
+  const buscaGoogle = palpites.nomesCurtos[0]
+    ? `https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com "${palpites.nomesCurtos[0]}"`)}`
+    : null;
 
   function rejeitar(handle: string) {
     const lista = [...new Set([...rejeitados, handle])].slice(-20);
@@ -186,6 +205,46 @@ export function BuscarInstagram({
         </Button>
       </form>
 
+      {palpites.handles.length > 0 ? (
+        <div className="text-xs space-y-1">
+          <p className="text-muted">
+            Toque para abrir no seu Instagram; o que existir, use:
+          </p>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            {palpites.handles.slice(0, MAX_PALPITES).map((h) => (
+              <li key={h} className="flex items-center gap-1">
+                <a
+                  href={instagramProfileUrl(h)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  @{h}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => usar(h)}
+                  disabled={salvando}
+                  className="text-muted underline hover:text-ink"
+                >
+                  usar
+                </button>
+              </li>
+            ))}
+          </ul>
+          {buscaGoogle ? (
+            <a
+              href={buscaGoogle}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-muted underline hover:text-ink"
+            >
+              Pesquisar “{palpites.nomesCurtos[0]}” no Google
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
       {buscando ? (
         <p className="text-xs text-muted">Pesquisando na internet… leva uns 20 segundos.</p>
       ) : null}
@@ -247,12 +306,6 @@ export function BuscarInstagram({
             {resultado.pesquisas} pesquisa(s) · US$ {resultado.custoUsd.toFixed(4)}
             {resultado.descartados > 0
               ? ` · ${resultado.descartados} sugestão(ões) descartada(s) por não aparecer nos resultados`
-              : ""}
-            {resultado.inexistentes > 0
-              ? ` · ${resultado.inexistentes} perfil(is) tirado(s) porque não existe(m) mais`
-              : ""}
-            {resultado.conferidos.total > 0
-              ? ` · Instagram conferido: ${resultado.conferidos.responderam} de ${resultado.conferidos.total} @ responderam`
               : ""}
             {resultado.candidatos.length > 0 && resultado.observacao
               ? ` · ${resultado.observacao}`

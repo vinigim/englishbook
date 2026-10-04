@@ -244,16 +244,18 @@ nome → @ da planilha de prospecção, o @ real está entre os palpites em 128
 (56%). Os palpites só orientam a pesquisa: a trava de "apareceu nos
 resultados" continua valendo.
 
-**Conferência direta no Instagram** (`src/lib/leads/instagram-perfil.ts`). Em
-paralelo com a IA, o servidor pede a página dos 8 @ prováveis mais fortes com o
-user-agent de robô de prévia de link e lê `og:title`/`og:description` (nome, @,
-seguidores). Palpite que existe **e** tem o nome do lead entra como candidato de
-confiança média, mesmo sem ter aparecido na pesquisa. Os candidatos da IA também
-são conferidos: perfil que o Instagram diz não existir sai da lista. Resposta
-de login ou erro vira "não deu para saber" e não muda nada. O log
-`[buscar-instagram]` e a tela mostram quantos @ o Instagram respondeu: se for
-sempre 0, ele está barrando o IP da Vercel, e a conferência não ajuda. A tela
-também lista o que a IA pesquisou.
+**@ prováveis como link, sem IA.** A ficha mostra os 8 primeiros palpites de
+`montarPalpites()` (`src/lib/leads/instagram-palpites.ts`, código puro) como
+links, cada um com "usar", e uma pesquisa pronta no Google. Abrem no Instagram
+do dono, logado no celular: o perfil que existe aparece, e o que não existe diz
+que não existe. Os palpites vêm em níveis (dr/dra + nome, dr.a + nome, nome +
+sufixo da especialidade, nome sozinho), e o @ real fica entre os 8 primeiros em
+122 dos 229 pares da planilha. Os níveis existem por causa de dois testes
+reais: a pesquisa da IA procurou exatamente "izabelacardealdermato" e o índice
+não tinha o perfil, e o servidor tentou abrir a página dos @ direto no
+Instagram e foi barrado nas 8 tentativas (pede login para IP de datacenter).
+Por isso essa conferência pelo servidor foi retirada. A tela da busca também
+lista o que a IA pesquisou.
 
 Cada candidato tem **"Não existe / não é ele"**: o @ sai da lista e vai no
 `excluir` das próximas buscas daquele lead (prompt e filtro), porque o índice

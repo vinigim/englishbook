@@ -444,6 +444,16 @@ export function LeadDetailClient({
     }
   }
 
+  // Mesma regra da rota de busca: só nome com letra (o display_name às vezes é
+  // o próprio LID do WhatsApp).
+  const nomesParaInstagram = [
+    ...new Set(
+      [lead.sheet_name, lead.display_name]
+        .map((n) => n?.trim())
+        .filter((n): n is string => Boolean(n && /\p{L}/u.test(n))),
+    ),
+  ];
+
   return (
     <div className="space-y-4">
       {/* ---------------------------------------------------- identificação */}
@@ -475,11 +485,17 @@ export function LeadDetailClient({
                 </button>
               </p>
             ) : (
-              <BuscarInstagram leadId={lead.id} />
+              <BuscarInstagram
+                leadId={lead.id}
+                nomes={nomesParaInstagram}
+                especialidade={lead.specialty}
+              />
             )}
             {instagram && trocarInstagram ? (
               <BuscarInstagram
                 leadId={lead.id}
+                nomes={nomesParaInstagram}
+                especialidade={lead.specialty}
                 atual={instagram}
                 onSalvo={() => setTrocarInstagram(false)}
               />
