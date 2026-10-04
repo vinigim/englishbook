@@ -352,6 +352,13 @@ com o total da carteira:
 | `aguardando_ele` (sem canal) | nenhuma saída registrada, mas o dono marcou a situação como em conversa, cliente ou inativo | nada |
 | `nunca_abordado` | nenhuma saída registrada e nenhuma dessas marcações | nada — a ausência é o sinal |
 
+**"Nunca abordado sem WhatsApp"** é a fila do Instagram: os leads de "Nunca
+abordado" (descartado fora) cujo WhatsApp foi **confirmado** como inexistente
+(`temWhatsApp() === false`, verificação da `0020`). Fixo ainda não verificado
+não entra, porque muita clínica tem WhatsApp Business no fixo: rode antes o
+botão de verificação em lote da caixa. É um subconjunto de "Nunca abordado" e
+não entra na soma dos três chips de contato.
+
 Na caixa de entrada, dois chips deixam de fora quem o dono já pôs de lado, sem
 mudar o estado: **frio confirmado** sai de "Devo responder" e **descartado** sai
 de "Nunca abordado". Por isso a soma dos três chips pode ficar abaixo do total.
