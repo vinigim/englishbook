@@ -229,10 +229,12 @@ pesquisar o @ provável como palavra quando o nome não basta. Os padrões só
 guiam a pesquisa: o @ continua tendo de aparecer nos resultados.
 
 O índice da pesquisa pode estar velho: um @ renomeado ou apagado continua
-aparecendo, e passa pela trava acima (caso real: `@churdleyrolimsales`, que não
-abria). O prompt manda preferir o @ cujo próprio perfil apareceu como resultado
-e rebaixar para confiança baixa o que só aparece citado ou tem cara de nome
-antigo. Conferir a existência pelo servidor não é confiável: o Instagram pede
+aparecendo, e passa pela trava acima. O prompt manda preferir o @ cujo próprio
+perfil apareceu como resultado e rebaixar para confiança baixa o que só aparece
+citado ou tem cara de conta antiga. Atenção ao conferir: o Instagram no
+navegador, sem login, às vezes mostra "Something went wrong" para perfil que
+existe; perfil que não existe mostra "Esta página não está disponível".
+Conferir a existência pelo servidor não é confiável: o Instagram pede
 login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
 (Dr. A e Dra. B)") vira uma pesquisa por pessoa, e não é descartado.
 
