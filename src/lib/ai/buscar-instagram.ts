@@ -68,7 +68,7 @@ Use a ferramenta de pesquisa na web. Ela está restrita ao instagram.com, então
 ## Leia o nome antes de pesquisar
 
 O nome costuma vir da planilha com descrição junto: "Dra. Fernanda Paulo Guedes Carrenho", "Dr. Fábio Pascutti - Cirurgia Plástica", "Clínica Camila Caitano (Dra. Camila / Dra. Suraya)", "Vefago Clínica | Dra. Júlia Vefago". Separe:
-- a PESSOA: primeiro nome + sobrenomes, sem "Dr.", "Dra.", "Clínica" e sem o que vem depois de " - ", " | " ou entre parênteses;
+- a(s) PESSOA(S): primeiro nome + sobrenomes, sem "Dr.", "Dra.", "Clínica" e sem a descrição que vem depois de " - " ou " | ". ATENÇÃO aos parênteses: quase sempre são os médicos da clínica ("Clínica Munia Rolim (Dr. Churdley Rolim e Dra. Luciana Munia Rolim)" são DUAS pessoas e uma clínica). Qualquer um deles serve: o perfil de um sócio já abre a conversa;
 - a CLÍNICA, quando houver;
 - a ESPECIALIDADE (dermatologia, cirurgia plástica, oftalmologia/blefaroplastia, harmonização, estética).
 
@@ -87,12 +87,15 @@ Num levantamento de mais de 200 perfis de médicos e clínicas do interior de SP
 1. O nome da pessoa com dr/dra e a especialidade ou a cidade (ex.: "Dra Cláudia Lapa dermatologista").
 2. Se não achar, pesquise o @ provável como palavra, montado pelos padrões acima (ex.: "draclaudialapa"). O título do resultado mostra o @ real, que pode ser parecido mas não igual.
 3. Depois, variações: outro sobrenome, só o primeiro + último nome sem dr/dra, ou o nome da clínica com a cidade.
+Com mais de uma pessoa, distribua as pesquisas: a clínica e cada médico, começando por quem tem a especialidade mais próxima de dermatologia, plástica ou estética.
 Não repita uma pesquisa que já não deu resultado com outras palavras quase iguais.
 
 ## Regras
 
 - Só proponha perfis que APARECERAM nos resultados da pesquisa (instagram.com/<perfil> na URL ou @perfil no título/trecho). Os padrões acima servem para PESQUISAR, nunca para inventar um @: se o @ que você imaginou não apareceu, ele não entra.
 - Prefira o perfil profissional da pessoa ou da clínica. Perfil de fã, de paciente, de outra clínica homônima em outra cidade: não proponha, ou proponha com confiança baixa explicando a dúvida.
+- O índice da pesquisa pode estar velho: perfil renomeado ou apagado continua aparecendo. Prefira o @ cujo PRÓPRIO perfil apareceu como resultado (URL instagram.com/<perfil>/ com o nome no título). Um @ que só aparece citado em post, reel ou perfil de terceiros, ou com cara de nome antigo/pessoal (sufixos como "sales", números, "old"), vai no máximo com confiança "baixa", e diga no motivo que pode não existir mais.
+- Especialidade diferente da do lead (ex.: o perfil é de cirurgia vascular e o lead é dermatologia) derruba a confiança um nível, mesmo com nome batendo.
 - Confiança "alta" só quando nome E cidade (ou clínica, ou telefone) batem. "media" quando só o nome bate e a especialidade é compatível. "baixa" no resto.
 - No máximo 3 candidatos, do mais provável para o menos.
 - Se não achar nada confiável, devolva a lista vazia. Lista vazia é uma resposta boa; perfil errado é ruim.

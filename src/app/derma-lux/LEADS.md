@@ -228,6 +228,14 @@ planilha de prospecção: dr/dra + primeiro nome + um sobrenome, sufixo
 pesquisar o @ provável como palavra quando o nome não basta. Os padrões só
 guiam a pesquisa: o @ continua tendo de aparecer nos resultados.
 
+O índice da pesquisa pode estar velho: um @ renomeado ou apagado continua
+aparecendo, e passa pela trava acima (caso real: `@churdleyrolimsales`, que não
+abria). O prompt manda preferir o @ cujo próprio perfil apareceu como resultado
+e rebaixar para confiança baixa o que só aparece citado ou tem cara de nome
+antigo. Conferir a existência pelo servidor não é confiável: o Instagram pede
+login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
+(Dr. A e Dra. B)") vira uma pesquisa por pessoa, e não é descartado.
+
 - **Nada é salvo sozinho.** O dono abre o perfil e toca em "Usar este", que
   chama `definirInstagram` e marca a análise como desatualizada.
 - **@ inventado é barrado no código:** só passa candidato cujo @ aparece na URL
