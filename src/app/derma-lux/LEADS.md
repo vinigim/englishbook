@@ -216,11 +216,27 @@ está vazia, a tela procura o Instagram entre as colunas extras.
 
 Lead sem Instagram mostra, na ficha, **"Buscar Instagram com IA"**
 (`/api/leads/[id]/buscar-instagram` → `src/lib/ai/buscar-instagram.ts`). O
-modelo da triagem pesquisa (ferramenta de pesquisa da própria API, até 3
+modelo da triagem pesquisa (ferramenta de pesquisa da própria API, até 4
 pesquisas, **restrita ao instagram.com**) com nome, clínica, especialidade,
 cidade e telefone, e devolve até 3 candidatos com confiança e motivo. Na web
 aberta o perfil sumia atrás de site de clínica e Doctoralia. Ao lado há um
 campo para colar o @ ou o link quando o dono já sabe qual é.
+
+O prompt ensina os padrões de @ deste público, tirados de mais de 200 perfis da
+planilha de prospecção: dr/dra + primeiro nome + um sobrenome, sufixo
+`.dermato`/`oftalmo`/`plastica`, apelidos, clínica com o @ do médico. E manda
+pesquisar o @ provável como palavra quando o nome não basta. Os padrões só
+guiam a pesquisa: o @ continua tendo de aparecer nos resultados.
+
+O índice da pesquisa pode estar velho: um @ renomeado ou apagado continua
+aparecendo, e passa pela trava acima. O prompt manda preferir o @ cujo próprio
+perfil apareceu como resultado e rebaixar para confiança baixa o que só aparece
+citado ou tem cara de conta antiga. Atenção ao conferir: o Instagram no
+navegador, sem login, às vezes mostra "Something went wrong" para perfil que
+existe; perfil que não existe mostra "Esta página não está disponível".
+Conferir a existência pelo servidor não é confiável: o Instagram pede
+login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
+(Dr. A e Dra. B)") vira uma pesquisa por pessoa, e não é descartado.
 
 - **Nada é salvo sozinho.** O dono abre o perfil e toca em "Usar este", que
   chama `definirInstagram` e marca a análise como desatualizada.
