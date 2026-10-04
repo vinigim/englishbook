@@ -38,6 +38,8 @@ export type DadosParaBusca = {
   telefone: string | null;
   /** Colunas extras da planilha (site, e-mail…), só as curtas. */
   extras: [string, string][];
+  /** Números de CRM achados na planilha. Muito médico põe o CRM na bio. */
+  crms?: string[];
   /**
    * Perfis que o dono marcou como errados (não existem, ou são de outra
    * pessoa). Não podem voltar como candidato — nem pelo prompt, nem pelo filtro.
@@ -84,9 +86,12 @@ Num levantamento de mais de 200 perfis de médicos e clínicas do interior de SP
 
 ## Como pesquisar
 
-1. O nome da pessoa com dr/dra e a especialidade ou a cidade (ex.: "Dra Cláudia Lapa dermatologista").
-2. Se não achar, pesquise o @ provável como palavra, montado pelos padrões acima (ex.: "draclaudialapa"). O título do resultado mostra o @ real, que pode ser parecido mas não igual.
-3. Depois, variações: outro sobrenome, só o primeiro + último nome sem dr/dra, ou o nome da clínica com a cidade.
+A mensagem traz, quando dá, "Pistas para a pesquisa" montadas pelo sistema: o nome curto (primeiro + último nome, que é como o médico se apresenta no perfil), @ prováveis e o CRM. Use-as.
+1. O nome curto, com a especialidade (ex.: "Izabela Cardeal dermatologista"). O nome completo da planilha ("Izabela Lidia Soares Cardeal") quase nunca é o nome do perfil.
+2. O CRM, se houver (ex.: "CRM 140320"): médico costuma pôr o CRM na bio, e ele confirma a pessoa.
+3. Os @ prováveis como palavra (ex.: "izabelacardealdermato"). O título do resultado mostra o @ real, que pode ser parecido mas não igual.
+4. Depois, variações: outro sobrenome, ou o nome da clínica com a cidade.
+Use TODAS as pesquisas disponíveis antes de devolver a lista vazia.
 Com mais de uma pessoa, distribua as pesquisas: a clínica e cada médico, começando por quem tem a especialidade mais próxima de dermatologia, plástica ou estética.
 Não repita uma pesquisa que já não deu resultado com outras palavras quase iguais.
 
@@ -96,6 +101,7 @@ Não repita uma pesquisa que já não deu resultado com outras palavras quase ig
 - Prefira o perfil profissional da pessoa ou da clínica. Perfil de fã, de paciente, de outra clínica homônima em outra cidade: não proponha, ou proponha com confiança baixa explicando a dúvida.
 - O índice da pesquisa pode estar velho: perfil renomeado ou apagado continua aparecendo. Prefira o @ cujo PRÓPRIO perfil apareceu como resultado (URL instagram.com/<perfil>/ com o nome no título). Um @ que só aparece citado em post, reel ou perfil de terceiros, ou com cara de conta antiga (números soltos, "old", "antigo"), vai no máximo com confiança "baixa", e diga no motivo que pode não existir mais. Sobrenome no @ não é sinal de conta antiga: Sales, Silva e Souza são sobrenomes.
 - Especialidade diferente da do lead (ex.: o perfil é de cirurgia vascular e o lead é dermatologia) derruba a confiança um nível, mesmo com nome batendo.
+- CRM igual ao do lead no perfil é confiança "alta" por si só.
 - Confiança "alta" só quando nome E cidade (ou clínica, ou telefone) batem. "media" quando só o nome bate e a especialidade é compatível. "baixa" no resto.
 - No máximo 3 candidatos, do mais provável para o menos.
 - Se não achar nada confiável, devolva a lista vazia. Lista vazia é uma resposta boa; perfil errado é ruim.
@@ -104,6 +110,112 @@ Termine a resposta com um bloco JSON, e nada depois dele:
 \`\`\`json
 {"candidatos":[{"handle":"perfil_sem_arroba","confianca":"alta|media|baixa","motivo":"frase curta em português","fonte":"URL do resultado onde viu"}],"observacao":"frase curta opcional"}
 \`\`\``;
+
+const PARTICULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
+
+/** Palavras que encerram o nome da pessoa: daí em diante é descrição. */
+const DESCRICAO =
+  /^(cl[ií]nica|est[eé]tica|avan[cç]ada|dermatolog\p{L}*|derma|cirurgi\p{L}*|pl[aá]stic\p{L}*|oftalmolog\p{L}*|blefaroplastia|harmoniza[cç][aã]o|odonto\p{L}*|dentista|m[eé]dic\p{L}*|crm\p{L}*|instituto|centro|hospital|em|no|na)$/iu;
+
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const slug = (t: string) => semAcento(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+type Pessoa = { titulo: "dr" | "dra" | null; partes: string[] };
+
+/**
+ * Pessoas citadas no nome da planilha, como [primeiro, ..., último].
+ *
+ * "Dra. Izabela Lidia Soares Cardeal - Dermatologista" vira
+ * [["Izabela", "Lidia", "Soares", "Cardeal"]]; "Clínica X (Dr. A B e Dra. C D)"
+ * vira as duas pessoas dos parênteses; "Clínica Dra. Melissa Martins" vira
+ * Melissa Martins. Sem nenhum "Dr."/"Dra.", só o primeiro trecho, e só se não
+ * for nome de clínica.
+ */
+function pessoasDoNome(nome: string): Pessoa[] {
+  const trechos = nome
+    .split(/\s[-–|]\s|[()/,;]|\s+e\s+(?=dra?\.?\s)/i)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const comTitulo = trechos
+    .map((t) => t.match(/(?:^|\s)(dra?)\.?\s+(.+)$/i))
+    .filter((m): m is RegExpMatchArray => m != null)
+    .map((m) => ({ titulo: m[1].toLowerCase() as "dr" | "dra", resto: m[2] }));
+  // Sem título: o primeiro trecho, cortado na descrição ("Ricardo Silveira
+  // Cirurgia Plástica" → Ricardo Silveira), se não começar como clínica.
+  const escolhidos = comTitulo.length
+    ? comTitulo
+    : /^(cl[ií]nica|instituto|centro|hospital|est[eé]tica|cirurgia)/i.test(trechos[0] ?? "")
+      ? []
+      : trechos.slice(0, 1).map((resto) => ({ titulo: null, resto }));
+
+  const pessoas: Pessoa[] = [];
+  for (const { titulo, resto } of escolhidos) {
+    const partes: string[] = [];
+    for (const p of resto.split(/\s+/)) {
+      if (DESCRICAO.test(p)) break;
+      if (/^\p{L}+$/u.test(p) && !PARTICULAS.has(p.toLowerCase())) partes.push(p);
+    }
+    if (partes.length >= 2) pessoas.push({ titulo, partes });
+  }
+  return pessoas.slice(0, 3);
+}
+
+/** Pistas determinísticas: o modelo barato errava ao montá-las sozinho. */
+function pistas(d: DadosParaBusca): string[] {
+  const contexto = semAcento(`${d.especialidade ?? ""} ${d.nomes.join(" ")}`).toLowerCase();
+  const sufixo = /dermat/.test(contexto)
+    ? "dermato"
+    : /oftalm|blefaro/.test(contexto)
+      ? "oftalmo"
+      : /plastic/.test(contexto)
+        ? "plastica"
+        : null;
+
+  const nomesCurtos: string[] = [];
+  const handles: string[] = [];
+  const pessoas = d.nomes.flatMap(pessoasDoNome);
+  for (const { titulo, partes } of pessoas) {
+    const [primeiro, segundo] = partes;
+    const ultimo = partes[partes.length - 1];
+    const penultimo = partes[partes.length - 2];
+    // Primeiro + último é o mais comum; com 3+ partes, também o nome composto
+    // ("Ana Laura Rezende" → analaurarezende) e o sobrenome do meio.
+    const combos: string[][] = [[primeiro, ultimo]];
+    if (partes.length >= 3) {
+      combos.push([primeiro, segundo, ultimo]);
+      if (penultimo.length >= 3) combos.push([primeiro, penultimo]);
+    }
+    for (const combo of combos) {
+      nomesCurtos.push(combo.join(" "));
+      const base = slug(combo.join(""));
+      const t = titulo ?? "dra";
+      handles.push(`${t}${base}`, base, `${t}.${base}`);
+      if (sufixo) handles.push(`${base}${sufixo}`, `${base}.${sufixo}`, `${base}_${sufixo}`);
+    }
+  }
+  // Sem médico com título, pode ser clínica: o @ costuma ser o nome dela
+  // junto, com ou sem a palavra "clínica".
+  if (!pessoas.some((p) => p.titulo)) {
+    for (const nome of d.nomes) {
+      const primeiro = nome.split(/\s[-–|]\s|[(),]/)[0] ?? "";
+      handles.push(
+        slug(primeiro),
+        slug(primeiro.replace(/\b(cl[ií]nica|de|da|do|e)\b/giu, "")),
+      );
+    }
+  }
+
+  const unicos = (l: string[]) => [...new Set(l.filter((h) => h.length >= 4))];
+  const linhas: string[] = [];
+  if (nomesCurtos.length) linhas.push(`Nome curto: ${unicos(nomesCurtos).join(" / ")}`);
+  if (d.crms?.length) linhas.push(`CRM: ${d.crms.join(", ")}`);
+  if (handles.length) {
+    linhas.push(
+      `@ prováveis (palpites para PESQUISAR, não para propor): ${unicos(handles).slice(0, 15).join(", ")}`,
+    );
+  }
+  return linhas;
+}
 
 function descreverLead(d: DadosParaBusca): string {
   const linhas = [
@@ -118,7 +230,9 @@ function descreverLead(d: DadosParaBusca): string {
   const aviso = excluir.length
     ? `\n\nEstes perfis estão ERRADOS (não existem ou não são deste lead): ${excluir.map((h) => `@${h}`).join(", ")}. Não os proponha, mesmo que voltem na pesquisa; procure outro.`
     : "";
-  return `Ache o Instagram deste lead:\n${linhas.join("\n")}${aviso}`;
+  const dicas = pistas(d);
+  const blocoPistas = dicas.length ? `\n\nPistas para a pesquisa:\n${dicas.join("\n")}` : "";
+  return `Ache o Instagram deste lead:\n${linhas.join("\n")}${blocoPistas}${aviso}`;
 }
 
 /** Texto das URLs e títulos de todos os resultados de pesquisa da conversa. */

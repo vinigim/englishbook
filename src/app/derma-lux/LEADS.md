@@ -234,6 +234,16 @@ perfil apareceu como resultado e rebaixar para confiança baixa o que só aparec
 citado ou tem cara de conta antiga. Atenção ao conferir: o Instagram no
 navegador, sem login, às vezes mostra "Something went wrong" para perfil que
 existe; perfil que não existe mostra "Esta página não está disponível".
+**Pistas montadas no código.** O modelo da triagem pesquisava o nome completo
+da planilha ("Izabela Lidia Soares Cardeal"), que nunca é o nome do perfil
+("Izabela Cardeal", `@izabelacardealdermato`). Agora `pistas()` tira do nome as
+pessoas (inclusive "Clínica Dra. X" e os médicos entre parênteses), corta a
+descrição, e manda o nome curto, até 15 @ prováveis e o CRM achado no nome ou
+nas colunas extras — médico costuma pôr o CRM na bio. Contra os 229 pares
+nome → @ da planilha de prospecção, o @ real está entre os palpites em 128
+(56%). Os palpites só orientam a pesquisa: a trava de "apareceu nos
+resultados" continua valendo.
+
 Cada candidato tem **"Não existe / não é ele"**: o @ sai da lista e vai no
 `excluir` das próximas buscas daquele lead (prompt e filtro), porque o índice
 devolve o mesmo perfil apagado toda vez. A lista fica no `localStorage` do
