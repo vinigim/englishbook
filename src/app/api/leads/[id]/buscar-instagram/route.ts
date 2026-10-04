@@ -134,7 +134,7 @@ export async function POST(
       excluir,
     });
     console.log(
-      `[buscar-instagram] lead ${id}: ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}, Instagram respondeu ${resultado.conferidos.responderam}/${resultado.conferidos.total}, ${resultado.inexistentes} inexistente(s)`,
+      `[buscar-instagram] lead ${id}: ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
     return NextResponse.json(resultado);
   } catch (err) {

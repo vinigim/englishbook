@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { toInstagramHandle } from "@/lib/leads/instagram";
-import { conferirPerfil, type PerfilConferido } from "@/lib/leads/instagram-perfil";
+import { montarPalpites, type Palpites } from "@/lib/leads/instagram-palpites";
 import { TRIAGE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd } from "./cost";
 
@@ -59,10 +59,6 @@ export type ResultadoBusca = {
   candidatos: CandidatoInstagram[];
   /** Candidatos que o modelo citou mas não estavam nos resultados. */
   descartados: number;
-  /** Candidatos tirados porque o Instagram disse que o perfil não existe. */
-  inexistentes: number;
-  /** @ prováveis conferidos direto no Instagram, e quantos responderam. */
-  conferidos: { total: number; responderam: number };
   /** O que a IA pesquisou, para entender uma busca que não achou nada. */
   consultas: string[];
   observacao: string | null;
@@ -118,113 +114,7 @@ Termine a resposta com um bloco JSON, e nada depois dele:
 {"candidatos":[{"handle":"perfil_sem_arroba","confianca":"alta|media|baixa","motivo":"frase curta em português","fonte":"URL do resultado onde viu"}],"observacao":"frase curta opcional"}
 \`\`\``;
 
-const PARTICULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
-
-/** Palavras que encerram o nome da pessoa: daí em diante é descrição. */
-const DESCRICAO =
-  /^(cl[ií]nica|est[eé]tica|avan[cç]ada|dermatolog\p{L}*|derma|cirurgi\p{L}*|pl[aá]stic\p{L}*|oftalmolog\p{L}*|blefaroplastia|harmoniza[cç][aã]o|odonto\p{L}*|dentista|m[eé]dic\p{L}*|crm\p{L}*|instituto|centro|hospital|em|no|na)$/iu;
-
-const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-const slug = (t: string) => semAcento(t).toLowerCase().replace(/[^a-z0-9]/g, "");
-
-type Pessoa = { titulo: "dr" | "dra" | null; partes: string[] };
-
-/**
- * Pessoas citadas no nome da planilha, como [primeiro, ..., último].
- *
- * "Dra. Izabela Lidia Soares Cardeal - Dermatologista" vira
- * [["Izabela", "Lidia", "Soares", "Cardeal"]]; "Clínica X (Dr. A B e Dra. C D)"
- * vira as duas pessoas dos parênteses; "Clínica Dra. Melissa Martins" vira
- * Melissa Martins. Sem nenhum "Dr."/"Dra.", só o primeiro trecho, e só se não
- * for nome de clínica.
- */
-function pessoasDoNome(nome: string): Pessoa[] {
-  const trechos = nome
-    .split(/\s[-–|]\s|[()/,;]|\s+e\s+(?=dra?\.?\s)/i)
-    .map((t) => t.trim())
-    .filter(Boolean);
-  const comTitulo = trechos
-    .map((t) => t.match(/(?:^|\s)(dra?)\.?\s+(.+)$/i))
-    .filter((m): m is RegExpMatchArray => m != null)
-    .map((m) => ({ titulo: m[1].toLowerCase() as "dr" | "dra", resto: m[2] }));
-  // Sem título: o primeiro trecho, cortado na descrição ("Ricardo Silveira
-  // Cirurgia Plástica" → Ricardo Silveira), se não começar como clínica.
-  const escolhidos = comTitulo.length
-    ? comTitulo
-    : /^(cl[ií]nica|instituto|centro|hospital|est[eé]tica|cirurgia)/i.test(trechos[0] ?? "")
-      ? []
-      : trechos.slice(0, 1).map((resto) => ({ titulo: null, resto }));
-
-  const pessoas: Pessoa[] = [];
-  for (const { titulo, resto } of escolhidos) {
-    const partes: string[] = [];
-    for (const p of resto.split(/\s+/)) {
-      if (DESCRICAO.test(p)) break;
-      if (/^\p{L}+$/u.test(p) && !PARTICULAS.has(p.toLowerCase())) partes.push(p);
-    }
-    if (partes.length >= 2) pessoas.push({ titulo, partes });
-  }
-  return pessoas.slice(0, 3);
-}
-
-type Pistas = { nomesCurtos: string[]; handles: string[]; pessoas: Pessoa[] };
-
-/** Pistas determinísticas: o modelo barato errava ao montá-las sozinho. */
-function montarPistas(d: DadosParaBusca): Pistas {
-  const contexto = semAcento(`${d.especialidade ?? ""} ${d.nomes.join(" ")}`).toLowerCase();
-  const sufixo = /dermat/.test(contexto)
-    ? "dermato"
-    : /oftalm|blefaro/.test(contexto)
-      ? "oftalmo"
-      : /plastic/.test(contexto)
-        ? "plastica"
-        : null;
-
-  const nomesCurtos: string[] = [];
-  const handles: string[] = [];
-  const pessoas = d.nomes.flatMap(pessoasDoNome);
-  for (const { titulo, partes } of pessoas) {
-    const [primeiro, segundo] = partes;
-    const ultimo = partes[partes.length - 1];
-    const penultimo = partes[partes.length - 2];
-    // Primeiro + último é o mais comum; com 3+ partes, também o nome composto
-    // ("Ana Laura Rezende" → analaurarezende) e o sobrenome do meio.
-    const combos: string[][] = [[primeiro, ultimo]];
-    if (partes.length >= 3) {
-      combos.push([primeiro, segundo, ultimo]);
-      if (penultimo.length >= 3) combos.push([primeiro, penultimo]);
-    }
-    for (const combo of combos) {
-      nomesCurtos.push(combo.join(" "));
-      const base = slug(combo.join(""));
-      const t = titulo ?? "dra";
-      handles.push(`${t}${base}`, base, `${t}.${base}`);
-      if (sufixo) handles.push(`${base}${sufixo}`, `${base}.${sufixo}`, `${base}_${sufixo}`);
-    }
-  }
-  // Sem médico com título, pode ser clínica: o @ costuma ser o nome dela
-  // junto, com ou sem a palavra "clínica".
-  if (!pessoas.some((p) => p.titulo)) {
-    for (const nome of d.nomes) {
-      const primeiro = nome.split(/\s[-–|]\s|[(),]/)[0] ?? "";
-      handles.push(
-        slug(primeiro),
-        slug(primeiro.replace(/\b(cl[ií]nica|de|da|do|e)\b/giu, "")),
-      );
-    }
-  }
-
-  const unicos = (l: string[]) => [...new Set(l.filter((h) => h.length >= 4))];
-  return {
-    nomesCurtos: unicos(nomesCurtos),
-    handles: unicos(handles)
-      .filter((h) => toInstagramHandle(h) === h && !d.excluir?.includes(h))
-      .slice(0, 15),
-    pessoas,
-  };
-}
-
-function pistas(d: DadosParaBusca, p: Pistas): string[] {
+function pistas(d: DadosParaBusca, p: Palpites): string[] {
   const linhas: string[] = [];
   if (p.nomesCurtos.length) linhas.push(`Nome curto: ${p.nomesCurtos.join(" / ")}`);
   if (d.crms?.length) linhas.push(`CRM: ${d.crms.join(", ")}`);
@@ -236,24 +126,7 @@ function pistas(d: DadosParaBusca, p: Pistas): string[] {
   return linhas;
 }
 
-/** Quantos @ prováveis conferir direto no Instagram, por busca. */
-const MAX_CONFERIR = 8;
-
-/** O nome do perfil tem o primeiro nome e um sobrenome de alguma pessoa do lead? */
-function nomeBate(nomePerfil: string | null, pessoas: Pessoa[]): boolean {
-  if (!nomePerfil) return false;
-  const n = slug(nomePerfil);
-  return pessoas.some(
-    ({ partes }) =>
-      n.includes(slug(partes[0])) && partes.slice(1).some((p) => p.length >= 3 && n.includes(slug(p))),
-  );
-}
-
-function descreverPerfil(p: PerfilConferido & { existe: true }): string {
-  return [p.nome, p.seguidores ? `${p.seguidores} seguidores` : null].filter(Boolean).join(", ");
-}
-
-function descreverLead(d: DadosParaBusca, p: Pistas): string {
+function descreverLead(d: DadosParaBusca, p: Palpites): string {
   const linhas = [
     d.nomes.length ? `Nome(s): ${d.nomes.join(" / ")}` : null,
     d.clinica ? `Clínica: ${d.clinica}` : null,
@@ -305,15 +178,10 @@ function apareceNosResultados(handle: string, resultados: string): boolean {
 
 export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoBusca> {
   const client = getAnthropic();
-  const p = montarPistas(dados);
+  const p = montarPalpites(dados);
   const mensagens: Anthropic.MessageParam[] = [
     { role: "user", content: descreverLead(dados, p) },
   ];
-
-  // Em paralelo com a IA: confere direto no Instagram os @ mais prováveis. A
-  // pesquisa não acha perfil pequeno; a prévia da página acha, se ele existir.
-  const aConferir = p.handles.slice(0, MAX_CONFERIR);
-  const conferenciaPalpites = Promise.all(aConferir.map((h) => conferirPerfil(h)));
 
   const conteudo: Anthropic.ContentBlock[] = [];
   let entrada = 0;
@@ -392,44 +260,6 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
     if (candidatos.length >= 3) break;
   }
 
-  // Confere também os candidatos da IA: o índice da pesquisa guarda perfil
-  // apagado. "Não existe" sai da lista; "não deu para saber" fica como estava.
-  const [doPalpite, daIa] = await Promise.all([
-    conferenciaPalpites,
-    Promise.all(candidatos.map((c) => conferirPerfil(c.handle))),
-  ]);
-  let inexistentes = 0;
-  const lidos: CandidatoInstagram[] = [];
-  const naoLidos: CandidatoInstagram[] = [];
-  candidatos.forEach((c, i) => {
-    const perfil = daIa[i];
-    if (perfil?.existe === false) inexistentes += 1;
-    else if (perfil?.existe) {
-      lidos.push({ ...c, motivo: `${c.motivo} · Perfil confirmado no Instagram: ${descreverPerfil(perfil)}.` });
-    } else naoLidos.push(c);
-  });
-
-  // Palpite que existe E tem o nome do lead no perfil entra mesmo sem ter
-  // aparecido na pesquisa: a página dele foi lida, o que vale mais que um
-  // título de resultado. Homônimo continua possível — por isso "média".
-  const jaListados = new Set(candidatos.map((c) => c.handle));
-  const dosPalpites: CandidatoInstagram[] = [];
-  aConferir.forEach((handle, i) => {
-    const perfil = doPalpite[i];
-    if (!perfil?.existe || jaListados.has(handle) || !nomeBate(perfil.nome, p.pessoas)) return;
-    jaListados.add(handle);
-    dosPalpites.push({
-      handle,
-      confianca: "media",
-      motivo: `Perfil existe no Instagram com o nome do lead (${descreverPerfil(perfil)}). Achado pelo @ provável, não pela pesquisa: confira a cidade e a especialidade.`,
-      fonte: `https://www.instagram.com/${handle}/`,
-    });
-  });
-
-  // Perfil lido primeiro: vale mais que um que só apareceu citado.
-  const finais = [...lidos, ...dosPalpites, ...naoLidos].slice(0, 3);
-  const responderam = [...doPalpite, ...daIa].filter((r) => r != null).length;
-
   const custoUsd =
     estimateCostUsd(TRIAGE_MODEL, {
       inputTokens: entrada,
@@ -439,10 +269,8 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
     pesquisas * PRECO_PESQUISA_USD;
 
   return {
-    candidatos: finais,
+    candidatos,
     descartados,
-    inexistentes,
-    conferidos: { total: aConferir.length + candidatos.length, responderam },
     consultas,
     observacao:
       typeof json?.observacao === "string" && json.observacao.trim()
