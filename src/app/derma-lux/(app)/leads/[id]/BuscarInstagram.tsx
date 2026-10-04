@@ -17,6 +17,9 @@ type Candidato = {
 type Resultado = {
   candidatos: Candidato[];
   descartados: number;
+  inexistentes: number;
+  conferidos: { total: number; responderam: number };
+  consultas: string[];
   observacao: string | null;
   pesquisas: number;
   custoUsd: number;
@@ -245,10 +248,21 @@ export function BuscarInstagram({
             {resultado.descartados > 0
               ? ` · ${resultado.descartados} sugestão(ões) descartada(s) por não aparecer nos resultados`
               : ""}
+            {resultado.inexistentes > 0
+              ? ` · ${resultado.inexistentes} perfil(is) tirado(s) porque não existe(m) mais`
+              : ""}
+            {resultado.conferidos.total > 0
+              ? ` · Instagram conferido: ${resultado.conferidos.responderam} de ${resultado.conferidos.total} @ responderam`
+              : ""}
             {resultado.candidatos.length > 0 && resultado.observacao
               ? ` · ${resultado.observacao}`
               : ""}
           </p>
+          {resultado.consultas.length > 0 ? (
+            <p className="text-[11px] text-muted">
+              Pesquisou: {resultado.consultas.map((q) => `“${q}”`).join(", ")}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
