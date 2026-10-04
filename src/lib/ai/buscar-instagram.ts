@@ -39,10 +39,10 @@ export type DadosParaBusca = {
   /** Colunas extras da planilha (site, e-mail…), só as curtas. */
   extras: [string, string][];
   /**
-   * Perfil que o dono marcou como errado (não existe, ou é de outra pessoa).
-   * Não pode voltar como candidato — nem pelo prompt, nem pelo filtro.
+   * Perfis que o dono marcou como errados (não existem, ou são de outra
+   * pessoa). Não podem voltar como candidato — nem pelo prompt, nem pelo filtro.
    */
-  excluir?: string | null;
+  excluir?: string[];
 };
 
 export type CandidatoInstagram = {
@@ -114,8 +114,9 @@ function descreverLead(d: DadosParaBusca): string {
     d.telefone ? `Telefone: ${d.telefone}` : null,
     ...d.extras.map(([k, v]) => `${k}: ${v}`),
   ].filter(Boolean);
-  const aviso = d.excluir
-    ? `\n\nO perfil @${d.excluir} está ERRADO (não existe ou não é deste lead). Não o proponha; procure outro.`
+  const excluir = d.excluir ?? [];
+  const aviso = excluir.length
+    ? `\n\nEstes perfis estão ERRADOS (não existem ou não são deste lead): ${excluir.map((h) => `@${h}`).join(", ")}. Não os proponha, mesmo que voltem na pesquisa; procure outro.`
     : "";
   return `Ache o Instagram deste lead:\n${linhas.join("\n")}${aviso}`;
 }
@@ -212,7 +213,7 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
 
   for (const c of json?.candidatos ?? []) {
     const handle = toInstagramHandle(typeof c.handle === "string" ? c.handle : null);
-    if (!handle || vistos.has(handle) || handle === dados.excluir) continue;
+    if (!handle || vistos.has(handle) || dados.excluir?.includes(handle)) continue;
     vistos.add(handle);
     if (!apareceNosResultados(handle, resultados)) {
       descartados += 1;

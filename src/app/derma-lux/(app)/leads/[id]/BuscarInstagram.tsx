@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +21,38 @@ type Resultado = {
   pesquisas: number;
   custoUsd: number;
 };
+
+/**
+ * Perfis que o dono marcou como "não existe" neste lead.
+ *
+ * O índice da pesquisa guarda perfil apagado ou renomeado, e sem isto o mesmo
+ * @ voltava a cada "Buscar de novo". Fica no navegador (localStorage), por
+ * lead: é conveniência de quem está conferindo, não dado do lead — e não pede
+ * migração. Em outro aparelho a lista começa vazia.
+ */
+const chaveRejeitados = (leadId: string) => `radar:ig-rejeitados:${leadId}`;
+
+function lerRejeitados(leadId: string): string[] {
+  try {
+    const bruto = window.localStorage.getItem(chaveRejeitados(leadId));
+    const lista: unknown = bruto ? JSON.parse(bruto) : [];
+    return Array.isArray(lista) ? lista.filter((h): h is string => typeof h === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function gravarRejeitados(leadId: string, lista: string[]) {
+  try {
+    if (lista.length) {
+      window.localStorage.setItem(chaveRejeitados(leadId), JSON.stringify(lista));
+    } else {
+      window.localStorage.removeItem(chaveRejeitados(leadId));
+    }
+  } catch {
+    // Sem armazenamento (aba anônima): vale só enquanto a ficha está aberta.
+  }
+}
 
 const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
   alta: "confiança alta",
@@ -52,6 +84,24 @@ export function BuscarInstagram({
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSalvar] = useTransition();
   const [manual, setManual] = useState("");
+  const [rejeitados, setRejeitados] = useState<string[]>([]);
+
+  // Lido depois de montar: no servidor não há localStorage.
+  useEffect(() => setRejeitados(lerRejeitados(leadId)), [leadId]);
+
+  function rejeitar(handle: string) {
+    const lista = [...new Set([...rejeitados, handle])].slice(-20);
+    setRejeitados(lista);
+    gravarRejeitados(leadId, lista);
+    setResultado((r) =>
+      r ? { ...r, candidatos: r.candidatos.filter((c) => c.handle !== handle) } : r,
+    );
+  }
+
+  function limparRejeitados() {
+    setRejeitados([]);
+    gravarRejeitados(leadId, []);
+  }
 
   async function buscar() {
     setBuscando(true);
@@ -61,7 +111,9 @@ export function BuscarInstagram({
       const res = await fetch(`/api/leads/${leadId}/buscar-instagram`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(atual ? { excluir: atual } : {}),
+        body: JSON.stringify({
+          excluir: [...new Set([...(atual ? [atual] : []), ...rejeitados])].slice(-20),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -175,6 +227,14 @@ export function BuscarInstagram({
                     >
                       Usar este
                     </Button>
+                    <button
+                      type="button"
+                      onClick={() => rejeitar(c.handle)}
+                      disabled={salvando}
+                      className="px-2 py-1 text-muted underline hover:text-ink"
+                    >
+                      Não existe / não é ele
+                    </button>
                   </div>
                 </li>
               ))}
@@ -190,6 +250,15 @@ export function BuscarInstagram({
               : ""}
           </p>
         </div>
+      ) : null}
+
+      {rejeitados.length > 0 ? (
+        <p className="text-[11px] text-muted">
+          Não voltam na busca: {rejeitados.map((h) => `@${h}`).join(", ")} ·{" "}
+          <button type="button" onClick={limparRejeitados} className="underline hover:text-ink">
+            limpar
+          </button>
+        </p>
       ) : null}
 
       {erro ? (
