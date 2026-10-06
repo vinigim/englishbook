@@ -283,6 +283,26 @@ login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
   @ marcado, mesmo que a planilha traga outro. Sem a migração, as duas pontas
   seguem funcionando com a regra antiga (a planilha manda).
 
+### Buscar Instagram em lote
+
+Nos chips **"Nunca abordado"** e **"Nunca abordado sem WhatsApp"**, um painel
+acima da lista roda a mesma busca da ficha em até 10 leads por clique, de cima
+para baixo, duas por vez (`BuscaInstagramLote.tsx`, rota
+`/api/leads/[id]/buscar-instagram`).
+
+- Pula quem já tem Instagram e quem já foi buscado.
+- **Nada é salvo sozinho.** Cada achado vai para "Para conferir" com o link do
+  perfil, "Usar" (`definirInstagram`) e "Não é ele". A IA já deu confiança
+  alta a perfil que não existia.
+- Os achados ficam no navegador (`localStorage`, `radar:ig-lote`): fechar a
+  tela não joga fora busca paga. Os buscados sem resultado também ficam lá,
+  para o lote seguinte não repetir. "incluir de novo" os devolve à fila.
+- "Não é ele" usa a mesma lista de rejeitados da ficha
+  (`radar:ig-rejeitados:<id>`), e a próxima busca daquele lead a recebe como
+  `excluir`.
+- O laço roda no navegador: sair da tela interrompe. Chave da IA ausente ou
+  pesquisa desligada param o lote no primeiro erro.
+
 ### Sincronização do direct (parada: depende da revisão da Meta)
 
 **Estado atual:** o código existe, mas os botões foram tirados do radar. Com o

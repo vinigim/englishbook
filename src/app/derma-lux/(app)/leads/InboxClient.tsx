@@ -26,6 +26,7 @@ import {
   temperaturaEfetiva,
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
+import { BuscaInstagramLote } from "./BuscaInstagramLote";
 import { guardarFiltrosDoRadar } from "./filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
@@ -390,6 +391,12 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
           className="w-full px-3 py-2 text-base sm:text-sm bg-paper border border-line focus:border-ink focus:outline-none"
         />
       </div>
+
+      {/* Só nos chips de "Nunca abordado": é quem ainda precisa de um canal
+          para a primeira mensagem. */}
+      {filtro === "nunca_abordado" || filtro === "nunca_abordado_sem_whatsapp" ? (
+        <BuscaInstagramLote fila={visiveis} todos={rows} />
+      ) : null}
 
       {visiveis.length === 0 ? (
         <p className="text-muted text-sm py-8 text-center">
