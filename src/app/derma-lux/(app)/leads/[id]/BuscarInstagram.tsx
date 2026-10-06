@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { instagramProfileUrl } from "@/lib/leads/instagram";
 import { montarPalpites } from "@/lib/leads/instagram-palpites";
+import { gravarRejeitados, lerRejeitados } from "@/lib/leads/instagram-rejeitados";
 import { definirInstagram } from "../../../leads-actions";
 
 type Candidato = {
@@ -23,38 +24,6 @@ type Resultado = {
   pesquisas: number;
   custoUsd: number;
 };
-
-/**
- * Perfis que o dono marcou como "não existe" neste lead.
- *
- * O índice da pesquisa guarda perfil apagado ou renomeado, e sem isto o mesmo
- * @ voltava a cada "Buscar de novo". Fica no navegador (localStorage), por
- * lead: é conveniência de quem está conferindo, não dado do lead — e não pede
- * migração. Em outro aparelho a lista começa vazia.
- */
-const chaveRejeitados = (leadId: string) => `radar:ig-rejeitados:${leadId}`;
-
-function lerRejeitados(leadId: string): string[] {
-  try {
-    const bruto = window.localStorage.getItem(chaveRejeitados(leadId));
-    const lista: unknown = bruto ? JSON.parse(bruto) : [];
-    return Array.isArray(lista) ? lista.filter((h): h is string => typeof h === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function gravarRejeitados(leadId: string, lista: string[]) {
-  try {
-    if (lista.length) {
-      window.localStorage.setItem(chaveRejeitados(leadId), JSON.stringify(lista));
-    } else {
-      window.localStorage.removeItem(chaveRejeitados(leadId));
-    }
-  } catch {
-    // Sem armazenamento (aba anônima): vale só enquanto a ficha está aberta.
-  }
-}
 
 const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
   alta: "confiança alta",
