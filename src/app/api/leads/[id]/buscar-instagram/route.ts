@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isAiConfigured } from "@/lib/ai/anthropic";
@@ -140,6 +141,21 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Falha na busca.";
     console.error("[buscar-instagram] falha:", message);
+    // Limite de taxa (429) ou API sobrecarregada (529): cada busca lê dezenas
+    // de milhares de tokens de resultado, e buscas em sequência estouram o
+    // limite por minuto da conta. Some sozinho; o lote espera e tenta de novo.
+    if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+      return NextResponse.json(
+        {
+          error: "rate_limited",
+          message:
+            err.status === 429
+              ? "Limite de uso por minuto da IA atingido. Espere um minuto e tente de novo."
+              : "A IA está sobrecarregada agora. Tente de novo em instantes.",
+        },
+        { status: 429 },
+      );
+    }
     // Pesquisa desligada na organização da Anthropic é o erro provável no
     // primeiro uso, e só o dono resolve — no console, não aqui.
     const desligada = /web.?search|not enabled|not allowed|permission/i.test(message);

@@ -287,8 +287,12 @@ login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
 
 Nos chips **"Nunca abordado"** e **"Nunca abordado sem WhatsApp"**, um painel
 acima da lista roda a mesma busca da ficha em até 10 leads por clique, de cima
-para baixo, duas por vez (`BuscaInstagramLote.tsx`, rota
-`/api/leads/[id]/buscar-instagram`).
+para baixo, uma por vez (`BuscaInstagramLote.tsx`, rota
+`/api/leads/[id]/buscar-instagram`). Duas simultâneas falharam as dez no
+primeiro teste: cada busca lê dezenas de milhares de tokens de resultado e
+estoura o limite por minuto da conta. Limite (a rota devolve 429) ou tempo
+esgotado (504) esperam 1 minuto e repetem o lead uma vez; o motivo da falha
+aparece na tela, e três falhas seguidas param o lote.
 
 - Pula quem já tem Instagram e quem já foi buscado.
 - **Nada é salvo sozinho.** Cada achado vai para "Para conferir" com o link do

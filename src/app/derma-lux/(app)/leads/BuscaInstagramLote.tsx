@@ -55,8 +55,21 @@ function gravarAchados(mapa: Record<string, Achado>) {
  */
 const LOTE = 10;
 
-/** Buscas simultâneas. Mais que isso esbarra no limite de taxa da API. */
-const PARALELO = 2;
+/**
+ * Espera antes de repetir uma busca barrada pelo limite da IA.
+ *
+ * Cada busca lê dezenas de milhares de tokens de resultado, e o limite da
+ * conta é por minuto: duas buscas simultâneas falharam as dez num teste real.
+ * Por isso também o lote vai uma de cada vez.
+ */
+const ESPERA_LIMITE_MS = 60_000;
+
+/** Resposta que vale esperar e repetir: limite da IA ou tempo esgotado. */
+function passageira(status: number): boolean {
+  return status === 429 || status === 504;
+}
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
   alta: "alta",
@@ -146,48 +159,70 @@ export function BuscaInstagramLote({
         .join(" · ");
     setStatus(`Buscando… ${resumo()}`);
 
-    const restantes = [...lote];
-    async function trabalhador() {
-      while (restantes.length && !parar.current) {
-        const row = restantes.shift()!;
-        const id = row.lead.id;
-        try {
-          const res = await fetch(`/api/leads/${id}/buscar-instagram`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ excluir: lerRejeitados(id).slice(-20) }),
-          });
-          const json = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            // Chave ausente ou pesquisa desligada falham em todos os leads:
-            // parar poupa nove esperas iguais.
-            if (json.error === "ai_not_configured" || /desligada/.test(json.message ?? "")) {
-              parar.current = true;
-              setErro(json.message ?? "A busca falhou.");
-            }
-            falhas += 1;
-          } else {
-            const candidatos = (json.candidatos ?? []) as Candidato[];
-            custo += Number(json.custoUsd) || 0;
-            if (candidatos.length) achou += 1;
-            atualizar((m) => ({
-              ...m,
-              [id]: {
-                em: new Date().toISOString(),
-                candidatos,
-                observacao: json.observacao ?? null,
-              },
-            }));
-          }
-        } catch {
-          falhas += 1;
-        }
-        feitos += 1;
-        setStatus(`Buscando… ${resumo()}`);
+    /** Uma busca. Devolve o erro, ou null se deu certo. */
+    async function buscarUm(id: string): Promise<{ status: number; msg: string } | null> {
+      let res: Response;
+      try {
+        res = await fetch(`/api/leads/${id}/buscar-instagram`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ excluir: lerRejeitados(id).slice(-20) }),
+        });
+      } catch {
+        return { status: 0, msg: "Falha de rede." };
       }
+      // Tempo esgotado na Vercel volta em HTML, não JSON.
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          status: res.status,
+          msg:
+            json.message ??
+            (res.status === 504
+              ? "A busca passou do tempo máximo (60s)."
+              : `${json.error ?? "erro"} (HTTP ${res.status})`),
+        };
+      }
+      const candidatos = (json.candidatos ?? []) as Candidato[];
+      custo += Number(json.custoUsd) || 0;
+      if (candidatos.length) achou += 1;
+      atualizar((m) => ({
+        ...m,
+        [id]: {
+          em: new Date().toISOString(),
+          candidatos,
+          observacao: json.observacao ?? null,
+        },
+      }));
+      return null;
     }
 
-    await Promise.all(Array.from({ length: PARALELO }, trabalhador));
+    let seguidas = 0;
+    for (const row of lote) {
+      if (parar.current) break;
+      let falha = await buscarUm(row.lead.id);
+      if (falha && passageira(falha.status) && !parar.current) {
+        setStatus(`${falha.msg} Esperando 1 minuto… ${resumo()}`);
+        await esperar(ESPERA_LIMITE_MS);
+        if (!parar.current) falha = await buscarUm(row.lead.id);
+      }
+      feitos += 1;
+      if (falha) {
+        falhas += 1;
+        seguidas += 1;
+        // O motivo na tela: "10 falha(s)" sozinho não dizia o que fazer.
+        setErro(falha.msg);
+        // Chave ausente, pesquisa desligada, ou falhas em série: os próximos
+        // falhariam igual, e cada tentativa pode custar.
+        if (falha.status === 500 || /desligada/.test(falha.msg) || seguidas >= 3) {
+          parar.current = true;
+        }
+      } else {
+        seguidas = 0;
+      }
+      setStatus(`Buscando… ${resumo()}`);
+    }
+
     setStatus(`${parar.current ? "Parado" : "Pronto"}: ${resumo()}`);
     setRodando(false);
   }
@@ -248,7 +283,7 @@ export function BuscaInstagramLote({
         ) : null}
       </div>
       <p className="text-xs text-muted">
-        Busca os leads desta lista sem Instagram, de cima para baixo
+        Busca os leads desta lista sem Instagram, um por vez, de cima para baixo
         {pendentes.length > LOTE ? ` (${pendentes.length} na fila)` : ""}. Mantenha esta
         tela aberta enquanto busca. Nada é salvo sem você conferir.
         {semResultado > 0 ? (
