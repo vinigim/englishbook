@@ -64,6 +64,8 @@ export type ResultadoBusca = {
   observacao: string | null;
   pesquisas: number;
   custoUsd: number;
+  /** Modelo que fez a busca. */
+  modelo: string;
 };
 
 const SISTEMA = `Você ajuda a Lux Derma, empresa que aluga lasers para médicos e clínicas de estética no Brasil, a achar o perfil do Instagram de um lead.
@@ -176,7 +178,15 @@ function apareceNosResultados(handle: string, resultados: string): boolean {
   );
 }
 
-export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoBusca> {
+/**
+ * `modelo`: Haiku na busca em lote (volume, custo) e Sonnet na ficha, onde o
+ * dono busca um lead de cada vez e paga mais por um julgamento melhor dos
+ * candidatos. Quem escolhe é a rota.
+ */
+export async function buscarInstagram(
+  dados: DadosParaBusca,
+  modelo: string = TRIAGE_MODEL,
+): Promise<ResultadoBusca> {
   const client = getAnthropic();
   const p = montarPalpites(dados);
   const mensagens: Anthropic.MessageParam[] = [
@@ -191,7 +201,7 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
 
   for (let rodada = 0; rodada <= MAX_CONTINUACOES; rodada += 1) {
     const resposta = await client.messages.create({
-      model: TRIAGE_MODEL,
+      model: modelo,
       max_tokens: 2000,
       system: SISTEMA,
       tools: [
@@ -261,7 +271,7 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
   }
 
   const custoUsd =
-    estimateCostUsd(TRIAGE_MODEL, {
+    estimateCostUsd(modelo, {
       inputTokens: entrada,
       outputTokens: saida,
       cacheReadTokens: cacheLido,
@@ -280,5 +290,6 @@ export async function buscarInstagram(dados: DadosParaBusca): Promise<ResultadoB
           : "A IA não devolveu a resposta no formato esperado.",
     pesquisas,
     custoUsd: Math.round(custoUsd * 10_000) / 10_000,
+    modelo,
   };
 }

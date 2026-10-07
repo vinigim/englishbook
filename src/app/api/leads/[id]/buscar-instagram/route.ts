@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { isAiConfigured } from "@/lib/ai/anthropic";
+import { DRAFT_MODEL, TRIAGE_MODEL, isAiConfigured } from "@/lib/ai/anthropic";
 import { buscarInstagram } from "@/lib/ai/buscar-instagram";
 import { extraFields, formatPhoneBR } from "@/app/derma-lux/leads-shared";
 import { toInstagramHandle } from "@/lib/leads/instagram";
@@ -31,6 +31,12 @@ const bodySchema = z.object({
    * buscas anteriores que não existem. A busca não pode devolvê-los.
    */
   excluir: z.array(z.string().max(200)).max(20).optional(),
+  /**
+   * Busca em lote do Radar: usa o Haiku, barato, porque roda em dezenas de
+   * leads. Sem isto (a ficha), usa o Sonnet: um lead por vez, e o dono pediu o
+   * julgamento melhor ali.
+   */
+  lote: z.boolean().optional(),
 });
 
 export async function POST(
@@ -133,9 +139,9 @@ export async function POST(
       extras,
       crms,
       excluir,
-    });
+    }, parsed.data.lote ? TRIAGE_MODEL : DRAFT_MODEL);
     console.log(
-      `[buscar-instagram] lead ${id}: ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
+      `[buscar-instagram] lead ${id} (${resultado.modelo}): ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
     return NextResponse.json(resultado);
   } catch (err) {

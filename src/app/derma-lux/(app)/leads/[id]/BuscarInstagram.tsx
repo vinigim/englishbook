@@ -23,6 +23,7 @@ type Resultado = {
   observacao: string | null;
   pesquisas: number;
   custoUsd: number;
+  modelo?: string;
 };
 
 const CONFIANCA_LABEL: Record<Candidato["confianca"], string> = {
@@ -273,6 +274,7 @@ export function BuscarInstagram({
           )}
           <p className="text-[11px] text-muted">
             {resultado.pesquisas} pesquisa(s) · US$ {resultado.custoUsd.toFixed(4)}
+            {resultado.modelo ? ` · ${resultado.modelo}` : ""}
             {resultado.descartados > 0
               ? ` · ${resultado.descartados} sugestão(ões) descartada(s) por não aparecer nos resultados`
               : ""}
