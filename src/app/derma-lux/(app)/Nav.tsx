@@ -11,6 +11,7 @@ import { dlLogout } from "../auth-actions";
 const LINKS = [
   { href: "/derma-lux", label: "Agenda" },
   { href: "/derma-lux/leads", label: "Leads" },
+  { href: "/derma-lux/parametros", label: "Parâmetros CO2" },
   { href: "/derma-lux/disponibilidade", label: "Disponibilidade Locação" },
   {
     href: "/derma-lux/disponibilidade-clinica",
