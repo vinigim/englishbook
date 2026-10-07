@@ -23,6 +23,7 @@ lasers to doctors and aesthetic clinics. It has two areas, both behind the same 
 |---|---|
 | `/derma-lux` | Rental agenda: equipment, rentals, availability, schedule blocks |
 | `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI |
+| `/derma-lux/parametros` | AI recommender for SmartXide Punto (CO2 laser) settings |
 
 `/` redirects to `/derma-lux` (`next.config.mjs`). UI language is pt-BR throughout.
 
@@ -90,6 +91,24 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
 button calls it: bulk sending through an unofficial provider is what gets numbers
 banned, so messages go out through the owner's own WhatsApp.
+
+### Parâmetros CO2 (laser settings recommender)
+
+The form posts a case (indication, region, Fitzpatrick type, history) to
+`/api/laser/recomendar`, which asks Opus (`LASER_MODEL`, default `claude-opus-5-5`)
+for every SmartXide Punto setting with its reason and the knowledge-base ids it used.
+
+- **Knowledge base** — `src/lib/laser/base-conhecimento.ts`. Small enough (~6k tokens
+  with the instructions) to go whole into a cached system block, so there is no vector
+  search. Ids are stable and stored in saved consultations: never rename one. Any text
+  change → bump `KB_VERSAO`; keep the array order fixed or the prompt cache breaks.
+- **Guards in code** — `src/lib/laser/guardas.ts`. Absolute contraindications block the
+  request before any API call; device limits and conservative phototype/region rules
+  are checked on the answer and shown as warnings. Warnings never silently rewrite the
+  model's numbers.
+- **Persistence** — `laser_consultas` (`0021`, `lux_staff` RLS). Same case + same
+  `KB_VERSAO`/`PROMPT_VERSAO`/model → the saved answer is returned for free. The route
+  checks `lux_staff` itself before spending on the API.
 
 ### Two caching layers in the AI pipeline (this is the owner's money)
 

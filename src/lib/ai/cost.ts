@@ -20,12 +20,19 @@ const PRECOS: Record<string, Preco> = {
   "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1 },
   "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2 },
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5 },
+  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
 };
 
 export type TokenUsage = {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
+  /**
+   * Tokens gravados no cache nesta chamada, já incluídos em `inputTokens`.
+   * Custam mais que a entrada comum: 1,25× com TTL de 5 min, 2× com TTL de 1 h.
+   */
+  cacheWriteTokens?: number;
+  cacheWriteMultiplier?: number;
 };
 
 export function estimateCostUsd(model: string, usage: TokenUsage): number {
@@ -35,11 +42,13 @@ export function estimateCostUsd(model: string, usage: TokenUsage): number {
   if (!preco) return 0;
 
   const cacheRead = usage.cacheReadTokens ?? 0;
-  const entradaCheia = Math.max(usage.inputTokens - cacheRead, 0);
+  const cacheWrite = usage.cacheWriteTokens ?? 0;
+  const entradaCheia = Math.max(usage.inputTokens - cacheRead - cacheWrite, 0);
 
   const total =
     (entradaCheia / 1_000_000) * preco.input +
     (cacheRead / 1_000_000) * preco.cacheRead +
+    (cacheWrite / 1_000_000) * preco.input * (usage.cacheWriteMultiplier ?? 1.25) +
     (usage.outputTokens / 1_000_000) * preco.output;
 
   // 6 casas é a precisão da coluna numeric(10,6) em wa_lead_analyses.
