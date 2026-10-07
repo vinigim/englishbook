@@ -166,7 +166,7 @@ export function BuscaInstagramLote({
         res = await fetch(`/api/leads/${id}/buscar-instagram`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ excluir: lerRejeitados(id).slice(-20) }),
+          body: JSON.stringify({ excluir: lerRejeitados(id).slice(-20), lote: true }),
         });
       } catch {
         return { status: 0, msg: "Falha de rede." };

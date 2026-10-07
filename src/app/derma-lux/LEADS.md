@@ -283,6 +283,11 @@ login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
   @ marcado, mesmo que a planilha traga outro. Sem a migração, as duas pontas
   seguem funcionando com a regra antiga (a planilha manda).
 
+**Modelo:** a busca da ficha usa o Sonnet (`DRAFT_MODEL`), um lead por vez,
+para julgar melhor os candidatos; a busca em lote manda `lote: true` e usa o
+Haiku (`TRIAGE_MODEL`), mais barato, porque roda em dezenas de leads. O
+modelo aparece ao lado do custo na ficha.
+
 ### Buscar Instagram em lote
 
 Nos chips **"Nunca abordado"** e **"Nunca abordado sem WhatsApp"**, um painel
