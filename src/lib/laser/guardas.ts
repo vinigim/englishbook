@@ -1,5 +1,13 @@
 import {
+  LESOES_FOCAIS,
+  grupoDoFototipo,
+  limitesDoGrupo,
+  num,
+  type LesaoFocalId,
+} from "./protocolo-premium";
+import {
   ACHADOS_DE_RISCO,
+  type ParametroNumerico,
   type EntradaConsulta,
   type Historico,
   type Recomendacao,
@@ -26,7 +34,7 @@ import {
 //  Limites do aparelho (ver trecho "equip-limites" da base)
 // ============================================================================
 export const LIMITES = {
-  potencia_w: { min: 1, max: 50, maxLiteratura: 30 },
+  potencia_w: { min: 1, max: 50 },
   dwell_time_us: { min: 200, max: 2000 },
   spacing_um: { min: 200, max: 1000 },
   smartstack: { min: 1, max: 5 },
@@ -71,6 +79,7 @@ export function recomendacaoBloqueada(motivo: string): Recomendacao {
     motivo_confianca: "Contraindicação absoluta, aplicada pelo sistema sem consultar a IA.",
     perguntas_pendentes: [],
     analise_foto: null,
+    parametros_focada: null,
   };
 }
 
@@ -118,12 +127,20 @@ export function verificarRecomendacao(
     }
   }
 
+  // --- Peça focada: outra tabela, outros parâmetros --------------------------
+  if (entrada.indicacao === "lesao_focal") {
+    avisos.push(...verificarFocada(entrada, rec));
+    return avisos;
+  }
+
   if (rec.viabilidade !== "nao_recomendado" && !p) {
     avisos.push(
       "A IA indicou o tratamento mas não devolveu parâmetros. Gere a consulta de novo.",
     );
   }
   if (!p) return avisos;
+
+  const dwell = p.dwell_time_us?.valor ?? null;
 
   // --- Limites do aparelho ---------------------------------------------------
   const foraDoLimite = (
@@ -140,75 +157,95 @@ export function verificarRecomendacao(
     }
   };
   foraDoLimite("Potência", p.potencia_w.valor, LIMITES.potencia_w.min, LIMITES.potencia_w.max, "W");
-  foraDoLimite("Dwell time", p.dwell_time_us.valor, LIMITES.dwell_time_us.min, LIMITES.dwell_time_us.max, "µs");
+  if (dwell != null) {
+    foraDoLimite("Time", dwell, LIMITES.dwell_time_us.min, LIMITES.dwell_time_us.max, "µs");
+  }
   foraDoLimite("Spacing", p.spacing_um.valor, LIMITES.spacing_um.min, LIMITES.spacing_um.max, "µm");
   foraDoLimite("SmartStack", p.smartstack.valor, LIMITES.smartstack.min, LIMITES.smartstack.max, "");
 
   if (!Number.isInteger(p.smartstack.valor)) {
     avisos.push(`SmartStack precisa ser inteiro; a IA sugeriu ${p.smartstack.valor}.`);
   }
-  if (
-    p.potencia_w.valor > LIMITES.potencia_w.maxLiteratura &&
-    p.potencia_w.valor <= LIMITES.potencia_w.max
-  ) {
+  // No HP o time não se ajusta; nos outros pulsos ele é obrigatório.
+  if (p.modo_emissao.valor !== "HP" && dwell == null) {
     avisos.push(
-      `Potência acima de ${LIMITES.potencia_w.maxLiteratura} W não aparece nos estudos com o scanner DOT.`,
+      `O pulso ${p.modo_emissao.valor} precisa de time, e a IA não informou. Gere a consulta de novo.`,
     );
   }
 
   // --- Valor dentro da própria faixa ----------------------------------------
-  for (const [nome, param] of [
+  const numericos: [string, ParametroNumerico | null][] = [
     ["Potência", p.potencia_w],
-    ["Dwell time", p.dwell_time_us],
+    ["Time", p.dwell_time_us],
     ["Spacing", p.spacing_um],
     ["SmartStack", p.smartstack],
-  ] as const) {
-    if (param.valor < param.faixa_min || param.valor > param.faixa_max) {
+  ];
+  for (const [nome, param] of numericos) {
+    if (param && (param.valor < param.faixa_min || param.valor > param.faixa_max)) {
       avisos.push(
         `${nome}: o valor sugerido (${param.valor}) está fora da faixa que a própria IA indicou (${param.faixa_min}–${param.faixa_max}).`,
       );
     }
   }
 
-  // --- Regras conservadoras por fototipo -------------------------------------
-  const fototipoAlto = ["IV", "V", "VI"].includes(entrada.fototipo);
-  const fototipoMuitoAlto = ["V", "VI"].includes(entrada.fototipo);
+  // --- Protocolo Premium: o que ele usa para o grupo de fototipo --------------
+  // Os limites saem das tabelas (protocolo-premium.ts): um valor além do que o
+  // protocolo usa para o grupo do paciente, em qualquer indicação, merece aviso.
+  const grupo = grupoDoFototipo(entrada.fototipo);
+  const lim = limitesDoGrupo(grupo);
+  const fototipoTexto = `fototipo ${grupo.replace("-", " e ")}`;
+  if (p.potencia_w.valor > lim.wattsMax) {
+    avisos.push(
+      `Potência de ${p.potencia_w.valor} W: acima do maior valor do protocolo Premium para ${fototipoTexto} (${lim.wattsMax} W).`,
+    );
+  }
+  if (dwell != null && dwell > lim.timeMax) {
+    avisos.push(
+      `Time de ${dwell} µs: acima do maior valor do protocolo Premium para ${fototipoTexto} (${lim.timeMax} µs).`,
+    );
+  }
+  if (p.spacing_um.valor < lim.spacingMin) {
+    avisos.push(
+      `Spacing de ${p.spacing_um.valor} µm: abaixo do menor valor do protocolo Premium para ${fototipoTexto} (${lim.spacingMin} µm).`,
+    );
+  }
+  if (p.smartstack.valor > lim.stackMax) {
+    avisos.push(
+      `SmartStack ${p.smartstack.valor}: acima do maior stack das tabelas de pele do protocolo Premium (${lim.stackMax}).`,
+    );
+  }
 
-  if (fototipoAlto && p.dwell_time_us.valor > 800) {
-    avisos.push(
-      `Dwell de ${p.dwell_time_us.valor} µs em fototipo ${entrada.fototipo}: acima de 800 µs o risco de mancha sobe. Confira antes de usar.`,
-    );
-  }
-  if (fototipoMuitoAlto && p.spacing_um.valor < 800) {
-    avisos.push(
-      `Spacing de ${p.spacing_um.valor} µm em fototipo ${entrada.fototipo}: a regra conservadora é ≥ 800 µm.`,
-    );
-  }
+  const fototipoAlto = ["IV", "V", "VI"].includes(entrada.fototipo);
   if (fototipoAlto && p.modo_varredura.valor !== "SmartTrack") {
     avisos.push(
       `Em fototipo ${entrada.fototipo}, use SmartTrack para reduzir o acúmulo de calor.`,
     );
   }
 
-  // --- Regras conservadoras por região ---------------------------------------
+  // --- Região -----------------------------------------------------------------
   const peleFina =
     PELE_FINA.includes(entrada.regiao) ||
     entrada.caracteristicasPele.includes("fina_atrofica");
   if (peleFina) {
     if (p.smartstack.valor > 2) {
       avisos.push(
-        `SmartStack ${p.smartstack.valor} em pele fina: a regra conservadora é stack 1–2.`,
+        `SmartStack ${p.smartstack.valor} em pele fina: as tabelas de pálpebras e corporal suave usam stack 2.`,
       );
     }
     if (p.potencia_w.valor > 15) {
       avisos.push(
-        `Potência de ${p.potencia_w.valor} W em pele fina: acima do ponto de partida conservador (até ~12 W).`,
+        `Potência de ${p.potencia_w.valor} W em pele fina: as tabelas de pálpebras e corporal suave vão até 15 W.`,
       );
     }
   }
-  if (EXTRAFACIAL.includes(entrada.regiao) && p.spacing_um.valor < 600) {
+  // Rejuvenescimento e estrias no corpo: as tabelas corporais usam 750–900 µm.
+  // Manchas e cicatrizes pontuais usam spacing baixo de propósito e ficam fora.
+  const tratamentoDeArea =
+    entrada.extensao === "regiao_inteira" &&
+    ["rejuvenescimento", "estrias_rubras", "estrias_albas"].includes(entrada.indicacao);
+  if (EXTRAFACIAL.includes(entrada.regiao) && tratamentoDeArea && p.spacing_um.valor < 750) {
     avisos.push(
-      `Spacing de ${p.spacing_um.valor} µm fora da face: a cicatrização é mais lenta; a regra conservadora é ≥ 800 µm.`,
+      `Spacing de ${p.spacing_um.valor} µm fora da face: as tabelas corporais do protocolo usam 750–900 µm.`,
     );
   }
   if (EXTRAFACIAL.includes(entrada.regiao) && p.passadas.valor > 1) {
@@ -224,12 +261,12 @@ export function verificarRecomendacao(
     }
     if (
       p.spacing_um.valor < 800 ||
-      p.dwell_time_us.valor > 400 ||
+      (dwell ?? 0) > 400 ||
       p.smartstack.valor > 1 ||
       p.potencia_w.valor > 15
     ) {
       avisos.push(
-        "Os protocolos publicados de melasma usam ~12 W, spacing ~800 µm, dwell ~300 µs e stack 1. Esta sugestão é mais agressiva.",
+        "Os estudos publicados de melasma usam ~12 W, spacing ~800 µm, time ~300 µs e stack 1. Esta sugestão é mais agressiva.",
       );
     }
   }
@@ -245,15 +282,18 @@ export function verificarRecomendacao(
   // --- Sessão anterior --------------------------------------------------------
   const ant = entrada.sessao === "subsequente" ? entrada.sessaoAnterior : null;
   if (ant) {
-    // "Mais agressivo": mais potência, dwell ou stack, ou spacing mais fechado.
+    // "Mais agressivo": mais potência, time ou stack, ou spacing mais fechado.
     const comparacoes = [
       { nome: "Potência", atual: p.potencia_w.valor, antes: ant.potencia, sobe: true, u: "W" },
-      { nome: "Dwell time", atual: p.dwell_time_us.valor, antes: ant.dwell, sobe: true, u: "µs" },
+      { nome: "Time", atual: dwell, antes: ant.dwell, sobe: true, u: "µs" },
       { nome: "SmartStack", atual: p.smartstack.valor, antes: ant.stack, sobe: true, u: "" },
       { nome: "Spacing", atual: p.spacing_um.valor, antes: ant.spacing, sobe: false, u: "µm" },
-    ];
-    const maisAgressivos = comparacoes.filter(
-      (c) => c.antes != null && (c.sobe ? c.atual > c.antes : c.atual < c.antes),
+    ].filter(
+      (c): c is { nome: string; atual: number; antes: number; sobe: boolean; u: string } =>
+        c.atual != null && c.antes != null,
+    );
+    const maisAgressivos = comparacoes.filter((c) =>
+      c.sobe ? c.atual > c.antes : c.atual < c.antes,
     );
 
     if (ant.teveHpi) {
@@ -269,7 +309,7 @@ export function verificarRecomendacao(
         );
       }
       for (const c of maisAgressivos) {
-        if (c.antes == null || c.antes === 0) continue;
+        if (c.antes === 0) continue;
         const variacao = Math.abs(c.atual - c.antes) / c.antes;
         // Stack sobe de 1 em 1: 1 → 2 é +100% e é o passo normal.
         if (c.nome !== "SmartStack" && variacao > 0.25) {
@@ -293,6 +333,61 @@ export function verificarRecomendacao(
     );
   }
 
+  return avisos;
+}
+
+// ============================================================================
+//  Peça focada
+// ============================================================================
+const MELANOCITICAS: readonly LesaoFocalId[] = ["nevo_dermico"];
+const PRE_MALIGNAS: readonly LesaoFocalId[] = [
+  "queratose_actinica",
+  "queilite_actinica",
+  "leucoplasia",
+];
+
+function verificarFocada(entrada: EntradaConsulta, rec: Recomendacao): string[] {
+  const avisos: string[] = [];
+  const f = rec.parametros_focada;
+  const lesao = LESOES_FOCAIS.find((l) => l.id === entrada.lesaoFocal);
+
+  if (!lesao) {
+    avisos.push("Escolha a lesão na lista da peça focada para conferir com o protocolo.");
+  }
+  if (lesao && MELANOCITICAS.includes(lesao.id)) {
+    avisos.push(
+      "Nevo melanocítico: só com diagnóstico clínico e dermatoscópico. A vaporização destrói o material para histologia; na dúvida, biópsia antes.",
+    );
+  }
+  if (lesao && PRE_MALIGNAS.includes(lesao.id)) {
+    avisos.push(
+      `${lesao.nome} é pré-maligna: exclua carcinoma antes de vaporizar; considere biópsia.`,
+    );
+  }
+
+  if (rec.viabilidade !== "nao_recomendado" && !f) {
+    avisos.push(
+      "A IA indicou o tratamento mas não devolveu os parâmetros da peça focada. Gere a consulta de novo.",
+    );
+  }
+  if (!f || !lesao) return avisos;
+
+  // A tabela tem opções diferentes para a mesma lesão (ex.: SP 0,3 W ou CW
+  // 3 W na verruga): compara com a opção do mesmo modo, se houver.
+  const opcoes = LESOES_FOCAIS.filter((l) => l.nome.split(" (opção")[0] === lesao.nome.split(" (opção")[0]);
+  const mesmaModo = opcoes.find((l) => l.modo === f.modo);
+  if (!mesmaModo) {
+    avisos.push(
+      `O protocolo Premium usa ${juntarComE(opcoes.map((o) => o.modo))} para ${lesao.nome.split(" (opção")[0]}; a IA sugeriu ${f.modo}.`,
+    );
+  } else if (f.potencia_w > mesmaModo.watts * 2) {
+    avisos.push(
+      `Potência de ${num(f.potencia_w)} W: mais que o dobro do protocolo Premium para ${mesmaModo.nome} em ${f.modo} (${num(mesmaModo.watts)} W).`,
+    );
+  }
+  if (f.modo === "CW" && f.frequencia_hz != null) {
+    avisos.push("No CW (contínuo) não há frequência; ignore o valor em Hz.");
+  }
   return avisos;
 }
 

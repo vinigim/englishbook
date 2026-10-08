@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IDS_BASE } from "./base-conhecimento";
+import { LESOES_FOCAIS_IDS } from "./protocolo-premium";
 import {
   ACHADOS_FOTO,
   ASSOCIACOES,
@@ -15,6 +16,7 @@ import {
   HISTORICOS,
   INDICACOES,
   MODOS_EMISSAO,
+  MODOS_FOCADA,
   MODOS_VARREDURA,
   REGIOES,
   SESSOES,
@@ -66,7 +68,10 @@ const PARAMETROS_JSON_SCHEMA = {
       additionalProperties: false,
     },
     potencia_w: numerico("Potência em watts."),
-    dwell_time_us: numerico("Dwell time em microssegundos (µs)."),
+    dwell_time_us: {
+      anyOf: [numerico("Time (dwell) em microssegundos (µs)."), { type: "null" }],
+      description: "null quando o pulso é HP: no HP o time não se ajusta.",
+    },
     spacing_um: numerico("Spacing / DOT pitch em micrômetros (µm)."),
     smartstack: numerico("Nível do SmartStack, inteiro de 1 a 5."),
     modo_varredura: {
@@ -229,6 +234,27 @@ export const RECOMENDACAO_JSON_SCHEMA = {
       ],
       description: "null quando não houver foto no caso.",
     },
+    parametros_focada: {
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            modo: { type: "string", enum: [...MODOS_FOCADA] },
+            potencia_w: { type: "number", description: "Potência em watts." },
+            frequencia_hz: {
+              type: ["number", "null"],
+              description: "Frequência em Hz; null no CW.",
+            },
+            motivo: { type: "string" },
+          },
+          required: ["modo", "potencia_w", "frequencia_hz", "motivo"],
+          additionalProperties: false,
+        },
+        { type: "null" },
+      ],
+      description:
+        "Só quando a indicação é lesão isolada com peça focada (sem scanner); nesse caso 'parametros' é null. Senão null.",
+    },
     perguntas_pendentes: {
       type: "array",
       items: { type: "string" },
@@ -250,6 +276,7 @@ export const RECOMENDACAO_JSON_SCHEMA = {
     "motivo_confianca",
     "perguntas_pendentes",
     "analise_foto",
+    "parametros_focada",
   ],
   additionalProperties: false,
 } as const;
@@ -269,7 +296,7 @@ export const recomendacaoSchema = z.object({
     .object({
       modo_emissao: z.object({ valor: z.enum(MODOS_EMISSAO), motivo: z.string() }),
       potencia_w: numericoZ,
-      dwell_time_us: numericoZ,
+      dwell_time_us: numericoZ.nullable(),
       spacing_um: numericoZ,
       smartstack: numericoZ,
       modo_varredura: z.object({
@@ -319,6 +346,16 @@ export const recomendacaoSchema = z.object({
     })
     .nullable()
     .default(null),
+  // Ausente nas consultas gravadas antes de o campo existir.
+  parametros_focada: z
+    .object({
+      modo: z.enum(MODOS_FOCADA),
+      potencia_w: z.number(),
+      frequencia_hz: z.number().nullable(),
+      motivo: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 
 // ============================================================================
@@ -346,6 +383,7 @@ const entradaObjeto = z.object({
   melasmaTipo: z.enum(TIPOS_MELASMA).nullable().default(null),
   melasmaRefratario: z.boolean().nullable().default(null),
   idadeCicatriz: z.enum(IDADES_CICATRIZ).nullable().default(null),
+  lesaoFocal: z.enum(LESOES_FOCAIS_IDS).nullable().default(null),
   regiao: z.enum(REGIOES, { message: "Escolha a região." }),
   extensao: z.enum(EXTENSOES).default("regiao_inteira"),
   grau: z.string().max(40).nullable().default(null),
