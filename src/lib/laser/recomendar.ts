@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { betaJSONSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/beta/json-schema";
+import type { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { estimateCostUsd } from "@/lib/ai/cost";
@@ -80,6 +80,25 @@ export type FotoEnviada = {
   mediaType: "image/jpeg" | "image/png" | "image/webp";
   base64: string;
   sha256: string;
+};
+
+/**
+ * A recomendação chega como chamada de ferramenta, e não por
+ * `output_config.format`.
+ *
+ * Com saída estruturada, a API compila o schema numa gramática, e a nossa
+ * passou do tamanho que ela aceita ("The compiled grammar is too large", 400
+ * em toda consulta) quando o schema cresceu. Ferramenta não estrita não
+ * compila gramática: o schema guia a IA, e quem garante o formato é o zod,
+ * com até duas devoluções para correção.
+ */
+const NOME_FERRAMENTA = "entregar_recomendacao";
+const MAX_TENTATIVAS = 3;
+const FERRAMENTA: Anthropic.Beta.BetaTool = {
+  name: NOME_FERRAMENTA,
+  description:
+    "Entrega ao médico a recomendação final de parâmetros. Chame exatamente uma vez, com todos os campos do schema.",
+  input_schema: RECOMENDACAO_JSON_SCHEMA as unknown as Anthropic.Beta.BetaTool.InputSchema,
 };
 
 type Resultado =
@@ -165,110 +184,160 @@ export async function recomendarParametros(
   }
 
   // --- 3. Chamada à IA --------------------------------------------------------
-  let message;
-  try {
-    message = await getAnthropic().beta.messages.parse({
-      model: LASER_MODEL,
-      max_tokens: 16000,
-      // Se o modelo recusar por política, a API repete a mesma chamada num
-      // modelo de reserva escolhido por ela, dentro da mesma requisição.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      system: [
+  // A conversa só cresce (append-only): a resposta inteira volta, com os
+  // blocos de thinking, quando é preciso pedir uma correção.
+  const conversa: Anthropic.Beta.BetaMessageParam[] = [
+    { role: "user", content: montarMensagem(entrada, fotos) },
+  ];
+  const uso = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  let model = LASER_MODEL;
+  let dados: z.infer<typeof recomendacaoSchema> | null = null;
+
+  for (let tentativa = 0; tentativa < MAX_TENTATIVAS && !dados; tentativa += 1) {
+    let message: Anthropic.Beta.BetaMessage;
+    try {
+      message = await getAnthropic().beta.messages.create({
+        model: LASER_MODEL,
+        max_tokens: 16000,
+        // Se o modelo recusar por política, a API repete a mesma chamada num
+        // modelo de reserva escolhido por ela, dentro da mesma requisição.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        // A ferramenta vem antes do system no prefixo, então entra no cache.
+        tools: [FERRAMENTA],
+        // "auto": o Opus 5.5 recusa tool_choice forçado (400). O prompt manda
+        // chamar a ferramenta, e o laço abaixo confere que ela foi chamada.
+        tool_choice: { type: "auto" },
+        system: [
+          {
+            type: "text",
+            text: buildSystemPrompt(),
+            // 1 h e não 5 min: consultas chegam espaçadas, ao longo do
+            // atendimento. Gravar custa 2× a entrada, mas uma única leitura
+            // dentro da hora já paga a diferença.
+            cache_control: { type: "ephemeral", ttl: "1h" },
+          },
+        ],
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+        messages: conversa,
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.RateLimitError) {
+        return {
+          ok: false,
+          error: "rate_limited",
+          message: "Limite de uso da IA atingido. Tente de novo em um minuto.",
+        };
+      }
+      if (err instanceof Anthropic.APIError) {
+        console.error("[laser-recomendar] erro da API", err.status, err.message);
+        // O motivo vai para a tela: "erro 400" sozinho não dá pista nenhuma, e
+        // quem vê a tela é a equipe (rota restrita a lux_staff), não o paciente.
+        const corpo = err.error as { error?: { message?: unknown } } | undefined;
+        const motivo =
+          typeof corpo?.error?.message === "string" ? corpo.error.message : err.message;
+        return {
+          ok: false,
+          error: "ai_error",
+          message: `A IA respondeu com erro ${err.status ?? ""}: ${motivo.slice(0, 300)}`,
+        };
+      }
+      throw err;
+    }
+
+    const u = message.usage;
+    const cacheRead = u.cache_read_input_tokens ?? 0;
+    const cacheWrite = u.cache_creation_input_tokens ?? 0;
+    // input_tokens da API não inclui o que foi lido ou gravado em cache.
+    uso.input += u.input_tokens + cacheRead + cacheWrite;
+    uso.output += u.output_tokens;
+    uso.cacheRead += cacheRead;
+    uso.cacheWrite += cacheWrite;
+    // Em caso de fallback, `message.model` é o modelo que de fato respondeu.
+    model = message.model;
+
+    if (message.stop_reason === "refusal") {
+      return {
+        ok: false,
+        error: "ai_refusal",
+        message: "A IA recusou este caso. Reformule as observações e tente de novo.",
+      };
+    }
+    if (message.stop_reason === "max_tokens") {
+      return {
+        ok: false,
+        error: "ai_truncated",
+        message: "A resposta da IA veio cortada. Tente de novo.",
+      };
+    }
+
+    const chamada = message.content.find(
+      (b): b is Anthropic.Beta.BetaToolUseBlock =>
+        b.type === "tool_use" && b.name === NOME_FERRAMENTA,
+    );
+    conversa.push({ role: "assistant", content: message.content });
+
+    if (!chamada) {
+      conversa.push({
+        role: "user",
+        content: `Entregue a recomendação chamando a ferramenta ${NOME_FERRAMENTA}, com todos os campos.`,
+      });
+      continue;
+    }
+
+    const parsed = recomendacaoSchema.safeParse(chamada.input);
+    if (parsed.success) {
+      dados = parsed.data;
+      break;
+    }
+
+    // Sem gramática, o formato não é garantido pela API: o erro volta para a
+    // IA corrigir, em vez de virar "formato inesperado" para o médico.
+    const problemas = parsed.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`)
+      .join("; ");
+    console.error("[laser-recomendar] formato inválido, pedindo correção", problemas);
+    conversa.push({
+      role: "user",
+      content: [
         {
-          type: "text",
-          text: buildSystemPrompt(),
-          // 1 h e não 5 min: consultas chegam espaçadas, ao longo do
-          // atendimento. Gravar custa 2× a entrada, mas uma única leitura
-          // dentro da hora já paga a diferença.
-          cache_control: { type: "ephemeral", ttl: "1h" },
+          type: "tool_result",
+          tool_use_id: chamada.id,
+          is_error: true,
+          content: `Formato inválido: ${problemas}. Chame ${NOME_FERRAMENTA} de novo com o formato certo.`,
         },
       ],
-      thinking: { type: "adaptive" },
-      output_config: {
-        effort: "high",
-        format: betaJSONSchemaOutputFormat(RECOMENDACAO_JSON_SCHEMA),
-      },
-      messages: [{ role: "user", content: montarMensagem(entrada, fotos) }],
     });
-  } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
-      return {
-        ok: false,
-        error: "rate_limited",
-        message: "Limite de uso da IA atingido. Tente de novo em um minuto.",
-      };
-    }
-    if (err instanceof Anthropic.APIError) {
-      console.error("[laser-recomendar] erro da API", err.status, err.message);
-      // O motivo vai para a tela: "erro 400" sozinho não dá pista nenhuma, e
-      // quem vê a tela é a equipe (rota restrita a lux_staff), não o paciente.
-      const corpo = err.error as { error?: { message?: unknown } } | undefined;
-      const motivo =
-        typeof corpo?.error?.message === "string" ? corpo.error.message : err.message;
-      return {
-        ok: false,
-        error: "ai_error",
-        message: `A IA respondeu com erro ${err.status ?? ""}: ${motivo.slice(0, 300)}`,
-      };
-    }
-    throw err;
   }
 
-  if (message.stop_reason === "refusal") {
-    return {
-      ok: false,
-      error: "ai_refusal",
-      message: "A IA recusou este caso. Reformule as observações e tente de novo.",
-    };
-  }
-  if (message.stop_reason === "max_tokens") {
-    return {
-      ok: false,
-      error: "ai_truncated",
-      message: "A resposta da IA veio cortada. Tente de novo.",
-    };
-  }
-
-  const parsed = recomendacaoSchema.safeParse(message.parsed_output);
-  if (!parsed.success) {
-    console.error("[laser-recomendar] formato inesperado", parsed.error.issues[0]);
+  if (!dados) {
     return {
       ok: false,
       error: "ai_bad_format",
-      message: "A IA devolveu um formato inesperado. Tente de novo.",
+      message: "A IA não entregou a recomendação no formato esperado. Tente de novo.",
     };
   }
 
   const recomendacao: Recomendacao = {
-    ...parsed.data,
-    fontes: parsed.data.fontes.filter((id) => IDS_BASE.includes(id)),
+    ...dados,
+    fontes: dados.fontes.filter((id) => IDS_BASE.includes(id)),
     // Sem foto não há o que analisar, diga o modelo o que disser.
-    analise_foto: fotos.length > 0 ? parsed.data.analise_foto : null,
+    analise_foto: fotos.length > 0 ? dados.analise_foto : null,
     // Peça focada só existe na indicação de lesão focal, e vice-versa.
     parametros_focada:
-      entrada.indicacao === "lesao_focal" ? parsed.data.parametros_focada : null,
+      entrada.indicacao === "lesao_focal" ? dados.parametros_focada : null,
   };
   const verificacoes = verificarRecomendacao(entrada, recomendacao);
 
   // --- 4. Custo ----------------------------------------------------------------
-  const u = message.usage;
-  const cacheRead = u.cache_read_input_tokens ?? 0;
-  const cacheWrite = u.cache_creation_input_tokens ?? 0;
-  const tokens = {
-    // input_tokens da API não inclui o que foi lido ou gravado em cache.
-    input: u.input_tokens + cacheRead + cacheWrite,
-    output: u.output_tokens,
-    cacheRead,
-    cacheWrite,
-  };
-  // Em caso de fallback, `message.model` é o modelo que de fato respondeu.
-  const model = message.model;
+  const tokens = uso;
   const costUsd = estimateCostUsd(model, {
-    inputTokens: tokens.input,
-    outputTokens: tokens.output,
-    cacheReadTokens: cacheRead,
-    cacheWriteTokens: cacheWrite,
+    inputTokens: uso.input,
+    outputTokens: uso.output,
+    cacheReadTokens: uso.cacheRead,
+    cacheWriteTokens: uso.cacheWrite,
     cacheWriteMultiplier: 2,
   });
 
