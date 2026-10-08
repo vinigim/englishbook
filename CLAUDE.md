@@ -114,6 +114,11 @@ for every SmartXide Punto setting with its reason and the knowledge-base ids it 
   gives the doctor (`rentals.client`, free text), the day and the device.
   `parametros_realizados` stores what the doctor actually used. The page searches by
   doctor name; reads fall back to the pre-0022 shape when the columns are missing.
+- **Photos** — optional, up to 3, **analyzed and discarded**: compressed in the browser
+  (1568 px JPEG, EXIF dropped), sent as multipart, validated by magic bytes in
+  `src/lib/laser/fotos.ts`, passed to the model and never stored anywhere. Only the
+  model's text (`analise_foto`) is saved. A consultation with photos is never reused
+  from or offered to the content-hash cache.
 
 ### Two caching layers in the AI pipeline (this is the owner's money)
 

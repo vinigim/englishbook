@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isAiConfigured } from "@/lib/ai/anthropic";
-import { recomendarParametros } from "@/lib/laser/recomendar";
+import { lerFotos } from "@/lib/laser/fotos";
+import { recomendarParametros, type FotoEnviada } from "@/lib/laser/recomendar";
 import { entradaSchema } from "@/lib/laser/schema";
 
 export const runtime = "nodejs";
@@ -55,9 +56,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Com foto o corpo é multipart (campo "dados" + arquivos "fotos"); sem
+  // foto, JSON. FormData porque Server Actions e JSON com base64 encareceriam
+  // o envio em ~33%; ver CLAUDE.md sobre uploads.
   let body: unknown;
+  let fotos: FotoEnviada[] = [];
   try {
-    body = await request.json();
+    if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await request.formData();
+      body = JSON.parse(String(form.get("dados") ?? "null"));
+      const lidas = await lerFotos(form.getAll("fotos"));
+      if (!lidas.ok) {
+        return NextResponse.json(
+          { error: "invalid_photo", message: lidas.message },
+          { status: 400 },
+        );
+      }
+      fotos = lidas.fotos;
+    } else {
+      body = await request.json();
+    }
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
@@ -73,6 +91,7 @@ export async function POST(request: NextRequest) {
   const resultado = await recomendarParametros(supabase, parsed.data.entrada, {
     forcar: parsed.data.forcar,
     rentalId: parsed.data.rentalId ?? null,
+    fotos,
   });
 
   if (!resultado.ok) {

@@ -488,7 +488,28 @@ export type Recomendacao = {
   motivo_confianca: string;
   /** O que a IA queria saber e não sabia, quando mudaria a recomendação. */
   perguntas_pendentes: string[];
+  /** Leitura das fotos enviadas; null quando não houve foto. */
+  analise_foto: AnaliseFoto | null;
 };
+
+export type AnaliseFoto = {
+  /** O que se vê, por área. */
+  achados: string[];
+  /** Onde a foto contradiz o formulário, e o que a IA fez com isso. */
+  divergencias: string[];
+  /** O que a foto não permitiu avaliar (luz, ângulo, foco, maquiagem). */
+  limitacoes: string[];
+};
+
+/** Limites do envio de fotos, usados na tela e na rota. */
+export const FOTOS_MAX = 3;
+/** Lado maior, em px: acima disso o modelo reduz a imagem de qualquer jeito. */
+export const FOTO_LADO_MAX = 1568;
+/**
+ * Teto por foto já comprimida. 3 × 1,2 MB cabe nos 4,5 MB que a Vercel aceita
+ * por requisição; uma foto de 1568 px em JPEG costuma ter 300–600 KB.
+ */
+export const FOTO_BYTES_MAX = 1_200_000;
 
 /** A locação da agenda à qual a consulta está ligada. */
 export type VinculoLocacao = {

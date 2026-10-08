@@ -28,6 +28,7 @@ import {
   type VinculoLocacao,
 } from "@/lib/laser/tipos";
 import { FormularioCaso } from "./FormularioCaso";
+import { AnaliseFotoCard, CampoFotos, type FotoLocal } from "./Fotos";
 import {
   ParametrosRealizadosCard,
   SeletorLocacao,
@@ -69,16 +70,28 @@ export function ParametrosClient({
   // Fora de `entrada` de propósito: a locação não muda a recomendação, então
   // não entra no hash nem invalida o reaproveitamento.
   const [rentalId, setRentalId] = useState<string | null>(null);
+  // Só na memória do navegador; vão na requisição e não voltam.
+  const [fotos, setFotos] = useState<FotoLocal[]>([]);
 
   async function consultar(forcar = false) {
     setCarregando(true);
     setErro(null);
     try {
-      const res = await fetch("/api/laser/recomendar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entrada, forcar, rentalId }),
-      });
+      const dados = { entrada, forcar, rentalId };
+      let res: Response;
+      if (fotos.length > 0) {
+        // Multipart: o navegador define o content-type com o boundary.
+        const form = new FormData();
+        form.set("dados", JSON.stringify(dados));
+        fotos.forEach((f, i) => form.append("fotos", f.blob, `foto-${i + 1}.jpg`));
+        res = await fetch("/api/laser/recomendar", { method: "POST", body: form });
+      } else {
+        res = await fetch("/api/laser/recomendar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(dados),
+        });
+      }
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErro(
@@ -104,6 +117,11 @@ export function ParametrosClient({
     setResposta(c.resposta);
     setEntradaDaResposta(c.entrada);
     setRentalId(c.resposta.locacao?.id ?? null);
+    // As fotos atuais são de outro caso; a consulta antiga não guardou as dela.
+    setFotos((atual) => {
+      atual.forEach((f) => URL.revokeObjectURL(f.url));
+      return [];
+    });
     setErro(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -144,6 +162,7 @@ export function ParametrosClient({
               <SeletorLocacao locacoes={locacoes} valor={rentalId} onChange={setRentalId} />
             )
           }
+          fotos={<CampoFotos fotos={fotos} setFotos={setFotos} />}
         />
 
         {/* ------------------------------------------------------------ */}
@@ -305,6 +324,8 @@ function Resultado({
           </p>
         </Alert>
       ) : null}
+
+      {r.analise_foto ? <AnaliseFotoCard analise={r.analise_foto} /> : null}
 
       {p ? (
         <Card variant="bordered" className="p-0">
