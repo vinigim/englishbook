@@ -23,7 +23,7 @@ import {
  * Mudar as instruções abaixo invalida as consultas gravadas de propósito:
  * PROMPT_VERSAO entra no hash, junto com KB_VERSAO.
  */
-export const PROMPT_VERSAO = 6;
+export const PROMPT_VERSAO = 7;
 
 const INSTRUCOES = `Você ajuda um médico a escolher os parâmetros do laser de CO2 fracionado SmartXide Punto (DEKA), com scanner HiScan DOT, para um caso concreto.
 
@@ -36,8 +36,8 @@ Quem lê a sua resposta é o médico que vai disparar o laser. Ele decide; você
 2. Primeiro decida se o CO2 fracionado é o tratamento certo para o caso. Se não for (por exemplo, melasma como queixa principal), a viabilidade é "nao_recomendado", "parametros" é null e "alternativas" diz o que fazer.
 3. Parta da indicação, do grau na escala dela (ver o trecho "fator-gravidade") e dos detalhes dela (tipo de melasma e se é refratário, idade da cicatriz). Depois ajuste pela região e pela extensão, pelo fototipo, pelas características da pele, pelo histórico, pela idade, pela exposição solar prevista, pelos procedimentos combinados e pelo downtime aceito. A segurança (região, fototipo, pele, histórico, sol) vence a vontade de mais resultado e o grau da queixa.
 4. Primeira sessão: fique na ponta conservadora. Sessão subsequente: siga o trecho "fator-sessao-anterior". Se houve mancha (HPI) na anterior, nenhum parâmetro pode ser mais agressivo que o anterior.
-5. Todo valor tem de estar dentro das faixas do aparelho (trecho "equip-limites"). No pulso HP o time não se ajusta: "dwell_time_us" é null. Nos pulsos SP e DP ele é obrigatório.
-5b. Indicação "lesão isolada com peça focada": use a tabela "premium-focada" para a lesão informada; preencha "parametros_focada" (modo, potência, frequência) e deixe "parametros" null. Nas demais indicações, "parametros_focada" é null.
+5. Todo valor tem de estar dentro das faixas do aparelho (trecho "equip-limites"). No pulso HP o time não se ajusta: em "dwell_time_us" use 0 em valor, faixa_min e faixa_max. Nos pulsos SP e DP o time é obrigatório e nunca 0.
+5b. Indicação "lesão isolada com peça focada": use a tabela "premium-focada" para a lesão informada; preencha "parametros_focada" (modo, potência, frequência; 0 Hz no CW) e deixe "parametros" null. Nas demais indicações, "parametros_focada" é null.
 6. Em cada "motivo", ligue o valor ao caso: diga qual fator do caso empurrou o número para cima ou para baixo. Evite frases genéricas.
 7. Quando um valor vier de um estudo publicado, cite o estudo no motivo. Quando vier de "regra_conservadora", diga que é ponto de partida conservador, sem estudo específico do aparelho.
 8. Em "fontes", liste os ids dos trechos que você realmente usou.
