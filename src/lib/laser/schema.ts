@@ -25,10 +25,11 @@ import {
 /**
  * Formato da recomendação.
  *
- * Mesmo arranjo de src/lib/ai/schema.ts: o JSON schema vai para
- * `output_config.format`, e o zod ao lado confere o que voltou antes de
- * gravar. Limites numéricos (potência máxima etc.) NÃO vão no JSON schema —
- * structured outputs não os garante —, e sim em ./guardas.ts, no código.
+ * O JSON schema é o `input_schema` da ferramenta "entregar_recomendacao"
+ * (ver recomendar.ts), não `output_config.format`: como saída estruturada, a
+ * gramática compilada passou do limite da API. Sem gramática, o schema guia a
+ * IA e o zod ao lado é quem garante o formato. Limites numéricos (potência
+ * máxima etc.) ficam em ./guardas.ts, no código.
  */
 
 const numerico = (descricao: string) =>
