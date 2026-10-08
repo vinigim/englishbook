@@ -98,9 +98,13 @@ The form posts a case (indication, region, Fitzpatrick type, history) to
 `/api/laser/recomendar`, which asks Opus (`LASER_MODEL`, default `claude-opus-5-5`)
 for every SmartXide Punto setting with its reason and the knowledge-base ids it used.
 
-- **Knowledge base** — `src/lib/laser/base-conhecimento.ts`. Small enough (~6k tokens
+- **Knowledge base** — `src/lib/laser/base-conhecimento.ts`. Small enough (~12k tokens
   with the instructions) to go whole into a cached system block, so there is no vector
-  search. Ids are stable and stored in saved consultations: never rename one. Any text
+  search. The top-weight source is the **Premium (DEKA-authorized) training protocol**,
+  transcribed in `src/lib/laser/protocolo-premium.ts`: it generates the `premium-*`
+  chunks and the per-phototype limits the guards check against. Pulse physics per that
+  protocol: heat HP < DP < SP, ablation SP < DP < HP; HP has no adjustable time
+  (`dwell_time_us` is null). Gynecology pages were left out on purpose. Ids are stable and stored in saved consultations: never rename one. Any text
   change → bump `KB_VERSAO`; keep the array order fixed or the prompt cache breaks.
 - **Guards in code** — `src/lib/laser/guardas.ts`. Absolute contraindications block the
   request before any API call; device limits and conservative phototype/region rules

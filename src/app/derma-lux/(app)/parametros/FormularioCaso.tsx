@@ -5,6 +5,11 @@ import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import {
+  LESOES_FOCAIS,
+  LESOES_FOCAIS_IDS,
+  type LesaoFocalId,
+} from "@/lib/laser/protocolo-premium";
+import {
   ASSOCIACOES,
   ASSOCIACAO_LABEL,
   CARACTERISTICAS_PELE,
@@ -36,6 +41,10 @@ import {
   type EntradaConsulta,
   type SessaoAnterior,
 } from "@/lib/laser/tipos";
+
+const LESAO_FOCAL_LABEL = Object.fromEntries(
+  LESOES_FOCAIS.map((l) => [l.id, l.nome]),
+) as Record<LesaoFocalId, string>;
 
 const CAMPO =
   "w-full h-11 px-3 bg-paper border border-line text-ink focus:outline-none focus:border-ink";
@@ -124,6 +133,20 @@ export function FormularioCaso({
               nome="melasmaRefratario"
               valor={entrada.melasmaRefratario ?? false}
               onChange={(v) => set("melasmaRefratario", v)}
+            />
+          </div>
+        ) : null}
+
+        {entrada.indicacao === "lesao_focal" ? (
+          <div className="border-l-2 border-accent pl-3">
+            <Selecao
+              id="lesaoFocal"
+              rotulo="Qual lesão (tabela da peça focada do protocolo)"
+              valor={entrada.lesaoFocal ?? ""}
+              opcoes={LESOES_FOCAIS_IDS}
+              rotulos={LESAO_FOCAL_LABEL}
+              vazio="Escolha a lesão"
+              onChange={(v) => set("lesaoFocal", v || null)}
             />
           </div>
         ) : null}

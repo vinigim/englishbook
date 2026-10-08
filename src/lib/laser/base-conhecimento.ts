@@ -1,3 +1,10 @@
+import {
+  PROTOCOLO_FONTE,
+  PROTOCOLO_PREMIUM,
+  textoLesoesFocais,
+  textoSecao,
+} from "./protocolo-premium";
+
 /**
  * Base de conhecimento do SmartXide Punto (DEKA) com scanner HiScan DOT.
  *
@@ -25,16 +32,19 @@
  *
  * De onde vieram os números
  * -------------------------
- * Folhetos da DEKA, fichas técnicas de distribuidores e estudos publicados
+ * A fonte de maior peso é o protocolo do treinamento da Premium (autorizada
+ * DEKA), transcrito em ./protocolo-premium.ts e gerado aqui como trechos
+ * "premium-*". O resto veio de folhetos da DEKA, fichas técnicas de distribuidores e estudos publicados
  * com o SmartXide DOT, encontrados por busca em out/2026. As páginas não
  * puderam ser abertas na íntegra no ambiente em que esta base foi escrita:
  * os valores vêm dos resumos da busca. Confira cada um no manual do aparelho
  * antes de tratá-lo como definitivo.
  */
 
-export const KB_VERSAO = 3;
+export const KB_VERSAO = 4;
 
 export const ORIGENS = [
+  "protocolo_treinamento",
   "fabricante",
   "estudo",
   "consenso",
@@ -43,6 +53,7 @@ export const ORIGENS = [
 export type Origem = (typeof ORIGENS)[number];
 
 export const ORIGEM_LABEL: Record<Origem, string> = {
+  protocolo_treinamento: "Protocolo de treinamento (Premium/DEKA)",
   fabricante: "Fabricante",
   estudo: "Estudo publicado",
   consenso: "Consenso clínico",
@@ -53,7 +64,8 @@ export type TrechoBase = {
   id: string;
   titulo: string;
   origem: Origem;
-  fonte?: { label: string; url: string };
+  /** `url` ausente quando a fonte é um documento entregue em mãos. */
+  fonte?: { label: string; url?: string };
   texto: string;
 };
 
@@ -83,11 +95,10 @@ Sem scanner, com peça de mão focada, o Punto corta e vaporiza lesões (uso cir
       url: "https://alibenalimedical.com/product/fractional-co2-laser-smartxide-dot/",
     },
     texto: `Faixas descritas para o sistema SmartXide DOT (confirmar no manual da versão do aparelho):
-- Dwell time (tempo por DOT): 200 a 2.000 µs (0,2 a 2 ms).
+- Dwell time (tempo por DOT): 200 a 2.000 µs (0,2 a 2 ms). No HP o time não se ajusta.
 - Spacing / DOT pitch (distância entre DOTs): 200 a 1.000 µm.
 - SmartStack: 1 a 5 pulsos sobre o mesmo DOT.
-- Diâmetro do DOT: cerca de 350 µm.
-- Potência: a literatura com o DOT usa até 30 W; o Punto permite até 50 W, mas valores acima de 30 W não aparecem nos estudos do sistema fracionado.
+- Potência: até 50 W no Punto; nas tabelas de pele do protocolo Premium o máximo é 25 W (manchas, SP, fototipo 1–2).
 Nunca recomende valores fora dessas faixas.`,
   },
   {
@@ -98,8 +109,52 @@ Nunca recomende valores fora dessas faixas.`,
       label: "Skin Inc. — SmartXide DOT",
       url: "https://www.skininc.com/products/equipment-tools/product/21892627/eclipsemed-ltd-smartxide-dot-system",
     },
-    texto: `O sistema DOT entrega energia ablativa num spot de cerca de 350 µm, com até 30 W no tecido.
-Como o DOT tem ~350 µm, um spacing de 350 µm ou menos faz as colunas se tocarem: o efeito deixa de ser fracionado e se aproxima do resurfacing total, com mais downtime e mais risco.`,
+    texto: `O diâmetro do DOT aparece de formas diferentes nas fontes: uma ficha de distribuidor fala em cerca de 350 µm; a ilustração do treinamento Premium indica cerca de 120 µm de ablação.
+O protocolo Premium usa spacing de 200–300 µm em manchas, cicatrizes de acne e hipertróficas, o que só é fracionado se o DOT for bem menor que 350 µm. Siga o protocolo: spacing baixo é legítimo quando a tabela da indicação o usa, sempre com o time curto que vem junto.`,
+  },
+
+  // ==========================================================================
+  //  Protocolo de treinamento Premium (autorizada DEKA) — a fonte principal
+  // ==========================================================================
+  {
+    id: "premium-pulsos",
+    titulo: "Protocolo Premium — os três pulsos e os cinco parâmetros",
+    origem: "protocolo_treinamento",
+    fonte: { label: PROTOCOLO_FONTE.label },
+    texto: `Definição dos pulsos, segundo o treinamento:
+- SP (Smart Pulse): MAIOR dano térmico (calor) e MENOR ablação (profundidade de vaporização). Cratera larga e rasa.
+- DP (Deka Pulse): MENOR dano térmico e MAIOR ablação. Cratera em V, mais funda.
+- HP (High Pulse): MUITA ablação e dano térmico mínimo ("pulso frio"). Cratera estreita e funda. No HP o time não se ajusta: a coluna fica vazia nas tabelas.
+Ordem de calor: HP < DP < SP. Ordem de ablação: SP < DP < HP.
+Os cinco parâmetros que determinam o tratamento:
+1. Pulso = formato da cratera.
+2. Watts = ablação.
+3. Time = calor ao redor do ponto (dwell, em µs).
+4. Spacing = densidade do tratamento.
+5. Stack = aprofundar a ablação e o calor.
+Como usar as tabelas: escolha a tabela da indicação, a linha do grupo de fototipo e o pulso; parta desses números e ajuste pelos demais fatores do caso. Quando não houver linha para o fototipo do paciente, extrapole na direção do padrão das tabelas (fototipo maior → menos watts, menos time, spacing maior) e diga que extrapolou.
+Leitura do documento: a coluna "time" não traz unidade; os valores (300–1.700) foram lidos como µs.`,
+  },
+  ...PROTOCOLO_PREMIUM.map(
+    (secao): TrechoBase => ({
+      id: `premium-${secao.id}`,
+      titulo: `Protocolo Premium — ${secao.titulo}`,
+      origem: "protocolo_treinamento",
+      fonte: { label: PROTOCOLO_FONTE.label },
+      texto: textoSecao(secao),
+    }),
+  ),
+  {
+    id: "premium-focada",
+    titulo: "Protocolo Premium — peça focada (sem scanner), lesões",
+    origem: "protocolo_treinamento",
+    fonte: { label: PROTOCOLO_FONTE.label },
+    texto: `Tabela da peça de mão focada do SmartXide Punto: tipo de disparo (EM), potência e frequência por lesão. Não usa spacing, stack nem time.
+${textoLesoesFocais()}
+Cuidados que valem para qualquer lesão da tabela:
+- Lesão pigmentada melanocítica (nevos) e qualquer lesão de diagnóstico incerto: só com diagnóstico clínico e dermatoscópico; na dúvida, biópsia antes. A vaporização destrói o material para histologia.
+- Queratose actínica, queilite actínica e leucoplasia são pré-malignas: excluir carcinoma antes; considerar biópsia.
+- Comece pela potência da tabela e suba só se a lesão não vaporizar; CW é corte/vaporização contínua com muito dano térmico.`,
   },
 
   // ==========================================================================
@@ -109,32 +164,32 @@ Como o DOT tem ~350 µm, um spacing de 350 µm ou menos faz as colunas se tocare
     id: "param-potencia",
     titulo: "Potência (W)",
     origem: "consenso",
-    texto: `Energia que o feixe entrega por segundo. Mais potência = coluna mais profunda e um pouco mais larga.
-- 5–15 W: ablação superficial. Manchas, textura, rejuvenescimento leve, pele fina.
-- 15–20 W: rejuvenescimento moderado, estrias, cicatrizes leves a moderadas.
-- 20–30 W: cicatrizes profundas e fibrose, em pele espessa (malar, nariz).
-A energia de cada DOT é potência × dwell time: 10 W × 600 µs = 6 mJ.`,
+    texto: `Watts = ablação. Mais potência = coluna mais profunda.
+Leia a potência sempre junto com o time: manchas usam 20–25 W com time de só 300 µs (muita ablação, pouco calor); rejuvenescimento suave usa 14–18 W com time de 800–1.000 µs.
+A energia de cada DOT é potência × time: 10 W × 600 µs = 6 mJ.
+No protocolo Premium, para a mesma indicação, a potência cai à medida que o fototipo sobe (ex.: rejuvenescimento suave SP: 18 → 16 → 14 W).`,
   },
   {
     id: "param-dwell",
     titulo: "Dwell time (µs)",
     origem: "consenso",
-    texto: `Quanto tempo o laser dispara sobre cada DOT. É o principal controle de CALOR RESIDUAL.
-- Curto (200–500 µs): ablação mais limpa, pouco calor lateral, recuperação rápida, menos risco de hiperpigmentação. Preferido em fototipos altos e pele fina.
-- Médio (500–800 µs): uso geral.
-- Longo (800–2.000 µs): mais coagulação, mais retração e estímulo de colágeno; mais dias de eritema e mais risco de mancha. Reservado a fototipos I–III com cicatriz fibrótica ou rugas profundas.
-Subir o dwell aumenta profundidade E calor ao mesmo tempo; para ganhar profundidade com menos calor, prefira subir o SmartStack.`,
+    texto: `Time = calor ao redor do ponto. É o principal controle de CALOR RESIDUAL.
+- Curto (~300 µs): manchas e melanoses — ablação com pouco calor.
+- Médio (600–900 µs): pálpebras, rejuvenescimento corporal, cicatrizes de acne.
+- Longo (900–1.100 µs): rejuvenescimento facial e resurfacing de acne em fototipo 1–2.
+No protocolo Premium o time cai à medida que o fototipo sobe (ex.: rejuvenescimento suave SP: 1.000 → 900 → 800 µs). No HP o time não se ajusta.
+Subir o time aumenta profundidade E calor ao mesmo tempo; para ganhar profundidade com menos calor, prefira subir o stack ou trocar SP por DP.`,
   },
   {
     id: "param-spacing",
     titulo: "Spacing / DOT pitch (µm)",
     origem: "consenso",
-    texto: `Distância entre o centro de DOTs vizinhos. É o controle de DENSIDADE.
-A área tratada por cm² cai com o quadrado do spacing: passar de 800 para 400 µm quadruplica a dose média.
-- 800–1.000 µm: baixa densidade; pele íntegra entre colunas cicatriza rápido. Fototipos IV–VI, pescoço, colo, mãos, corpo, primeira sessão.
-- 500–700 µm: uso geral na face.
-- 200–400 µm: alta densidade, próximo do resurfacing total; só fototipos I–III, face, com experiência.
-A densidade é o fator que mais pesa no risco de hiperpigmentação pós-inflamatória em pele morena: reduzir densidade protege mais do que reduzir potência.`,
+    texto: `Spacing = densidade do tratamento: distância entre o centro de DOTs vizinhos.
+A área tratada por cm² cai com o quadrado do spacing: passar de 800 para 400 µm quadruplica a densidade.
+- 200–350 µm: manchas, cicatrizes de acne (só sobre a cicatriz), hipertróficas, intenso em HP — sempre com time curto ou HP.
+- 600–800 µm: rejuvenescimento facial, pálpebras, resurfacing de acne.
+- 800–950 µm: corpo (pescoço, colo, mãos, braços, estrias) e CoolPeel.
+No protocolo Premium o spacing aumenta à medida que o fototipo sobe (ex.: rejuvenescimento suave SP: 750 → 800 → 850 µm). Em pele morena, abrir o spacing protege mais do que baixar a potência.`,
   },
   {
     id: "param-smartstack",
@@ -152,16 +207,13 @@ Para ganhar profundidade, subir o stack é mais seguro do que subir o dwell, por
   },
   {
     id: "param-modos-psd",
-    titulo: "Modos de emissão (PSD: SP, DP, HP)",
-    origem: "fabricante",
-    fonte: {
-      label: "Folheto Tetra PRO (DEKA)",
-      url: "https://app.aico.swiss/19871/storage/files/Tetra-PRO-Brochure-Dermatology-ING-Rev-1.2.pdf",
-    },
-    texto: `A tecnologia PSD (Pulse Shape Design) define a forma de cada pulso: um pico inicial alto vaporiza a epiderme e a cauda do pulso aquece a derme.
-- HP (HighPulse): pico alto, pulso curto. Ablação limpa e pouco calor. É o modo do protocolo CoolPeel (superficial, pouco downtime). Bom para manchas, textura e fototipos altos.
-- SP (SmartPulse): equilíbrio entre ablação e efeito térmico. Modo padrão do resurfacing fracionado com DOT; controla profundidade (energia) e dano térmico (dwell) ao mesmo tempo.
-- DP (DEKAPulse): pulso mais longo e mais térmico; mais coagulação e retração. Rugas e flacidez em fototipos I–III.
+    titulo: "Modos de emissão (SP, DP, HP)",
+    origem: "protocolo_treinamento",
+    fonte: { label: PROTOCOLO_FONTE.label },
+    texto: `Segundo o treinamento Premium (ver "premium-pulsos"), a forma do pulso decide a relação entre ablação e calor:
+- SP (Smart Pulse): maior dano térmico, menor ablação. Para estimular colágeno e retrair com calor em profundidade: rejuvenescimento suave, corporal suave, pálpebras.
+- DP (Deka Pulse): menor dano térmico, maior ablação. Rejuvenescimento intenso, cicatrizes de acne, cicatrizes atróficas e estrias brancas.
+- HP (High Pulse): muita ablação, dano térmico mínimo (pulso frio); o time não se ajusta. Manchas, hipertróficas, CoolPeel e opções com pouco downtime em fototipo 3–4.
 - CW (contínuo): só com peça focada, para corte e vaporização. Nunca recomende CW para resurfacing fracionado.`,
   },
   {
@@ -198,11 +250,11 @@ Sobrepor disparos dobra a dose na faixa sobreposta: é uma causa comum de mancha
     origem: "consenso",
     texto: `Três grandezas resumem o tratamento:
 - Profundidade: potência, dwell time, SmartStack.
-- Calor residual: dwell time, modo de pulso (HP < SP < DP), modo de varredura.
+- Calor residual: time, modo de pulso (HP < DP < SP), modo de varredura.
 - Densidade: spacing (e número de passadas).
 Regras:
 - Mude um parâmetro por vez entre sessões, 10–20% de cada vez, e só se a sessão anterior cicatrizou sem mancha.
-- Fototipo alto: reduza densidade e dwell antes de reduzir potência.
+- Fototipo alto: siga o padrão do protocolo — menos watts, menos time e spacing maior, juntos.
 - Cicatriz profunda: ganhe profundidade com stack antes de subir dwell.
 - Pele fina (pálpebra, pescoço, colo, mãos): reduza potência E densidade juntas.
 - Segunda passada na mesma sessão soma densidade; só com spacing aberto e em pele espessa.
@@ -217,10 +269,11 @@ O valor em J/cm² mostrado na tela do aparelho usa o cálculo da DEKA; use-o par
     titulo: "Fototipo e risco de hiperpigmentação pós-inflamatória (HPI)",
     origem: "consenso",
     texto: `O risco de HPI cresce do fototipo I ao VI e é o principal efeito adverso do CO2 fracionado em pele brasileira.
-- I–III: tolera densidade média a alta e dwell longo.
-- IV: densidade baixa a média (spacing ≥ 600–700 µm), dwell ≤ 800 µs, SmartTrack, intervalo ≥ 6 semanas, preparo clareador.
-- V: densidade baixa (spacing ≥ 800 µm), dwell curto (≤ 500 µs), stack 1–2, HP ou SP, SmartTrack, intervalo 6–8 semanas, teste obrigatório.
-- VI: ablativo fracionado só com muita cautela, teste prévio obrigatório e expectativa de mais sessões leves; considerar alternativas não ablativas.
+O protocolo Premium já embute o ajuste por fototipo em cada tabela: do grupo 1–2 para o 5–6, menos watts, menos time e spacing maior. Use a linha do grupo do paciente.
+Além disso:
+- IV–VI: SmartTrack, intervalo ≥ 6 semanas, preparo clareador, teste em área pequena na primeira sessão.
+- Quando a tabela da indicação não tem linha para 5–6 (ex.: rejuvenescimento intenso, acne), não use a linha de 3–4 sem ajustar: extrapole para baixo e diga isso.
+- VI: considerar alternativas menos ablativas (CoolPeel) ou não ablativas.
 A HPI costuma aparecer 3–6 semanas após a sessão. Hipopigmentação tardia (meses) também ocorre, mais com alta densidade.`,
   },
   {
@@ -246,22 +299,19 @@ A HPI costuma aparecer 3–6 semanas após a sessão. Hipopigmentação tardia (
     id: "regiao-periorbital",
     titulo: "Periorbital e pálpebras",
     origem: "consenso",
-    texto: `A pálpebra tem a pele mais fina do corpo.
-- Reduza potência e densidade em relação à face: ponto de partida conservador em torno de 6–10 W, dwell 200–400 µs, spacing 700–1.000 µm, stack 1.
+    texto: `A pálpebra tem a pele mais fina do corpo. Use a tabela "premium-palpebras" (10–15 W, stack 2, time 600–800 µs, spacing 700–800 µm conforme o fototipo; o documento não indica o pulso).
 - Dentro do rebordo orbitário, protetor ocular metálico interno (escudo corneano); todos na sala com óculos para 10.600 nm.
-- Pálpebra inferior: tratamento agressivo pode retrair e causar ectrópio. Evite stack alto e alta densidade.
-Não foi encontrado protocolo publicado do SmartXide DOT específico para pálpebra: os números acima são ponto de partida conservador.`,
+- Pálpebra inferior: tratamento agressivo pode retrair e causar ectrópio. Não passe do stack 2 nem feche o spacing além da tabela.`,
   },
   {
     id: "regiao-extrafacial",
     titulo: "Pescoço, colo, mãos e corpo",
     origem: "consenso",
     texto: `Fora da face há muito menos unidades pilossebáceas: a cicatrização é mais lenta e o risco de cicatriz e de HPI é maior.
-- Reduza densidade em cerca de metade em relação à face (spacing 800–1.000 µm) e reduza potência.
-- Pescoço e colo: pele fina, risco de cicatriz hipertrófica em faixa; stack 1, dwell curto.
-- Mãos: pele fina sobre tendões; parâmetros leves.
-- Abdome, coxas, glúteos, braços, dorso: estrias e cicatrizes; potência média, densidade baixa, intervalo ≥ 6–8 semanas.
-- Faça uma única passada fora da face.`,
+- Pescoço, colo, mãos e braços: tabela "premium-corporal-suave" (SP, 10–15 W, stack 2, time 600–800 µs, spacing 800–900 µm).
+- Cicatrizes atróficas e estrias brancas no corpo: "premium-corporal-forte" (DP, stack 3), marcada como intensa no documento.
+- Pescoço e colo: risco de cicatriz hipertrófica em faixa; não passe da tabela.
+- Faça uma única passada fora da face; intervalo ≥ 6–8 semanas.`,
   },
 
   // ==========================================================================
@@ -271,12 +321,11 @@ Não foi encontrado protocolo publicado do SmartXide DOT específico para pálpe
     id: "ind-rejuvenescimento",
     titulo: "Rejuvenescimento e fotoenvelhecimento por grau de Glogau",
     origem: "consenso",
-    texto: `O grau de Glogau orienta a intensidade:
-- Glogau I (sem rugas: textura, poros, discromia leve): superficial. HP (CoolPeel) ou SP com potência baixa, dwell curto, spacing 500–700 µm, stack 1. Downtime de 2–4 dias.
-- Glogau II (rugas em movimento): SP, potência baixa a média, dwell 400–600 µs, spacing 500–700 µm, stack 1.
-- Glogau III (rugas em repouso): SP, potência média, dwell 500–800 µs, spacing 500–700 µm, stack 1–2.
-- Glogau IV (só rugas): SP ou DP, potência mais alta, dwell 800–1.000 µs, spacing 400–600 µm, stack 2, só em fototipo I–III; examinar lesões actínicas antes. Downtime de 7–10 dias.
-Séries de 2–4 sessões com 4–6 semanas de intervalo. Grau sem informação: trate como Glogau III na ponta conservadora.`,
+    texto: `Use o grau de Glogau para escolher a tabela do protocolo Premium:
+- Glogau I, ou quem quer recuperação mínima: CoolPeel ("premium-coolpeel": HP, 1,5–4 W, spacing 950) ou rejuvenescimento suave em HP.
+- Glogau II–III: rejuvenescimento suave ("premium-rejuv-suave"): SP para mais calor e retração; DP para mais ablação com menos calor.
+- Glogau IV: rejuvenescimento intenso ("premium-rejuv-intenso"): DP stack 3; examinar lesões actínicas antes. Downtime de 7–10 dias.
+Séries de 2–4 sessões com 4–6 semanas de intervalo. Grau sem informação: rejuvenescimento suave, na linha do fototipo.`,
   },
   {
     id: "ind-cicatriz-acne",
@@ -292,6 +341,7 @@ Por grau (escala qualitativa de Goodman & Baron):
 - Grau 2 (leve): fracionado superficial a médio, stack 1–2, 2–3 sessões.
 - Grau 3 (moderada, nivela ao esticar): é a melhor indicação do fracionado; stack 2–3, 3–4 sessões. Rolling: subcisão associada.
 - Grau 4 (grave, não nivela ao esticar): o laser sozinho rende pouco. Associe subcisão (rolling), TCA CROSS ou punch (icepick e boxcar profundos) e programe série mais longa; a primeira sessão continua conservadora.
+Tabela do protocolo: lesões isoladas → "premium-acne-cicatriz" (DP 10 W, stack 2, ou 3 se profunda, spacing 300, só sobre a cicatriz); região inteira → "premium-acne-resurfacing" (DP 15–20 W, stack 3).
 Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após a última.`,
   },
   {
@@ -299,8 +349,8 @@ Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após
     titulo: "Cicatrizes cirúrgicas e traumáticas por aspecto",
     origem: "consenso",
     texto: `- Plana (incomoda cor ou textura): fracionado superficial a médio, densidade média.
-- Elevada (hipertrófica): densidade baixa e profundidade maior; associar corticoide tópico ou intralesional logo após a sessão (laser-assisted drug delivery). Cicatriz ainda vermelha e ativa: densidade ainda menor.
-- Deprimida (atrófica): stack 2–3 sobre a cicatriz; considerar preenchimento ou subcisão associados.
+- Elevada (hipertrófica): tabela "premium-hipertroficas" (HP, 6–10 W, stack 2/3, spacing 200–300 µm); associar corticoide tópico ou intralesional logo após a sessão (laser-assisted drug delivery).
+- Deprimida (atrófica): tabela "premium-corporal-forte" (DP, stack 3) sobre a cicatriz; considerar preenchimento ou subcisão associados.
 - Com retração ou aderência: o fracionado melhora a elasticidade, mas retração importante é cirúrgica (zetaplastia, liberação); o laser entra como complemento.
 - Momento: pode começar 4–12 semanas após a cirurgia, quando o resultado tende a ser melhor.
 - Histórico de queloide é fator de risco para a pele ao redor: teste em área pequena.`,
@@ -309,8 +359,8 @@ Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após
     id: "ind-estrias",
     titulo: "Estrias por tipo, largura e quantidade",
     origem: "consenso",
-    texto: `- Albas (antigas, brancas): CO2 fracionado tem boa evidência; potência média, densidade média a alta dentro da estria, stack 2.
-- Rubras (recentes, avermelhadas): lasers vasculares costumam ser a primeira escolha; o CO2 funciona, mas com parâmetros mais leves.
+    texto: `- Albas (antigas, brancas): tabela "premium-corporal-forte" (DP, stack 3).
+- Rubras (recentes, avermelhadas): tabela "premium-corporal-suave" (SP, stack 2). Lasers vasculares também são opção.
 - Finas e poucas: tratamento só sobre as estrias (área pequena), 2–3 sessões.
 - Largas ou numerosas: série de 3–5 sessões; resultado parcial é a expectativa realista.
 - Largas e numerosas com atrofia: melhora modesta; combine expectativa, considere associações (PRP, drug delivery).
@@ -320,7 +370,7 @@ Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após
     id: "ind-pigmento-melasma",
     titulo: "Manchas, lentigos e melasma",
     origem: "consenso",
-    texto: `- Lentigos solares e manchas epidérmicas: ablação superficial, HP ou SP com dwell curto (≤ 300 µs), potência baixa a média, stack 1.
+    texto: `- Lentigos solares e manchas epidérmicas: tabela "premium-manchas" (SP, DP ou HP; time de 300 µs; spacing 200–350 µm conforme o fototipo). Lesão isolada também pode ir com a peça focada ("premium-focada": discromias superficiais).
 - Melasma: o CO2 fracionado NÃO é primeira linha nem monoterapia. A primeira abordagem é tópica (clareadores, fotoproteção) e ácido tranexâmico. O CO2 tem lugar no melasma REFRATÁRIO (≥ 3 meses de tratamento tópico adequado sem resposta), com parâmetros baixos e quase sempre como veículo para ácido tranexâmico aplicado logo após o laser. Ver o trecho "ind-melasma-protocolo".
 - Paciente com melasma e outra queixa: trate a outra queixa com parâmetros mínimos fora das áreas de melasma, ou prefira outro método.`,
   },
@@ -597,12 +647,10 @@ Complicações a vigiar: eritema prolongado, HPI, infecção (herpes, bacteriana
     id: "regra-pontos-de-partida",
     titulo: "Pontos de partida conservadores sem protocolo publicado",
     origem: "regra_conservadora",
-    texto: `Para estas situações não há estudo publicado com o SmartXide DOT. Os valores são derivados das faixas publicadas, na ponta conservadora, e devem ser validados com o manual e o treinamento da DEKA:
-- Rejuvenescimento facial moderado: SP, 12–18 W, 500–800 µs, spacing 500–700 µm, stack 1–2.
-- Pálpebras e periorbital: SP ou HP, 6–10 W, 200–400 µs, spacing 700–1.000 µm, stack 1.
-- Pescoço e colo: SP ou HP, 8–12 W, 300–500 µs, spacing 800–1.000 µm, stack 1.
-- Dorso das mãos: SP ou HP, 8–12 W, 300–500 µs, spacing 800–1.000 µm, stack 1.
-Ao usar estes valores, diga ao médico que são pontos de partida conservadores e não protocolo publicado.`,
+    texto: `Use estes valores SÓ quando não houver tabela do protocolo Premium para o caso (ex.: poros e textura isolados, regiões do corpo fora das tabelas) e diga ao médico que são pontos de partida conservadores, não protocolo:
+- Poros e textura: como o rejuvenescimento suave da linha do fototipo, com stack 1, ou CoolPeel.
+- Abdome, coxas, glúteos e dorso sem estrias: como o corporal suave da linha do fototipo.
+Quando o protocolo e um estudo publicado divergirem, siga o protocolo e cite a divergência.`,
   },
 ];
 

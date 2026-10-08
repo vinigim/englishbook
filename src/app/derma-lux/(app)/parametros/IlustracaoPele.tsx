@@ -36,13 +36,21 @@ const COR = {
   texto: "#6f6a60",
 } as const;
 
-const MODO_ABLACAO: Record<ModoEmissao, number> = { HP: 1.1, SP: 1, DP: 0.85 };
-const MODO_HALO: Record<ModoEmissao, number> = { HP: 0.4, SP: 1, DP: 2 };
+// Segundo o treinamento Premium (trecho "premium-pulsos"): calor HP < DP < SP,
+// ablação SP < DP < HP. A cratera do SP é larga e rasa (U), a do DP é um V e a
+// do HP é um V estreito e fundo — é o desenho do próprio documento.
+const MODO_ABLACAO: Record<ModoEmissao, number> = { SP: 0.8, DP: 1, HP: 1.15 };
+const MODO_HALO: Record<ModoEmissao, number> = { SP: 1.8, DP: 1, HP: 0.35 };
+const MODO_LARGURA: Record<ModoEmissao, number> = { SP: 1.4, DP: 1, HP: 0.75 };
+/** Largura do fundo da cratera, em fração da boca: U no SP, V nos outros. */
+const MODO_FUNDO: Record<ModoEmissao, number> = { SP: 0.5, DP: 0.2, HP: 0.15 };
+/** O HP não tem time ajustável; para o desenho, vale um pulso curto. */
+const TIME_HP = 300;
 
 export const MODO_DESCRICAO: Record<ModoEmissao, string> = {
-  HP: "Pico alto, pulso curto: canal limpo, pouco calor ao redor.",
-  SP: "Equilíbrio entre ablação e calor. Padrão do fracionado.",
-  DP: "Pulso longo e térmico: mais coagulação e retração.",
+  SP: "Maior dano térmico e menor ablação: cratera larga e rasa.",
+  DP: "Menor dano térmico e maior ablação: cratera em V.",
+  HP: "Muita ablação e dano térmico mínimo (pulso frio).",
 };
 
 // Geometria do corte, em unidades do viewBox.
@@ -54,26 +62,37 @@ const FIM_PAPILAR = 52;
 const FIM_RETICULAR = 140;
 const FUNDO_MAX = FIM_RETICULAR - SUPERFICIE;
 
-type Coluna = { profundidade: number; largura: number; halo: number };
+type Coluna = { profundidade: number; largura: number; halo: number; fundo: number };
 
 function coluna({ potencia, dwell, stack, modo }: PerfilBase): Coluna {
+  // A profundidade usa a mesma energia nos três pulsos, para a comparação ser
+  // justa; o calor do HP usa um pulso curto, porque nele o time não se ajusta.
+  const dwellCalor = modo === "HP" ? TIME_HP : dwell;
   const energiaMj = (potencia * dwell) / 1000;
   const relativa = Math.sqrt(Math.max(energiaMj * stack, 0) / 60);
   // Exagerado de propósito: num esquema, diferenças reais de 20% somem.
   const profundidade = Math.min(1, (0.08 + 0.75 * relativa) * MODO_ABLACAO[modo]);
   const largura =
-    13 * (1 - 0.06 * (stack - 1)) * (1 + 0.2 * Math.min(potencia / 30, 1.5));
+    13 *
+    MODO_LARGURA[modo] *
+    (1 - 0.06 * (stack - 1)) *
+    (1 + 0.2 * Math.min(potencia / 30, 1.5));
   const halo =
-    (2 + 14 * Math.min(dwell / 1500, 1)) *
+    (2 + 14 * Math.min(dwellCalor / 1500, 1)) *
     MODO_HALO[modo] *
     (1 + 0.12 * (stack - 1));
-  return { profundidade, largura, halo };
+  return { profundidade, largura, halo, fundo: MODO_FUNDO[modo] };
 }
 
 /** Canal afunilado com fundo arredondado, centrado em x. */
-function caminhoCanal(x: number, largura: number, fundo: number): string {
+function caminhoCanal(
+  x: number,
+  largura: number,
+  fundo: number,
+  fracaoFundo = 0.22,
+): string {
   const topo = largura / 2;
-  const base = Math.max(largura * 0.22, 1.5);
+  const base = Math.max(largura * fracaoFundo, 1.5);
   return [
     `M ${x - topo} ${SUPERFICIE}`,
     `L ${x - base} ${fundo - base}`,
@@ -132,11 +151,16 @@ function CorteColuna({
       <CamadasDaPele largura={W} />
       {/* Zona de coagulação: o mesmo canal, alargado pelo halo. */}
       <path
-        d={caminhoCanal(x, c.largura + 2 * c.halo, Math.min(fundo + c.halo * 0.8, FIM_RETICULAR + 10))}
+        d={caminhoCanal(
+          x,
+          c.largura + 2 * c.halo,
+          Math.min(fundo + c.halo * 0.8, FIM_RETICULAR + 10),
+          c.fundo,
+        )}
         fill={COR.coagulacao}
         fillOpacity={0.55}
       />
-      <path d={caminhoCanal(x, c.largura, fundo)} fill={COR.ablacao} />
+      <path d={caminhoCanal(x, c.largura, fundo, c.fundo)} fill={COR.ablacao} />
       {comRotulos ? <RotulosCamadas /> : null}
     </svg>
   );
@@ -209,7 +233,7 @@ function tresValores(min: number, valor: number, max: number): number[] {
 }
 
 export function ComparaModo({ base }: { base: PerfilBase }) {
-  const modos: ModoEmissao[] = ["HP", "SP", "DP"];
+  const modos: ModoEmissao[] = ["SP", "DP", "HP"];
   return (
     <Painel
       opcoes={modos.map((m) => ({
@@ -218,7 +242,7 @@ export function ComparaModo({ base }: { base: PerfilBase }) {
         recomendado: m === base.modo,
         nota: MODO_DESCRICAO[m],
       }))}
-      legenda="Mesma potência, dwell e stack; só a forma do pulso muda. Do HP ao DP o canal fica um pouco mais raso e o halo de calor cresce: mais retração e estímulo de colágeno, mais dias de eritema e mais risco de mancha."
+      legenda="Mesma potência, time e stack; só a forma do pulso muda (no HP o time não se ajusta). Do SP ao HP a cratera fica mais estreita e mais funda e o calor ao redor diminui. O SP é o que mais aquece: mais retração e estímulo de colágeno, mais dias de eritema e mais risco de mancha."
     />
   );
 }

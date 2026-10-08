@@ -240,6 +240,9 @@ export async function recomendarParametros(
     fontes: parsed.data.fontes.filter((id) => IDS_BASE.includes(id)),
     // Sem foto não há o que analisar, diga o modelo o que disser.
     analise_foto: fotos.length > 0 ? parsed.data.analise_foto : null,
+    // Peça focada só existe na indicação de lesão focal, e vice-versa.
+    parametros_focada:
+      entrada.indicacao === "lesao_focal" ? parsed.data.parametros_focada : null,
   };
   const verificacoes = verificarRecomendacao(entrada, recomendacao);
 

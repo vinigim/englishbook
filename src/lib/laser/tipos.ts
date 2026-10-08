@@ -1,3 +1,5 @@
+import type { LesaoFocalId } from "./protocolo-premium";
+
 /**
  * Vocabulário do recomendador de parâmetros do SmartXide Punto.
  *
@@ -22,6 +24,7 @@ export const INDICACOES = [
   "poros_textura",
   "flacidez_palpebral",
   "queratoses_actinicas",
+  "lesao_focal",
   "outra",
 ] as const;
 export type Indicacao = (typeof INDICACOES)[number];
@@ -39,6 +42,7 @@ export const INDICACAO_LABEL: Record<Indicacao, string> = {
   poros_textura: "Poros dilatados e textura",
   flacidez_palpebral: "Flacidez palpebral",
   queratoses_actinicas: "Queratoses actínicas (campo cancerizável)",
+  lesao_focal: "Lesão isolada com peça focada (sem scanner)",
   outra: "Outra (descrever nas observações)",
 };
 
@@ -161,6 +165,7 @@ export const ESCALAS: Record<Indicacao, Escala | null> = {
   poros_textura: null,
   flacidez_palpebral: null,
   queratoses_actinicas: null,
+  lesao_focal: null,
   outra: null,
 };
 
@@ -357,6 +362,8 @@ export type EntradaConsulta = {
   melasmaRefratario: boolean | null;
   /** Só para cicatrizes. */
   idadeCicatriz: IdadeCicatriz | null;
+  /** Só para "lesao_focal": a linha da tabela da peça focada. */
+  lesaoFocal: LesaoFocalId | null;
   regiao: Regiao;
   extensao: Extensao;
   /** Valor da escala da indicação (ver ESCALAS); null = não informado ou sem escala. */
@@ -385,6 +392,7 @@ export const ENTRADA_PADRAO: EntradaConsulta = {
   melasmaTipo: null,
   melasmaRefratario: null,
   idadeCicatriz: null,
+  lesaoFocal: null,
   regiao: "face_total",
   extensao: "regiao_inteira",
   grau: null,
@@ -421,6 +429,7 @@ export function normalizarEntrada(
     melasmaTipo: melasma ? (e.melasmaTipo ?? "nao_sei") : null,
     melasmaRefratario: melasma ? (e.melasmaRefratario ?? false) : null,
     idadeCicatriz: ehCicatriz(e.indicacao) ? e.idadeCicatriz : null,
+    lesaoFocal: e.indicacao === "lesao_focal" ? e.lesaoFocal : null,
     // Grau de outra escala (trocou a indicação depois de marcar) não vale.
     grau: opcaoGrau(e.indicacao, e.grau)?.valor ?? null,
     sessaoAnterior: subsequente
@@ -475,7 +484,8 @@ export type Recomendacao = {
   parametros: {
     modo_emissao: { valor: ModoEmissao; motivo: string };
     potencia_w: ParametroNumerico;
-    dwell_time_us: ParametroNumerico;
+    /** null no HP: o time não se ajusta nesse pulso. */
+    dwell_time_us: ParametroNumerico | null;
     spacing_um: ParametroNumerico;
     smartstack: ParametroNumerico;
     modo_varredura: { valor: ModoVarredura; motivo: string };
@@ -498,6 +508,19 @@ export type Recomendacao = {
   perguntas_pendentes: string[];
   /** Leitura das fotos enviadas; null quando não houve foto. */
   analise_foto: AnaliseFoto | null;
+  /** Só para lesão isolada com peça focada; aí `parametros` é null. */
+  parametros_focada: ParametrosFocada | null;
+};
+
+export const MODOS_FOCADA = ["SP", "HP", "CW"] as const;
+export type ModoFocada = (typeof MODOS_FOCADA)[number];
+
+export type ParametrosFocada = {
+  modo: ModoFocada;
+  potencia_w: number;
+  /** null no CW (contínuo). */
+  frequencia_hz: number | null;
+  motivo: string;
 };
 
 /**
@@ -607,7 +630,7 @@ export function realizadoAPartirDe(rec: Recomendacao): ParametrosRealizados {
   return {
     modo: p?.modo_emissao.valor ?? null,
     potencia: p?.potencia_w.valor ?? null,
-    dwell: p?.dwell_time_us.valor ?? null,
+    dwell: p?.dwell_time_us?.valor ?? null,
     spacing: p?.spacing_um.valor ?? null,
     stack: p?.smartstack.valor ?? null,
     varredura: p?.modo_varredura.valor ?? null,

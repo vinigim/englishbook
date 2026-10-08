@@ -269,7 +269,8 @@ function Resultado({
   const base: PerfilBase | null = p
     ? {
         potencia: p.potencia_w.valor,
-        dwell: p.dwell_time_us.valor,
+        // No HP o time não se ajusta; o desenho usa um pulso curto.
+        dwell: p.dwell_time_us?.valor ?? 300,
         stack: Math.round(p.smartstack.valor),
         modo: p.modo_emissao.valor,
       }
@@ -353,6 +354,35 @@ function Resultado({
         />
       ) : null}
 
+      {r.parametros_focada ? (
+        <Card variant="bordered" className="p-0">
+          <h3 className="font-display text-xl text-ink tracking-tight px-6 pt-5 pb-3">
+            Peça focada (sem scanner)
+          </h3>
+          <dl className="divide-y divide-line border-t border-line">
+            <LinhaTexto
+              nome="Modo"
+              valor={r.parametros_focada.modo}
+              motivo={r.parametros_focada.motivo}
+            />
+            <LinhaTexto
+              nome="Potência"
+              valor={`${r.parametros_focada.potencia_w} W`}
+              motivo=""
+            />
+            <LinhaTexto
+              nome="Frequência"
+              valor={
+                r.parametros_focada.frequencia_hz != null
+                  ? `${r.parametros_focada.frequencia_hz} Hz`
+                  : "Contínuo"
+              }
+              motivo=""
+            />
+          </dl>
+        </Card>
+      ) : null}
+
       {p ? (
         <Card variant="bordered" className="p-0">
           <h3 className="font-display text-xl text-ink tracking-tight px-6 pt-5 pb-3">
@@ -376,17 +406,25 @@ function Resultado({
                 />
               }
             />
-            <LinhaNumero
-              nome="Dwell time"
-              unidade="µs"
-              param={p.dwell_time_us}
-              ilustracao={
-                <ComparaDwell
-                  base={base!}
-                  faixa={{ min: p.dwell_time_us.faixa_min, max: p.dwell_time_us.faixa_max }}
-                />
-              }
-            />
+            {p.dwell_time_us ? (
+              <LinhaNumero
+                nome="Time (dwell)"
+                unidade="µs"
+                param={p.dwell_time_us}
+                ilustracao={
+                  <ComparaDwell
+                    base={base!}
+                    faixa={{ min: p.dwell_time_us.faixa_min, max: p.dwell_time_us.faixa_max }}
+                  />
+                }
+              />
+            ) : (
+              <LinhaTexto
+                nome="Time (dwell)"
+                valor="—"
+                motivo="No High Pulse o time não se ajusta: o pulso já é curto e frio."
+              />
+            )}
             <LinhaNumero
               nome="Spacing (DOT pitch)"
               unidade="µm"
@@ -527,7 +565,7 @@ function LinhaTexto({
       <dt className="text-sm text-muted">{nome}</dt>
       <dd>
         <p className="font-display text-xl text-ink">{valor}</p>
-        <p className="text-sm text-ink/80 mt-0.5">{motivo}</p>
+        {motivo ? <p className="text-sm text-ink/80 mt-0.5">{motivo}</p> : null}
         {ilustracao ? <VerNaPele>{ilustracao}</VerNaPele> : null}
       </dd>
     </div>
