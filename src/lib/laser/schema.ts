@@ -319,3 +319,18 @@ function migrarEntradaAntiga(bruto: unknown): unknown {
 }
 
 export const entradaSchema = z.preprocess(migrarEntradaAntiga, entradaObjeto);
+
+// ============================================================================
+//  Parâmetros realizados
+// ============================================================================
+export const realizadoSchema = z.object({
+  modo: z.enum(MODOS_EMISSAO).nullable().default(null),
+  potencia: z.number().min(0).max(50).nullable().default(null),
+  dwell: z.number().min(0).max(3000).nullable().default(null),
+  spacing: z.number().min(0).max(1500).nullable().default(null),
+  stack: z.number().int().min(1).max(5).nullable().default(null),
+  varredura: z.enum(MODOS_VARREDURA).nullable().default(null),
+  passadas: z.number().int().min(1).max(5).nullable().default(null),
+  notas: z.string().trim().max(1000, "As notas passam de 1000 caracteres.").default(""),
+  registradoEm: z.string().nullable().default(null),
+});

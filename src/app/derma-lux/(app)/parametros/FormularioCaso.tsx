@@ -51,11 +51,14 @@ export function FormularioCaso({
   setEntrada,
   onEnviar,
   carregando,
+  topo,
 }: {
   entrada: EntradaConsulta;
   setEntrada: (f: (e: EntradaConsulta) => EntradaConsulta) => void;
   onEnviar: () => void;
   carregando: boolean;
+  /** Seletor de locação; fica fora de `entrada` porque não muda a recomendação. */
+  topo?: React.ReactNode;
 }) {
   function set<K extends keyof EntradaConsulta>(k: K, v: EntradaConsulta[K]) {
     setEntrada((e) => ({ ...e, [k]: v }));
@@ -85,6 +88,7 @@ export function FormularioCaso({
 
   return (
     <Card variant="bordered" className="space-y-6 h-fit">
+      {topo ? <Secao titulo="Médico e locação">{topo}</Secao> : null}
       {/* ------------------------------------------------------------------ */}
       <Secao titulo="O caso">
         <Selecao

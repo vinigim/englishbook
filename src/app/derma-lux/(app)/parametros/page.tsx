@@ -3,9 +3,8 @@ import {
   BASE_CONHECIMENTO,
   ORIGEM_LABEL,
 } from "@/lib/laser/base-conhecimento";
-import { entradaSchema, recomendacaoSchema } from "@/lib/laser/schema";
-import { normalizarEntrada, type RespostaConsulta } from "@/lib/laser/tipos";
-import { ParametrosClient, type ConsultaGravada, type FonteInfo } from "./ParametrosClient";
+import { listarConsultas, listarLocacoes } from "@/lib/laser/consultas";
+import { ParametrosClient, type FonteInfo } from "./ParametrosClient";
 
 export const dynamic = "force-dynamic";
 
@@ -22,37 +21,12 @@ export const metadata = {
 export default async function ParametrosPage() {
   const supabase = await createClient();
 
-  // Sem a migração 0021 a consulta falha; a tela segue sem histórico.
-  const { data, error } = await supabase
-    .from("laser_consultas")
-    .select(
-      "id, created_at, entrada, recomendacao, verificacoes, bloqueado_por, model, cost_usd",
-    )
-    .order("created_at", { ascending: false })
-    .limit(30);
-
-  const historico: ConsultaGravada[] = [];
-  for (const row of data ?? []) {
-    const rec = recomendacaoSchema.safeParse(row.recomendacao);
-    if (!rec.success) continue;
-    const resposta: RespostaConsulta = {
-      id: row.id as string,
-      recomendacao: rec.data,
-      verificacoes: (row.verificacoes as string[] | null) ?? [],
-      bloqueadoPor: (row.bloqueado_por as string | null) ?? null,
-      reaproveitada: true,
-      model: (row.model as string | null) ?? null,
-      costUsd: Number(row.cost_usd ?? 0),
-    };
-    // Consultas gravadas antes dos campos novos ganham os valores padrão.
-    const entrada = entradaSchema.safeParse(row.entrada);
-    if (!entrada.success) continue;
-    historico.push({
-      createdAt: row.created_at as string,
-      entrada: normalizarEntrada(entrada.data),
-      resposta,
-    });
-  }
+  // Sem a migração 0021 a leitura falha e a tela segue sem histórico; sem a
+  // 0022, segue sem vínculo com a locação.
+  const [{ consultas: historico, erro, semVinculo }, locacoes] = await Promise.all([
+    listarConsultas(supabase, { limite: 50 }),
+    listarLocacoes(supabase),
+  ]);
 
   const fontes: Record<string, FonteInfo> = Object.fromEntries(
     BASE_CONHECIMENTO.map((t) => [
@@ -85,8 +59,10 @@ export default async function ParametrosPage() {
 
       <ParametrosClient
         historico={historico}
+        locacoes={locacoes}
         fontes={fontes}
-        semTabela={Boolean(error)}
+        semTabela={Boolean(erro)}
+        semVinculo={!erro && semVinculo}
       />
     </div>
   );

@@ -490,9 +490,36 @@ export type Recomendacao = {
   perguntas_pendentes: string[];
 };
 
+/** A locação da agenda à qual a consulta está ligada. */
+export type VinculoLocacao = {
+  id: string;
+  /** rentals.client — o médico ou a clínica que alugou. */
+  medico: string;
+  /** yyyy-mm-dd */
+  data: string;
+  equipamento: string | null;
+  especialidade: string | null;
+};
+
+/** O que o médico de fato usou, que pode diferir da recomendação. */
+export type ParametrosRealizados = {
+  modo: ModoEmissao | null;
+  potencia: number | null;
+  dwell: number | null;
+  spacing: number | null;
+  stack: number | null;
+  varredura: ModoVarredura | null;
+  passadas: number | null;
+  notas: string;
+  /** ISO; preenchido pelo servidor ao gravar. */
+  registradoEm: string | null;
+};
+
 /** O que a rota devolve à tela. */
 export type RespostaConsulta = {
   id: string | null;
+  locacao: VinculoLocacao | null;
+  realizado: ParametrosRealizados | null;
   recomendacao: Recomendacao;
   /** Avisos que o código acrescentou depois de conferir a resposta da IA. */
   verificacoes: string[];
@@ -502,3 +529,26 @@ export type RespostaConsulta = {
   model: string | null;
   costUsd: number;
 };
+
+/** Uma consulta gravada, como a tela lista. */
+export type ConsultaGravada = {
+  createdAt: string;
+  entrada: EntradaConsulta;
+  resposta: RespostaConsulta;
+};
+
+/** Os parâmetros recomendados, como ponto de partida do registro do realizado. */
+export function realizadoAPartirDe(rec: Recomendacao): ParametrosRealizados {
+  const p = rec.parametros;
+  return {
+    modo: p?.modo_emissao.valor ?? null,
+    potencia: p?.potencia_w.valor ?? null,
+    dwell: p?.dwell_time_us.valor ?? null,
+    spacing: p?.spacing_um.valor ?? null,
+    stack: p?.smartstack.valor ?? null,
+    varredura: p?.modo_varredura.valor ?? null,
+    passadas: p?.passadas.valor ?? null,
+    notas: "",
+    registradoEm: null,
+  };
+}

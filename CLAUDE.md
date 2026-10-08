@@ -107,8 +107,13 @@ for every SmartXide Punto setting with its reason and the knowledge-base ids it 
   are checked on the answer and shown as warnings. Warnings never silently rewrite the
   model's numbers.
 - **Persistence** — `laser_consultas` (`0021`, `lux_staff` RLS). Same case + same
-  `KB_VERSAO`/`PROMPT_VERSAO`/model → the saved answer is returned for free. The route
-  checks `lux_staff` itself before spending on the API.
+  `KB_VERSAO`/`PROMPT_VERSAO`/model → the saved answer is copied into a new row for free
+  (`reaproveitada_de`), so every request keeps its own rental link and realized
+  settings. The route checks `lux_staff` itself before spending on the API.
+- **Rental link** (`0022`) — `rental_id` ties a consultation to an agenda rental, which
+  gives the doctor (`rentals.client`, free text), the day and the device.
+  `parametros_realizados` stores what the doctor actually used. The page searches by
+  doctor name; reads fall back to the pre-0022 shape when the columns are missing.
 
 ### Two caching layers in the AI pipeline (this is the owner's money)
 
