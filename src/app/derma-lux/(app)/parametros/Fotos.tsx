@@ -2,12 +2,16 @@
 
 import { useRef, useState } from "react";
 import { Alert } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import {
   FOTOS_MAX,
   FOTO_BYTES_MAX,
   FOTO_LADO_MAX,
+  efeitoDeConfirmar,
   type AnaliseFoto,
+  type DivergenciaFoto,
+  type EntradaConsulta,
 } from "@/lib/laser/tipos";
 
 /** Foto pronta para enviar: já comprimida, só na memória do navegador. */
@@ -161,14 +165,61 @@ export function CampoFotos({
 }
 
 /** O que a IA viu nas fotos, no resultado. */
-export function AnaliseFotoCard({ analise }: { analise: AnaliseFoto }) {
+export function AnaliseFotoCard({
+  analise,
+  entrada,
+  onResponder,
+  ocupado,
+}: {
+  analise: AnaliseFoto;
+  /** O caso atual do formulário, para dizer o que cada botão vai mudar. */
+  entrada: EntradaConsulta;
+  /** Ausente quando não há como consultar de novo (ex.: consulta antiga). */
+  onResponder?: (d: DivergenciaFoto, confere: boolean) => void;
+  ocupado: boolean;
+}) {
   return (
     <div className="space-y-3">
       {analise.divergencias.length > 0 ? (
-        <Alert variant="warning" title="A foto não bate com o formulário">
-          <ul className="list-disc list-inside space-y-1">
+        <Alert variant="warning" title="A foto mostra algo que o formulário não diz">
+          <ul className="space-y-3">
             {analise.divergencias.map((d) => (
-              <li key={d}>{d}</li>
+              <li key={d.texto} className="space-y-1.5">
+                <p>{d.texto}</p>
+                <p className="text-xs text-muted">
+                  {d.ajuste_aplicado
+                    ? "Os parâmetros abaixo já estão mais conservadores por causa disto."
+                    : "Os parâmetros abaixo seguem o formulário."}
+                </p>
+                {onResponder ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={ocupado}
+                      onClick={() => onResponder(d, true)}
+                      title={`Sim: ${efeitoDeConfirmar(entrada, d)} e consulta de novo`}
+                    >
+                      Sim, confere
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={ocupado}
+                      onClick={() => onResponder(d, false)}
+                      title="Não: registra que foi examinado e descartado, e consulta de novo"
+                    >
+                      Não confere
+                    </Button>
+                  </div>
+                ) : null}
+                {onResponder ? (
+                  <p className="text-[11px] text-muted">
+                    “Sim” {efeitoDeConfirmar(entrada, d)}; “Não” registra que
+                    você examinou e descartou. Os dois consultam de novo.
+                  </p>
+                ) : null}
+              </li>
             ))}
           </ul>
         </Alert>

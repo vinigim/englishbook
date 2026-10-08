@@ -20,7 +20,9 @@ import {
   REGIAO_LABEL,
   VIABILIDADE_LABEL,
   normalizarEntrada,
+  responderDivergencia,
   type ConsultaGravada,
+  type DivergenciaFoto,
   type EntradaConsulta,
   type ParametroNumerico,
   type Recomendacao,
@@ -73,11 +75,11 @@ export function ParametrosClient({
   // Só na memória do navegador; vão na requisição e não voltam.
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
 
-  async function consultar(forcar = false) {
+  async function consultar(forcar = false, caso: EntradaConsulta = entrada) {
     setCarregando(true);
     setErro(null);
     try {
-      const dados = { entrada, forcar, rentalId };
+      const dados = { entrada: caso, forcar, rentalId };
       let res: Response;
       if (fotos.length > 0) {
         // Multipart: o navegador define o content-type com o boundary.
@@ -102,7 +104,7 @@ export function ParametrosClient({
         return;
       }
       setResposta(json as RespostaConsulta);
-      setEntradaDaResposta(entrada);
+      setEntradaDaResposta(caso);
       router.refresh();
     } catch {
       setErro("Falha de rede ao consultar a IA. Tente de novo.");
@@ -124,6 +126,17 @@ export function ParametrosClient({
     });
     setErro(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * O médico confirmou ou descartou um achado da foto: atualiza o formulário
+   * e consulta de novo com o caso corrigido. As fotos, se ainda estiverem na
+   * tela, vão junto.
+   */
+  function responderFoto(d: DivergenciaFoto, confere: boolean) {
+    const caso = responderDivergencia(entrada, d, confere);
+    setEntrada(caso);
+    consultar(false, caso);
   }
 
   function aoAtualizar(c: ConsultaGravada) {
@@ -185,6 +198,8 @@ export function ParametrosClient({
               locacoes={locacoes}
               semVinculo={semVinculo}
               onAtualizada={aoAtualizar}
+              entradaAtual={entrada}
+              onResponderFoto={responderFoto}
               formularioMudou={
                 JSON.stringify(normalizarEntrada(entrada)) !==
                 JSON.stringify(normalizarEntrada(entradaDaResposta))
@@ -233,6 +248,8 @@ function Resultado({
   locacoes,
   semVinculo,
   onAtualizada,
+  entradaAtual,
+  onResponderFoto,
 }: {
   resposta: RespostaConsulta;
   entrada: EntradaConsulta;
@@ -243,6 +260,8 @@ function Resultado({
   locacoes: VinculoLocacao[];
   semVinculo: boolean;
   onAtualizada: (c: ConsultaGravada) => void;
+  entradaAtual: EntradaConsulta;
+  onResponderFoto: (d: DivergenciaFoto, confere: boolean) => void;
 }) {
   const r = resposta.recomendacao;
   const p = r.parametros;
@@ -325,7 +344,14 @@ function Resultado({
         </Alert>
       ) : null}
 
-      {r.analise_foto ? <AnaliseFotoCard analise={r.analise_foto} /> : null}
+      {r.analise_foto ? (
+        <AnaliseFotoCard
+          analise={r.analise_foto}
+          entrada={entradaAtual}
+          onResponder={onResponderFoto}
+          ocupado={carregando}
+        />
+      ) : null}
 
       {p ? (
         <Card variant="bordered" className="p-0">

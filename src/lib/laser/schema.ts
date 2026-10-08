@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IDS_BASE } from "./base-conhecimento";
 import {
+  ACHADOS_FOTO,
   ASSOCIACOES,
   CARACTERISTICAS_PELE,
   CONFIANCAS,
@@ -184,9 +185,36 @@ export const RECOMENDACAO_JSON_SCHEMA = {
             },
             divergencias: {
               type: "array",
-              items: { type: "string" },
+              items: {
+                type: "object",
+                properties: {
+                  texto: {
+                    type: "string",
+                    description:
+                      "O que a foto mostra que o formulário não diz, e o que você fez com isso.",
+                  },
+                  achado: {
+                    type: "string",
+                    enum: [...ACHADOS_FOTO],
+                    description:
+                      "O item do formulário a que isso corresponde; 'outro' se não houver item.",
+                  },
+                  grau_sugerido: {
+                    type: ["string", "null"],
+                    description:
+                      "Só quando achado = 'grau': o valor da escala da indicação que a foto sugere (ex.: '3', 'III'). Senão null.",
+                  },
+                  ajuste_aplicado: {
+                    type: "boolean",
+                    description:
+                      "true se você já deixou os parâmetros mais conservadores por causa deste achado.",
+                  },
+                },
+                required: ["texto", "achado", "grau_sugerido", "ajuste_aplicado"],
+                additionalProperties: false,
+              },
               description:
-                "Onde a foto contradiz o formulário (grau, extensão, acne ativa, área) e qual valor você seguiu.",
+                "Onde a foto contradiz ou acrescenta ao formulário (grau, acne ativa, rosácea, área).",
             },
             limitacoes: {
               type: "array",
@@ -272,7 +300,21 @@ export const recomendacaoSchema = z.object({
   analise_foto: z
     .object({
       achados: z.array(z.string()),
-      divergencias: z.array(z.string()),
+      // Consultas gravadas antes traziam só o texto; viram "outro".
+      divergencias: z.array(
+        z.preprocess(
+          (d) =>
+            typeof d === "string"
+              ? { texto: d, achado: "outro", grau_sugerido: null, ajuste_aplicado: false }
+              : d,
+          z.object({
+            texto: z.string(),
+            achado: z.enum(ACHADOS_FOTO).catch("outro"),
+            grau_sugerido: z.string().nullable().default(null),
+            ajuste_aplicado: z.boolean().default(false),
+          }),
+        ),
+      ),
       limitacoes: z.array(z.string()),
     })
     .nullable()
@@ -329,6 +371,8 @@ const entradaObjeto = z.object({
     .trim()
     .max(2000, "As observações passam de 2000 caracteres.")
     .default(""),
+  achadosConfirmados: z.array(z.string().trim().max(500)).max(20).default([]),
+  achadosDescartados: z.array(z.string().trim().max(500)).max(20).default([]),
 });
 
 /**

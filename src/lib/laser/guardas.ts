@@ -1,4 +1,10 @@
-import type { EntradaConsulta, Historico, Recomendacao, Regiao } from "./tipos";
+import {
+  ACHADOS_DE_RISCO,
+  type EntradaConsulta,
+  type Historico,
+  type Recomendacao,
+  type Regiao,
+} from "./tipos";
 
 /**
  * Regras que o CÓDIGO aplica, não o modelo.
@@ -98,6 +104,16 @@ export function verificarRecomendacao(
     if (entrada.caracteristicasPele.includes("acne_ativa")) {
       avisos.push(
         "Há acne inflamatória ativa na área: trate a acne antes do laser.",
+      );
+    }
+  }
+
+  // A IA tem de aplicar o ajuste conservador nos achados de risco da foto
+  // (regra 15 do prompt). Se não aplicou, o código avisa.
+  for (const d of rec.analise_foto?.divergencias ?? []) {
+    if (ACHADOS_DE_RISCO.includes(d.achado) && !d.ajuste_aplicado && p) {
+      avisos.push(
+        `A foto sugere ${d.achado === "acne_ativa" ? "acne inflamatória ativa" : "rosácea ou pele sensível"} e a IA não deixou os parâmetros mais conservadores por isso. Confirme ou descarte o achado.`,
       );
     }
   }
