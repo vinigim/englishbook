@@ -45,4 +45,4 @@ export const TRIAGE_MODEL =
  * não existir jeito de a fatura crescer sem alguém ter decidido.
  */
 export const DRAFT_MODEL =
-  process.env.LEAD_DRAFT_MODEL ?? "claude-sonnet-5";
+  process.env.LEAD_DRAFT_MODEL ?? "claude-sonnet-5-5";

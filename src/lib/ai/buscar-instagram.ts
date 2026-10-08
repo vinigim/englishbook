@@ -146,17 +146,42 @@ function descreverLead(d: DadosParaBusca, p: Palpites): string {
   return `Ache o Instagram deste lead:\n${linhas.join("\n")}${blocoPistas}${aviso}`;
 }
 
-/** Texto das URLs e títulos de todos os resultados de pesquisa da conversa. */
+/**
+ * Texto das URLs e títulos de todos os resultados de pesquisa da conversa.
+ *
+ * Com a busca de filtragem dinâmica (Sonnet 5.5), o modelo roda código para
+ * filtrar os resultados, e parte do que ele viu chega pela saída desse
+ * código, não pelo bloco de resultados. Os dois entram aqui: sem isso, um
+ * perfil verdadeiro seria descartado por "não aparecer nos resultados".
+ */
 function textoDosResultados(conteudo: Anthropic.ContentBlock[]): string {
   const partes: string[] = [];
   for (const bloco of conteudo) {
-    if (bloco.type !== "web_search_tool_result") continue;
-    const resultados = Array.isArray(bloco.content) ? bloco.content : [];
-    for (const r of resultados) {
-      if (r.type === "web_search_result") partes.push(r.url, r.title);
+    if (bloco.type === "web_search_tool_result") {
+      const resultados = Array.isArray(bloco.content) ? bloco.content : [];
+      for (const r of resultados) {
+        if (r.type === "web_search_result") partes.push(r.url, r.title);
+      }
+    } else if (bloco.type === "bash_code_execution_tool_result") {
+      const c = bloco.content;
+      if (c.type === "bash_code_execution_result") partes.push(c.stdout);
     }
   }
   return partes.join("\n").toLowerCase();
+}
+
+/**
+ * Busca com filtragem dinâmica: o modelo filtra os resultados com código
+ * antes de lê-los, o que deixa a pesquisa mais precisa. Só existe nos modelos
+ * mais novos; o Haiku 4.5 da busca em lote fica na versão básica.
+ */
+function temBuscaDinamica(modelo: string): boolean {
+  return /^claude-(sonnet-5|opus-5|opus-4-[678]|fable-)/.test(modelo);
+}
+
+/** O Haiku 4.5 não aceita `effort`: a requisição volta com erro. */
+function aceitaEffort(modelo: string): boolean {
+  return !modelo.startsWith("claude-haiku-4");
 }
 
 function extrairJson(texto: string): unknown {
@@ -198,15 +223,19 @@ export async function buscarInstagram(
   let saida = 0;
   let cacheLido = 0;
   let pesquisas = 0;
+  let recusou = false;
 
   for (let rodada = 0; rodada <= MAX_CONTINUACOES; rodada += 1) {
     const resposta = await client.messages.create({
       model: modelo,
       max_tokens: 2000,
       system: SISTEMA,
+      // Sonnet 5.5: esforço recalibrado; "medium" é o ponto de partida do guia
+      // para uso de ferramentas em várias etapas, como pesquisar e conferir.
+      ...(aceitaEffort(modelo) ? { output_config: { effort: "medium" as const } } : {}),
       tools: [
         {
-          type: "web_search_20250305",
+          type: temBuscaDinamica(modelo) ? "web_search_20260209" : "web_search_20250305",
           name: "web_search",
           max_uses: MAX_PESQUISAS,
           // Só o instagram.com: na web inteira, o perfil some atrás de site
@@ -226,6 +255,11 @@ export async function buscarInstagram(
     cacheLido += resposta.usage.cache_read_input_tokens ?? 0;
     pesquisas += resposta.usage.server_tool_use?.web_search_requests ?? 0;
 
+    // Recusa por política: não há o que continuar.
+    if (resposta.stop_reason === "refusal") {
+      recusou = true;
+      break;
+    }
     // Turno longo pausado pela API: devolve o que veio e deixa continuar.
     if (resposta.stop_reason !== "pause_turn") break;
     mensagens.push({ role: "assistant", content: resposta.content });
@@ -282,8 +316,9 @@ export async function buscarInstagram(
     candidatos,
     descartados,
     consultas,
-    observacao:
-      typeof json?.observacao === "string" && json.observacao.trim()
+    observacao: recusou
+      ? "A IA recusou esta busca."
+      : typeof json?.observacao === "string" && json.observacao.trim()
         ? json.observacao.slice(0, 300)
         : json
           ? null

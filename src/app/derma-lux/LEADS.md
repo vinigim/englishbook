@@ -106,13 +106,13 @@ Dois níveis, para não gastar à toa:
 | | Modelo | Quando roda |
 |---|---|---|
 | **Triagem** | Haiku 4.5 | Em todos os leads pendentes |
-| **Redação** | Sonnet 5 (escolhível) | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
+| **Redação** | Sonnet 5.5 (escolhível) | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
 
 A triagem classifica estágio, temperatura, intenção, objeções e equipamento de
 interesse. A redação escolhe a ação e escreve a mensagem.
 
 **Quem escreve dá para escolher por clique.** Na ficha do lead, um seletor
-oferece Haiku 4.5, Sonnet 5 e Opus 5 (`src/lib/ai/models.ts`), cada um com a
+oferece Haiku 4.5, Sonnet 5.5 e Opus 5 (`src/lib/ai/models.ts`), cada um com a
 estimativa em dólares de uma reanálise — calculada sobre o que as últimas 200
 análises de fato gastaram, não sobre preço de tabela.
 

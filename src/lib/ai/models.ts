@@ -9,7 +9,7 @@
  */
 export const DRAFT_MODELS = [
   "claude-haiku-4-5",
-  "claude-sonnet-5",
+  "claude-sonnet-5-5",
   "claude-opus-5",
 ] as const;
 
@@ -17,7 +17,7 @@ export type DraftModel = (typeof DRAFT_MODELS)[number];
 
 export const DRAFT_MODEL_LABEL: Record<DraftModel, string> = {
   "claude-haiku-4-5": "Haiku 4.5",
-  "claude-sonnet-5": "Sonnet 5",
+  "claude-sonnet-5-5": "Sonnet 5.5",
   "claude-opus-5": "Opus 5",
 };
 
@@ -29,7 +29,7 @@ export const DRAFT_MODEL_LABEL: Record<DraftModel, string> = {
  */
 export const DRAFT_MODEL_NOTE: Record<DraftModel, string> = {
   "claude-haiku-4-5": "rápido e direto; texto mais simples",
-  "claude-sonnet-5": "o padrão — equilíbrio entre custo e escrita",
+  "claude-sonnet-5-5": "o padrão — equilíbrio entre custo e escrita",
   "claude-opus-5": "o mais capaz; para o lead que vale a mensagem certa",
 };
 
