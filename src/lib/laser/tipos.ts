@@ -129,6 +129,8 @@ export const HISTORICOS = [
   "lactacao",
   "hiperpigmentacao_pos_inflamatoria_previa",
   "procedimento_recente_area",
+  "retinoide_topico_em_uso",
+  "medicacao_fotossensibilizante",
 ] as const;
 export type Historico = (typeof HISTORICOS)[number];
 
@@ -151,21 +153,202 @@ export const HISTORICO_LABEL: Record<Historico, string> = {
     "Já teve mancha (HPI) após procedimento",
   procedimento_recente_area:
     "Peeling, laser ou preenchimento na área nas últimas 4 semanas",
+  retinoide_topico_em_uso: "Usa retinoide tópico ou ácidos na área",
+  medicacao_fotossensibilizante:
+    "Usa medicação fotossensibilizante (ex.: doxiciclina, tetraciclinas)",
+};
+
+// ============================================================================
+//  Perguntas que só aparecem para algumas indicações
+// ============================================================================
+export const TIPOS_MELASMA = ["epidermico", "dermico", "misto", "nao_sei"] as const;
+export type TipoMelasma = (typeof TIPOS_MELASMA)[number];
+
+export const TIPO_MELASMA_LABEL: Record<TipoMelasma, string> = {
+  epidermico: "Epidérmico (realça na luz de Wood)",
+  dermico: "Dérmico",
+  misto: "Misto",
+  nao_sei: "Não avaliado",
+};
+
+export const IDADES_CICATRIZ = ["menos_6m", "6_12m", "mais_12m"] as const;
+export type IdadeCicatriz = (typeof IDADES_CICATRIZ)[number];
+
+export const IDADE_CICATRIZ_LABEL: Record<IdadeCicatriz, string> = {
+  menos_6m: "Menos de 6 meses",
+  "6_12m": "6 a 12 meses",
+  mais_12m: "Mais de 12 meses",
+};
+
+export function ehMelasma(i: Indicacao): boolean {
+  return i === "melasma";
+}
+
+export function ehCicatriz(i: Indicacao): boolean {
+  return i.startsWith("cicatriz_");
+}
+
+// ============================================================================
+//  A pele e o contexto
+// ============================================================================
+export const EXTENSOES = ["regiao_inteira", "lesoes_isoladas"] as const;
+export type Extensao = (typeof EXTENSOES)[number];
+
+export const EXTENSAO_LABEL: Record<Extensao, string> = {
+  regiao_inteira: "A região inteira",
+  lesoes_isoladas: "Lesões isoladas dentro da região",
+};
+
+export const CARACTERISTICAS_PELE = [
+  "oleosa_espessa",
+  "fina_atrofica",
+  "sensivel_rosacea",
+  "acne_ativa",
+  "fotodano_intenso",
+] as const;
+export type CaracteristicaPele = (typeof CARACTERISTICAS_PELE)[number];
+
+export const CARACTERISTICA_PELE_LABEL: Record<CaracteristicaPele, string> = {
+  oleosa_espessa: "Oleosa e espessa",
+  fina_atrofica: "Fina ou atrófica",
+  sensivel_rosacea: "Sensível ou com rosácea",
+  acne_ativa: "Acne inflamatória ativa na área",
+  fotodano_intenso: "Fotodano intenso",
+};
+
+export const EXPOSICOES_SOLARES = ["baixa", "moderada", "alta"] as const;
+export type ExposicaoSolar = (typeof EXPOSICOES_SOLARES)[number];
+
+export const EXPOSICAO_SOLAR_LABEL: Record<ExposicaoSolar, string> = {
+  baixa: "Baixa — rotina em ambiente fechado",
+  moderada: "Moderada — deslocamentos, algum sol",
+  alta: "Alta — trabalha ao sol, praia ou viagem prevista",
+};
+
+export const ASSOCIACOES = [
+  "drug_delivery_txa",
+  "drug_delivery_outros",
+  "subcisao",
+  "prp",
+  "corticoide_intralesional",
+  "tca_cross",
+] as const;
+export type Associacao = (typeof ASSOCIACOES)[number];
+
+export const ASSOCIACAO_LABEL: Record<Associacao, string> = {
+  drug_delivery_txa: "Aplicar ácido tranexâmico logo após o laser",
+  drug_delivery_outros: "Aplicar outro ativo logo após (vitamina C, exossomos…)",
+  subcisao: "Subcisão",
+  prp: "PRP",
+  corticoide_intralesional: "Corticoide na cicatriz",
+  tca_cross: "TCA CROSS",
+};
+
+export const RESULTADOS_ANTERIORES = ["bom", "parcial", "sem_melhora"] as const;
+export type ResultadoAnterior = (typeof RESULTADOS_ANTERIORES)[number];
+
+export const RESULTADO_ANTERIOR_LABEL: Record<ResultadoAnterior, string> = {
+  bom: "Boa melhora",
+  parcial: "Melhora parcial",
+  sem_melhora: "Sem melhora",
+};
+
+/** O que se sabe da última sessão. Tudo opcional: nem sempre há o registro. */
+export type SessaoAnterior = {
+  potencia: number | null;
+  dwell: number | null;
+  spacing: number | null;
+  stack: number | null;
+  diasEritema: number | null;
+  teveHpi: boolean;
+  resultado: ResultadoAnterior | null;
+};
+
+export const SESSAO_ANTERIOR_VAZIA: SessaoAnterior = {
+  potencia: null,
+  dwell: null,
+  spacing: null,
+  stack: null,
+  diasEritema: null,
+  teveHpi: false,
+  resultado: null,
 };
 
 export type EntradaConsulta = {
   indicacao: Indicacao;
+  /** Só para melasma. */
+  melasmaTipo: TipoMelasma | null;
+  /** Só para melasma: já fez ≥ 3 meses de tratamento tópico sem resposta? */
+  melasmaRefratario: boolean | null;
+  /** Só para cicatrizes. */
+  idadeCicatriz: IdadeCicatriz | null;
   regiao: Regiao;
-  fototipo: Fototipo;
+  extensao: Extensao;
   gravidade: Gravidade;
-  downtime: Downtime;
+  fototipo: Fototipo;
+  idade: number | null;
+  caracteristicasPele: CaracteristicaPele[];
+  historico: Historico[];
   sessao: Sessao;
   /** Só faz sentido quando `sessao` é "subsequente". */
+  sessaoAnterior: SessaoAnterior | null;
+  /** Texto livre sobre a sessão anterior, complementar aos campos acima. */
   respostaAnterior: string;
-  idade: number | null;
-  historico: Historico[];
+  associacoes: Associacao[];
+  downtime: Downtime;
+  exposicaoSolar: ExposicaoSolar;
   observacoes: string;
 };
+
+export const ENTRADA_PADRAO: EntradaConsulta = {
+  indicacao: "rejuvenescimento_moderado",
+  melasmaTipo: null,
+  melasmaRefratario: null,
+  idadeCicatriz: null,
+  regiao: "face_total",
+  extensao: "regiao_inteira",
+  gravidade: "moderada",
+  fototipo: "III",
+  idade: null,
+  caracteristicasPele: [],
+  historico: [],
+  sessao: "primeira",
+  sessaoAnterior: null,
+  respostaAnterior: "",
+  associacoes: [],
+  downtime: "moderado",
+  exposicaoSolar: "baixa",
+  observacoes: "",
+};
+
+/**
+ * Zera o que não se aplica e ordena as listas.
+ *
+ * Usada no hash e no prompt: um campo de melasma esquecido preenchido numa
+ * consulta de estrias não pode mudar a resposta nem o reaproveitamento. Também
+ * completa consultas gravadas antes de os campos novos existirem.
+ */
+export function normalizarEntrada(
+  parcial: Partial<EntradaConsulta>,
+): EntradaConsulta {
+  const e: EntradaConsulta = { ...ENTRADA_PADRAO, ...parcial };
+  const melasma = ehMelasma(e.indicacao);
+  const subsequente = e.sessao === "subsequente";
+  return {
+    ...e,
+    melasmaTipo: melasma ? (e.melasmaTipo ?? "nao_sei") : null,
+    melasmaRefratario: melasma ? (e.melasmaRefratario ?? false) : null,
+    idadeCicatriz: ehCicatriz(e.indicacao) ? e.idadeCicatriz : null,
+    sessaoAnterior: subsequente
+      ? { ...SESSAO_ANTERIOR_VAZIA, ...(e.sessaoAnterior ?? {}) }
+      : null,
+    respostaAnterior: subsequente ? e.respostaAnterior.trim() : "",
+    caracteristicasPele: [...new Set(e.caracteristicasPele)].sort(),
+    historico: [...new Set(e.historico)].sort(),
+    associacoes: [...new Set(e.associacoes)].sort(),
+    observacoes: e.observacoes.trim(),
+  };
+}
 
 // ============================================================================
 //  Saída
@@ -225,6 +408,8 @@ export type Recomendacao = {
   fontes: string[];
   confianca: Confianca;
   motivo_confianca: string;
+  /** O que a IA queria saber e não sabia, quando mudaria a recomendação. */
+  perguntas_pendentes: string[];
 };
 
 /** O que a rota devolve à tela. */

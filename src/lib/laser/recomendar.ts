@@ -12,7 +12,12 @@ import {
 } from "./guardas";
 import { PROMPT_VERSAO, buildSystemPrompt, descreverCaso } from "./prompt";
 import { RECOMENDACAO_JSON_SCHEMA, recomendacaoSchema } from "./schema";
-import type { EntradaConsulta, Recomendacao, RespostaConsulta } from "./tipos";
+import {
+  normalizarEntrada,
+  type EntradaConsulta,
+  type Recomendacao,
+  type RespostaConsulta,
+} from "./tipos";
 
 /**
  * Modelo da recomendação.
@@ -31,20 +36,34 @@ const TABELA = "laser_consultas";
  * Hash do que decide a resposta.
  *
  * Mesmo caso + mesma base + mesmo prompt + mesmo modelo = mesma consulta, e a
- * resposta gravada é devolvida sem chamar a API. O histórico é ordenado para
- * que marcar as caixas em outra ordem não gere um hash diferente.
+ * resposta gravada é devolvida sem chamar a API. A entrada é normalizada
+ * antes (listas ordenadas, campos que não se aplicam zerados), para que marcar
+ * as caixas em outra ordem não gere um hash diferente.
  */
 export function hashConsulta(e: EntradaConsulta): string {
-  const normalizada = {
-    ...e,
-    historico: [...e.historico].sort(),
-    respostaAnterior: e.sessao === "subsequente" ? e.respostaAnterior : "",
+  const chave = {
+    entrada: normalizarEntrada(e),
     v: `kb${KB_VERSAO}-p${PROMPT_VERSAO}-${LASER_MODEL}`,
   };
-  const chaves = Object.keys(normalizada).sort();
-  return createHash("sha256")
-    .update(JSON.stringify(normalizada, chaves))
-    .digest("hex");
+  return createHash("sha256").update(jsonOrdenado(chave)).digest("hex");
+}
+
+/**
+ * JSON com as chaves ordenadas em todos os níveis.
+ *
+ * Não use `JSON.stringify(obj, listaDeChaves)`: a lista vale para os objetos
+ * aninhados também, e os campos da sessão anterior sumiriam do hash.
+ */
+function jsonOrdenado(valor: unknown): string {
+  if (Array.isArray(valor)) return `[${valor.map(jsonOrdenado).join(",")}]`;
+  if (valor && typeof valor === "object") {
+    const obj = valor as Record<string, unknown>;
+    return `{${Object.keys(obj)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${jsonOrdenado(obj[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(valor ?? null);
 }
 
 type Resultado =
@@ -53,9 +72,12 @@ type Resultado =
 
 export async function recomendarParametros(
   supabase: SupabaseClient,
-  entrada: EntradaConsulta,
+  entradaBruta: EntradaConsulta,
   opcoes: { forcar?: boolean } = {},
 ): Promise<Resultado> {
+  // Normalizada uma vez: é ela que vai para a IA, para o hash e para o banco.
+  const entrada = normalizarEntrada(entradaBruta);
+
   // --- 1. Contraindicação absoluta: nem chama a IA ---------------------------
   const bloqueio = motivoDeBloqueio(entrada);
   if (bloqueio) {
