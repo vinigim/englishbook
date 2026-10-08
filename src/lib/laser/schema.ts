@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { IDS_BASE } from "./base-conhecimento";
 import { LESOES_FOCAIS_IDS } from "./protocolo-premium";
 import {
   ACHADOS_FOTO,
@@ -170,10 +169,15 @@ export const RECOMENDACAO_JSON_SCHEMA = {
       description:
         "Outros tratamentos ou combinações que valem para o caso (ex.: subcisão, TCA CROSS). Vazio se não houver.",
     },
+    // Sem enum de propósito: com os 57 ids da base como valores permitidos, a
+    // gramática compilada passou do tamanho que a API aceita ("The compiled
+    // grammar is too large", 400 em toda consulta). Id inexistente é
+    // descartado no código (recomendar.ts), então a trava aqui era redundante.
     fontes: {
       type: "array",
-      items: { type: "string", enum: [...IDS_BASE] },
-      description: "Ids dos trechos da base de conhecimento que sustentam a recomendação.",
+      items: { type: "string" },
+      description:
+        'Ids dos trechos da base de conhecimento que sustentam a recomendação, exatamente como no atributo id de cada <trecho> (ex.: "premium-manchas").',
     },
     confianca: { type: "string", enum: [...CONFIANCAS] },
     motivo_confianca: {
