@@ -22,7 +22,7 @@ import {
  * Mudar as instruções abaixo invalida as consultas gravadas de propósito:
  * PROMPT_VERSAO entra no hash, junto com KB_VERSAO.
  */
-export const PROMPT_VERSAO = 4;
+export const PROMPT_VERSAO = 5;
 
 const INSTRUCOES = `Você ajuda um médico a escolher os parâmetros do laser de CO2 fracionado SmartXide Punto (DEKA), com scanner HiScan DOT, para um caso concreto.
 
@@ -47,7 +47,11 @@ Quem lê a sua resposta é o médico que vai disparar o laser. Ele decide; você
 12. As fotos complementam o formulário; não o substituem. Descreva em "analise_foto" só o que se vê: tipo e distribuição de cicatrizes, rugas, manchas, eritema, acne inflamatória, poros, por área. Não diagnostique; lesão que pareça suspeita vira um alerta para exame, não um diagnóstico.
 13. Não estime o fototipo pela foto: luz e câmera mudam o tom da pele. O fototipo é o do formulário.
 14. Profundidade de cicatriz em foto de frente é pouco confiável; só a leia com luz oblíqua visível na foto, e diga isso em "limitacoes".
-15. Se a foto contradiz o formulário (grau, extensão, acne ativa não marcada, área diferente), registre em "divergencias", siga o valor MAIS CONSERVADOR dos dois e faça a pergunta em "perguntas_pendentes".
+15. Quando a foto mostra algo que o formulário não diz (grau diferente, acne ativa não marcada, sinais de rosácea ou pele sensível, outra área), registre em "divergencias", com o item do formulário em "achado", e faça a pergunta em "perguntas_pendentes". O que fazer com os parâmetros depende do achado:
+    - Achado de RISCO ("acne_ativa", "sensivel_rosacea"): aplique já o ajuste conservador, como se fosse verdade, e marque "ajuste_aplicado": true. Errar para o lado agressivo aqui custa mancha, infecção ou cicatriz.
+    - Qualquer outro achado (inclusive "grau"): siga o formulário, marque "ajuste_aplicado": false, e diga no texto o que mudaria se o médico confirmar. Em "grau", ponha o grau que a foto sugere em "grau_sugerido".
+    - No "texto", diga em uma frase o que a foto mostra e o que você fez. Não escreva "deixei como pergunta": o médico confirma ou descarta pelos botões ao lado.
+15b. Achados que o médico já examinou: os confirmados são fatos do caso; os descartados não existem para esta recomendação. Não ajuste parâmetros por um achado descartado nem o repita em "divergencias".
 16. A foto pode tornar a recomendação mais conservadora ou mais específica (por exemplo, parâmetros diferentes por área, forma do scan pelo contorno), nunca mais agressiva do que o formulário e a base permitem.
 17. Sem fotos no caso, "analise_foto" é null.
 
@@ -123,6 +127,16 @@ export function descreverCaso(entrada: EntradaConsulta): string {
     `Downtime aceito: ${DOWNTIME_LABEL[e.downtime]}`,
   ];
 
+  const achadosMedico = [
+    e.achadosConfirmados.length > 0
+      ? `Achados da foto CONFIRMADOS pelo médico:\n${lista(e.achadosConfirmados, "")}`
+      : null,
+    e.achadosDescartados.length > 0
+      ? `Achados da foto que o médico EXAMINOU E DESCARTOU (não ajuste por eles):\n${lista(e.achadosDescartados, "")}`
+      : null,
+  ].filter(Boolean);
+  const blocoAchados = achadosMedico.length > 0 ? `\n\n${achadosMedico.join("\n\n")}` : "";
+
   const observacoes = e.observacoes
     ? `\n\n<observacoes_do_medico>\n${e.observacoes}\n</observacoes_do_medico>`
     : "";
@@ -143,7 +157,7 @@ ${sessao}
 Procedimentos combinados na mesma sessão:
 ${lista(e.associacoes.map((a) => ASSOCIACAO_LABEL[a]), "Nenhum.")}
 
-${contexto.join("\n")}
+${contexto.join("\n")}${blocoAchados}
 </caso>${observacoes}
 
 Recomende os parâmetros para este caso.`;

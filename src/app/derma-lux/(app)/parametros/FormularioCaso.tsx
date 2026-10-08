@@ -164,6 +164,31 @@ export function FormularioCaso({
 
       {fotos ? <Secao titulo="Fotos">{fotos}</Secao> : null}
 
+      {entrada.achadosConfirmados.length + entrada.achadosDescartados.length > 0 ? (
+        <Secao titulo="Achados da foto já respondidos">
+          <AchadosRespondidos
+            titulo="Confirmados"
+            itens={entrada.achadosConfirmados}
+            onRemover={(t) =>
+              setEntrada((e) => ({
+                ...e,
+                achadosConfirmados: e.achadosConfirmados.filter((x) => x !== t),
+              }))
+            }
+          />
+          <AchadosRespondidos
+            titulo="Descartados"
+            itens={entrada.achadosDescartados}
+            onRemover={(t) =>
+              setEntrada((e) => ({
+                ...e,
+                achadosDescartados: e.achadosDescartados.filter((x) => x !== t),
+              }))
+            }
+          />
+        </Secao>
+      ) : null}
+
       {/* ------------------------------------------------------------------ */}
       <Secao titulo="O paciente">
         <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-3">
@@ -372,6 +397,41 @@ function EscolhaGrau({
     </div>
   );
 }
+/**
+ * Achados da foto que o médico confirmou ou descartou pelos botões do
+ * resultado. Remover desfaz a resposta; vale na próxima consulta.
+ */
+function AchadosRespondidos({
+  titulo,
+  itens,
+  onRemover,
+}: {
+  titulo: string;
+  itens: string[];
+  onRemover: (texto: string) => void;
+}) {
+  if (itens.length === 0) return null;
+  return (
+    <div>
+      <Label>{titulo}</Label>
+      <ul className="space-y-1.5 text-sm text-ink">
+        {itens.map((t) => (
+          <li key={t} className="flex items-start gap-2">
+            <span className="flex-1">{t}</span>
+            <button
+              type="button"
+              className="text-xs text-muted underline hover:text-ink shrink-0"
+              onClick={() => onRemover(t)}
+            >
+              remover
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-4">

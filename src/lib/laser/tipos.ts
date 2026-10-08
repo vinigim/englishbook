@@ -374,6 +374,10 @@ export type EntradaConsulta = {
   downtime: Downtime;
   exposicaoSolar: ExposicaoSolar;
   observacoes: string;
+  /** Achados da foto que o médico confirmou e que não têm item no formulário. */
+  achadosConfirmados: string[];
+  /** Achados da foto que o médico examinou e descartou. */
+  achadosDescartados: string[];
 };
 
 export const ENTRADA_PADRAO: EntradaConsulta = {
@@ -395,6 +399,8 @@ export const ENTRADA_PADRAO: EntradaConsulta = {
   downtime: "moderado",
   exposicaoSolar: "baixa",
   observacoes: "",
+  achadosConfirmados: [],
+  achadosDescartados: [],
 };
 
 /**
@@ -425,6 +431,8 @@ export function normalizarEntrada(
     historico: [...new Set(e.historico)].sort(),
     associacoes: [...new Set(e.associacoes)].sort(),
     observacoes: e.observacoes.trim(),
+    achadosConfirmados: [...new Set(e.achadosConfirmados.map((t) => t.trim()))].sort(),
+    achadosDescartados: [...new Set(e.achadosDescartados.map((t) => t.trim()))].sort(),
   };
 }
 
@@ -492,11 +500,46 @@ export type Recomendacao = {
   analise_foto: AnaliseFoto | null;
 };
 
+/**
+ * A que item do formulário uma divergência da foto corresponde.
+ *
+ * É o que permite o botão "Sim, confere" marcar o item certo sozinho. "grau"
+ * vem com o grau sugerido; "outro" não tem item no formulário e vira um
+ * achado confirmado em texto.
+ */
+export const ACHADOS_FOTO = [
+  "acne_ativa",
+  "sensivel_rosacea",
+  "fina_atrofica",
+  "oleosa_espessa",
+  "fotodano_intenso",
+  "grau",
+  "outro",
+] as const;
+export type AchadoFoto = (typeof ACHADOS_FOTO)[number];
+
+/**
+ * Achados que pedem cautela mesmo sem confirmação: errar para o lado
+ * agressivo aqui custa mancha, infecção ou cicatriz. Nesses, a IA já aplica o
+ * ajuste conservador e pergunta; nos demais, segue o formulário e pergunta.
+ */
+export const ACHADOS_DE_RISCO: readonly AchadoFoto[] = ["acne_ativa", "sensivel_rosacea"];
+
+export type DivergenciaFoto = {
+  /** Frase para o médico: o que a foto mostra e o que foi feito com isso. */
+  texto: string;
+  achado: AchadoFoto;
+  /** Só quando `achado` é "grau": o valor da escala que a foto sugere. */
+  grau_sugerido: string | null;
+  /** A IA já deixou os parâmetros mais conservadores por causa disso? */
+  ajuste_aplicado: boolean;
+};
+
 export type AnaliseFoto = {
   /** O que se vê, por área. */
   achados: string[];
   /** Onde a foto contradiz o formulário, e o que a IA fez com isso. */
-  divergencias: string[];
+  divergencias: DivergenciaFoto[];
   /** O que a foto não permitiu avaliar (luz, ângulo, foco, maquiagem). */
   limitacoes: string[];
 };
@@ -572,4 +615,41 @@ export function realizadoAPartirDe(rec: Recomendacao): ParametrosRealizados {
     notas: "",
     registradoEm: null,
   };
+}
+
+/**
+ * Aplica ao caso a resposta do médico a uma divergência da foto.
+ *
+ * "Confere" marca o item do formulário quando existe (característica da pele,
+ * grau) e, quando não existe, guarda o achado como confirmado. "Não confere"
+ * guarda o achado como descartado, para a IA não voltar a ajustar por ele.
+ */
+export function responderDivergencia(
+  e: EntradaConsulta,
+  d: DivergenciaFoto,
+  confere: boolean,
+): EntradaConsulta {
+  if (!confere) {
+    return { ...e, achadosDescartados: [...e.achadosDescartados, d.texto] };
+  }
+  if ((CARACTERISTICAS_PELE as readonly string[]).includes(d.achado)) {
+    const c = d.achado as CaracteristicaPele;
+    return e.caracteristicasPele.includes(c)
+      ? e
+      : { ...e, caracteristicasPele: [...e.caracteristicasPele, c] };
+  }
+  if (d.achado === "grau" && opcaoGrau(e.indicacao, d.grau_sugerido)) {
+    return { ...e, grau: d.grau_sugerido };
+  }
+  return { ...e, achadosConfirmados: [...e.achadosConfirmados, d.texto] };
+}
+
+/** O que o botão "Sim, confere" vai fazer, dito antes do clique. */
+export function efeitoDeConfirmar(e: EntradaConsulta, d: DivergenciaFoto): string {
+  if ((CARACTERISTICAS_PELE as readonly string[]).includes(d.achado)) {
+    return `marca “${CARACTERISTICA_PELE_LABEL[d.achado as CaracteristicaPele]}”`;
+  }
+  const grau = d.achado === "grau" ? opcaoGrau(e.indicacao, d.grau_sugerido) : null;
+  if (grau) return `muda o grau para ${grau.rotulo}`;
+  return "registra o achado como confirmado";
 }
