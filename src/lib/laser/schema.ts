@@ -68,10 +68,13 @@ const PARAMETROS_JSON_SCHEMA = {
       additionalProperties: false,
     },
     potencia_w: numerico("Potência em watts."),
-    dwell_time_us: {
-      anyOf: [numerico("Time (dwell) em microssegundos (µs)."), { type: "null" }],
-      description: "null quando o pulso é HP: no HP o time não se ajusta.",
-    },
+    // Sem união aqui de propósito: anyOf dentro de outro anyOf (o de
+    // "parametros") estourou o limite de complexidade das saídas estruturadas
+    // — a API respondia 400. No HP o modelo manda 0, e o zod abaixo converte
+    // para null.
+    dwell_time_us: numerico(
+      "Time (dwell) em microssegundos (µs). No pulso HP o time não se ajusta: use 0 em valor, faixa_min e faixa_max.",
+    ),
     spacing_um: numerico("Spacing / DOT pitch em micrômetros (µm)."),
     smartstack: numerico("Nível do SmartStack, inteiro de 1 a 5."),
     modo_varredura: {
@@ -241,9 +244,10 @@ export const RECOMENDACAO_JSON_SCHEMA = {
           properties: {
             modo: { type: "string", enum: [...MODOS_FOCADA] },
             potencia_w: { type: "number", description: "Potência em watts." },
+            // Sem união: 0 no CW, convertido para null no zod abaixo.
             frequencia_hz: {
-              type: ["number", "null"],
-              description: "Frequência em Hz; null no CW.",
+              type: "number",
+              description: "Frequência em Hz; 0 no CW (contínuo).",
             },
             motivo: { type: "string" },
           },
@@ -296,7 +300,12 @@ export const recomendacaoSchema = z.object({
     .object({
       modo_emissao: z.object({ valor: z.enum(MODOS_EMISSAO), motivo: z.string() }),
       potencia_w: numericoZ,
-      dwell_time_us: numericoZ.nullable(),
+      // 0 = "não se aplica" (HP). Consultas gravadas antes já trazem null.
+      dwell_time_us: z.preprocess(
+        (d) =>
+          d && typeof d === "object" && (d as { valor?: unknown }).valor === 0 ? null : d,
+        numericoZ.nullable(),
+      ),
       spacing_um: numericoZ,
       smartstack: numericoZ,
       modo_varredura: z.object({
@@ -351,7 +360,8 @@ export const recomendacaoSchema = z.object({
     .object({
       modo: z.enum(MODOS_FOCADA),
       potencia_w: z.number(),
-      frequencia_hz: z.number().nullable(),
+      // 0 = contínuo (CW).
+      frequencia_hz: z.preprocess((v) => (v === 0 ? null : v), z.number().nullable()),
       motivo: z.string(),
     })
     .nullable()

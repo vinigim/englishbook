@@ -201,10 +201,15 @@ export async function recomendarParametros(
     }
     if (err instanceof Anthropic.APIError) {
       console.error("[laser-recomendar] erro da API", err.status, err.message);
+      // O motivo vai para a tela: "erro 400" sozinho não dá pista nenhuma, e
+      // quem vê a tela é a equipe (rota restrita a lux_staff), não o paciente.
+      const corpo = err.error as { error?: { message?: unknown } } | undefined;
+      const motivo =
+        typeof corpo?.error?.message === "string" ? corpo.error.message : err.message;
       return {
         ok: false,
         error: "ai_error",
-        message: `A IA respondeu com erro ${err.status ?? ""}. Tente de novo.`,
+        message: `A IA respondeu com erro ${err.status ?? ""}: ${motivo.slice(0, 300)}`,
       };
     }
     throw err;
