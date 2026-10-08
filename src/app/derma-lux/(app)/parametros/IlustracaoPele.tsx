@@ -129,14 +129,82 @@ function CamadasDaPele({ largura }: { largura: number }) {
   );
 }
 
+/** Seta com ponta, desenhada à mão: <marker> repetiria ids entre os SVGs da página. */
+function Seta({
+  x1,
+  y1,
+  x2,
+  y2,
+  duas = false,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  duas?: boolean;
+}) {
+  const ponta = (xa: number, ya: number, xb: number, yb: number) => {
+    const ang = Math.atan2(yb - ya, xb - xa);
+    const t = 3.2;
+    const a1 = ang + Math.PI - 0.45;
+    const a2 = ang + Math.PI + 0.45;
+    return `${xb},${yb} ${xb + t * Math.cos(a1)},${yb + t * Math.sin(a1)} ${xb + t * Math.cos(a2)},${yb + t * Math.sin(a2)}`;
+  };
+  return (
+    <g stroke={COR.ablacao} fill={COR.ablacao}>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={0.7} />
+      <polygon points={ponta(x1, y1, x2, y2)} stroke="none" />
+      {duas ? <polygon points={ponta(x2, y2, x1, y1)} stroke="none" /> : null}
+    </g>
+  );
+}
+
+const ESTILO_ANOTACAO = { fontSize: 6.2, fill: COR.ablacao, fontWeight: 600 } as const;
+
+/**
+ * Setas no próprio corte, como na figura do treinamento Premium: a
+ * profundidade é a ablação (watts), a faixa ao redor é o calor (time).
+ */
+function Anotacoes({ c, x, fundo }: { c: Coluna; x: number; fundo: number }) {
+  const borda = x + c.largura / 2 + c.halo;
+  const xCota = Math.min(borda + 5, W - 12);
+  const yMeio = SUPERFICIE + (fundo - SUPERFICIE) * 0.45;
+  const xCanal = x + c.largura * 0.3;
+  return (
+    <g>
+      <Seta x1={xCota} y1={SUPERFICIE + 1} x2={xCota} y2={fundo} duas />
+      <text
+        x={xCota + 3}
+        y={(SUPERFICIE + fundo) / 2}
+        style={ESTILO_ANOTACAO}
+        transform={`rotate(90 ${xCota + 3} ${(SUPERFICIE + fundo) / 2})`}
+        textAnchor="middle"
+      >
+        ablação · watts
+      </text>
+      {c.halo > 2.5 ? (
+        <>
+          <Seta x1={xCanal} y1={yMeio} x2={Math.min(borda, xCota - 2)} y2={yMeio} />
+          <text x={x} y={Math.min(fundo + c.halo + 9, H - 16)} style={ESTILO_ANOTACAO} textAnchor="middle">
+            calor · time
+          </text>
+        </>
+      ) : null}
+    </g>
+  );
+}
+
 function CorteColuna({
   perfil,
   rotulo,
   comRotulos = false,
+  anotar = false,
 }: {
   perfil: PerfilBase;
   rotulo: string;
   comRotulos?: boolean;
+  /** Setas de "ablação · watts" e "calor · time" dentro do desenho. */
+  anotar?: boolean;
 }) {
   const c = coluna(perfil);
   const fundo = SUPERFICIE + c.profundidade * FUNDO_MAX;
@@ -162,6 +230,7 @@ function CorteColuna({
       />
       <path d={caminhoCanal(x, c.largura, fundo, c.fundo)} fill={COR.ablacao} />
       {comRotulos ? <RotulosCamadas /> : null}
+      {anotar ? <Anotacoes c={c} x={x} fundo={fundo} /> : null}
     </svg>
   );
 }
@@ -188,7 +257,12 @@ function Painel({ opcoes, legenda }: { opcoes: Opcao[]; legenda: string }) {
                 : "border border-line p-1.5 opacity-80"
             }
           >
-            <CorteColuna perfil={o.perfil} rotulo={o.rotulo} comRotulos={i === 0} />
+            <CorteColuna
+              perfil={o.perfil}
+              rotulo={o.rotulo}
+              comRotulos={i === 0}
+              anotar={o.recomendado}
+            />
             <figcaption className="text-center mt-1">
               <span className="block text-sm font-medium text-ink">{o.rotulo}</span>
               {o.recomendado ? (
@@ -335,6 +409,49 @@ function VistaDeCima({ spacing, rotulo }: { spacing: number; rotulo: string }) {
   );
 }
 
+/**
+ * O spacing visto de lado, como na figura do treinamento: colunas vizinhas na
+ * mesma escala horizontal da vista de cima (2 mm), com a cota entre duas.
+ */
+const CORTE_SPACING_H = 62;
+function CorteSpacing({ spacing }: { spacing: number }) {
+  const escala = VISTA / LADO_UM;
+  const sup = 12;
+  const fimEpi = 17;
+  const fimPap = 28;
+  const fundo = 46;
+  const xs: number[] = [];
+  for (let x = spacing / 2; x < LADO_UM; x += spacing) xs.push(x * escala);
+  return (
+    <svg
+      viewBox={`0 0 ${VISTA} ${CORTE_SPACING_H}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label={`Corte lateral: colunas a cada ${spacing} micrômetros`}
+    >
+      <rect x={0} y={sup} width={VISTA} height={fimEpi - sup} fill={COR.epiderme} />
+      <rect x={0} y={fimEpi} width={VISTA} height={fimPap - fimEpi} fill={COR.dermePapilar} />
+      <rect x={0} y={fimPap} width={VISTA} height={CORTE_SPACING_H - fimPap} fill={COR.dermeReticular} />
+      {xs.map((x) => (
+        <g key={x}>
+          <path d={`M ${x - 5} ${sup} L ${x - 1.2} ${fundo + 3} Q ${x} ${fundo + 5.5} ${x + 1.2} ${fundo + 3} L ${x + 5} ${sup} Z`} fill={COR.coagulacao} fillOpacity={0.5} />
+          <path d={`M ${x - 3} ${sup} L ${x - 0.6} ${fundo} Q ${x} ${fundo + 1.5} ${x + 0.6} ${fundo} L ${x + 3} ${sup} Z`} fill={COR.ablacao} />
+        </g>
+      ))}
+      {xs.length > 1 ? (
+        <>
+          <Seta x1={xs[0]} y1={6} x2={xs[1]} y2={6} duas />
+          <line x1={xs[0]} x2={xs[0]} y1={4} y2={sup} stroke={COR.ablacao} strokeWidth={0.4} strokeDasharray="1 1" />
+          <line x1={xs[1]} x2={xs[1]} y1={4} y2={sup} stroke={COR.ablacao} strokeWidth={0.4} strokeDasharray="1 1" />
+          <text x={(xs[0] + xs[1]) / 2} y={4} style={ESTILO_ANOTACAO} textAnchor="middle">
+            spacing
+          </text>
+        </>
+      ) : null}
+    </svg>
+  );
+}
+
 export function ComparaSpacing({
   valor,
   faixa,
@@ -359,6 +476,7 @@ export function ComparaSpacing({
                 v === valor ? "border-2 border-accent p-1.5" : "border border-line p-1.5 opacity-80"
               }
             >
+              <CorteSpacing spacing={v} />
               <VistaDeCima spacing={v} rotulo={`${v} µm`} />
               <figcaption className="text-center mt-1">
                 <span className="block text-sm font-medium text-ink">{v} µm</span>
@@ -376,8 +494,9 @@ export function ComparaSpacing({
         })}
       </div>
       <p className="text-[11px] text-muted mt-3">
-        Vista de cima de um quadrado de 2 × 2 mm. A contagem de DOTs é exata
-        para o spacing; o tamanho do ponto é ilustrativo.
+        Em cima, o corte lateral; embaixo, a vista de cima de um quadrado de
+        2 × 2 mm. A contagem de DOTs é exata para o spacing; o tamanho das
+        colunas é ilustrativo.
       </p>
       <p className="text-xs text-ink/80 mt-2">
         A densidade cai com o quadrado do spacing: abrir de 500 para 1.000 µm
@@ -385,5 +504,85 @@ export function ComparaSpacing({
         cicatrização mais rápida e menos risco de mancha.
       </p>
     </div>
+  );
+}
+
+// ============================================================================
+//  Os 5 parâmetros — adaptado da figura do treinamento Premium
+// ============================================================================
+/**
+ * Um desenho só, com as cinco grandezas apontando para a parte da coluna que
+ * cada uma controla. Mesma lógica da página 1 do material da Premium
+ * (autorizada DEKA): pulso = formato, watts = ablação, time = calor ao redor,
+ * spacing = densidade, stack = aprofundar ablação e calor.
+ */
+export function CincoParametros() {
+  const LW = 330;
+  const LH = 150;
+  const sup = 22;
+  const fimEpi = 32;
+  const fimPap = 56;
+  const fimRet = 134;
+  const xa = 50;
+  const xb = 110;
+  const fundo = 96;
+  const meiaHalo = 19;
+  const xCota = xb + meiaHalo + 8;
+  const yCalor = 72;
+  const canal = (x: number, meia: number, f: number, base: number) =>
+    `M ${x - meia} ${sup} L ${x - base} ${f - base} Q ${x} ${f + base} ${x + base} ${f - base} L ${x + meia} ${sup} Z`;
+  // Na mesma ordem vertical das partes que apontam: as linhas não se cruzam.
+  const rotulos: { y: number; titulo: string; texto: string; ax: number; ay: number }[] = [
+    { y: 12, titulo: "Spacing = densidade", texto: "distância entre os pontos", ax: (xa + xb) / 2 + 12, ay: 12 },
+    { y: 38, titulo: "Pulso = formato", texto: "SP em U, DP em V, HP em V estreito", ax: xb + 9, ay: sup + 2 },
+    { y: 64, titulo: "Watts = ablação", texto: "profundidade do canal vaporizado", ax: xCota, ay: 52 },
+    { y: 90, titulo: "Time = calor ao redor", texto: "espessura da faixa de coagulação", ax: xb + meiaHalo - 4, ay: yCalor },
+    { y: 116, titulo: "Stack = aprofundar", texto: "pulsos repetidos no mesmo ponto", ax: xb + 1, ay: fundo + 11 },
+  ];
+  return (
+    <svg
+      viewBox={`0 0 ${LW} ${LH}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label="Os cinco parâmetros: spacing é a densidade, pulso o formato, watts a ablação, time o calor ao redor, stack aprofunda"
+    >
+      <rect x={0} y={sup} width={160} height={fimEpi - sup} fill={COR.epiderme} />
+      <rect x={0} y={fimEpi} width={160} height={fimPap - fimEpi} fill={COR.dermePapilar} />
+      <rect x={0} y={fimPap} width={160} height={fimRet - fimPap} fill={COR.dermeReticular} />
+      <rect x={0} y={fimRet} width={160} height={LH - fimRet} fill={COR.hipoderme} />
+      {[xa, xb].map((x) => (
+        <g key={x}>
+          <path d={canal(x, meiaHalo, fundo + 8, 5)} fill={COR.coagulacao} fillOpacity={0.55} />
+          <path d={canal(x, 8, fundo, 2.2)} fill={COR.ablacao} />
+        </g>
+      ))}
+      {/* stack: o pulso a mais desce além do fundo */}
+      <path
+        d={`M ${xb - 1.8} ${fundo} L ${xb} ${fundo + 12} L ${xb + 1.8} ${fundo} Z`}
+        fill={COR.ablacao}
+        fillOpacity={0.45}
+      />
+      {/* spacing: cota entre os dois centros */}
+      <Seta x1={xa} y1={12} x2={xb} y2={12} duas />
+      <line x1={xa} x2={xa} y1={9} y2={sup} stroke={COR.ablacao} strokeWidth={0.4} strokeDasharray="1 1" />
+      <line x1={xb} x2={xb} y1={9} y2={sup} stroke={COR.ablacao} strokeWidth={0.4} strokeDasharray="1 1" />
+      {/* watts: cota de profundidade, fora da coluna */}
+      <Seta x1={xCota} y1={sup + 1} x2={xCota} y2={fundo} duas />
+      <line x1={xb} x2={xCota + 2} y1={fundo} y2={fundo} stroke={COR.ablacao} strokeWidth={0.4} strokeDasharray="1 1" />
+      {/* time: do canal até a borda da coagulação */}
+      <Seta x1={xb + 4} y1={yCalor} x2={xb + meiaHalo - 4} y2={yCalor} />
+      {rotulos.map((r) => (
+        <g key={r.titulo}>
+          <line x1={r.ax} y1={r.ay} x2={176} y2={r.y - 3} stroke={COR.linha} strokeWidth={0.7} />
+          <circle cx={r.ax} cy={r.ay} r={1.3} fill={COR.ablacao} />
+          <text x={180} y={r.y - 1} style={{ fontSize: 8, fontWeight: 600, fill: COR.ablacao }}>
+            {r.titulo}
+          </text>
+          <text x={180} y={r.y + 8} style={{ fontSize: 6.8, fill: COR.texto }}>
+            {r.texto}
+          </text>
+        </g>
+      ))}
+    </svg>
   );
 }

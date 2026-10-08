@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import {
+  CincoParametros,
   ComparaDwell,
   ComparaModo,
   ComparaPotencia,
@@ -385,9 +386,21 @@ function Resultado({
 
       {p ? (
         <Card variant="bordered" className="p-0">
-          <h3 className="font-display text-xl text-ink tracking-tight px-6 pt-5 pb-3">
+          <h3 className="font-display text-xl text-ink tracking-tight px-6 pt-5 pb-1">
             Parâmetros
           </h3>
+          <details className="px-6 pb-3 group">
+            <summary className="text-xs font-medium text-accent underline cursor-pointer hover:text-ink">
+              Como ler estes parâmetros
+            </summary>
+            <div className="mt-2 max-w-md">
+              <CincoParametros />
+              <p className="text-[11px] text-muted mt-1">
+                Adaptado do material do treinamento Premium (autorizada DEKA).
+                Esquema sem escala.
+              </p>
+            </div>
+          </details>
           <dl className="divide-y divide-line border-t border-line">
             <LinhaTexto
               nome="Modo de emissão"
