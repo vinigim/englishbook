@@ -96,7 +96,7 @@ type Onde = "analise" | "mensagem";
 type Feedback = { onde: Onde; tipo: "erro" | "info"; texto: string };
 
 /** O padrão da redação. Igual ao do servidor — aqui é só o valor inicial. */
-const MODELO_PADRAO: DraftModel = "claude-sonnet-5";
+const MODELO_PADRAO: DraftModel = "claude-sonnet-5-5";
 
 export function LeadDetailClient({
   detail,
