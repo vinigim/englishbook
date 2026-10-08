@@ -10,9 +10,7 @@
 //  Entrada
 // ============================================================================
 export const INDICACOES = [
-  "rejuvenescimento_leve",
-  "rejuvenescimento_moderado",
-  "rejuvenescimento_intenso",
+  "rejuvenescimento",
   "cicatriz_acne_rolling",
   "cicatriz_acne_boxcar",
   "cicatriz_acne_icepick",
@@ -29,9 +27,7 @@ export const INDICACOES = [
 export type Indicacao = (typeof INDICACOES)[number];
 
 export const INDICACAO_LABEL: Record<Indicacao, string> = {
-  rejuvenescimento_leve: "Rejuvenescimento leve (textura, linhas finas)",
-  rejuvenescimento_moderado: "Rejuvenescimento moderado (rugas, fotoenvelhecimento)",
-  rejuvenescimento_intenso: "Rejuvenescimento intenso (rugas profundas)",
+  rejuvenescimento: "Rejuvenescimento e fotoenvelhecimento",
   cicatriz_acne_rolling: "Cicatriz de acne — rolling",
   cicatriz_acne_boxcar: "Cicatriz de acne — boxcar",
   cicatriz_acne_icepick: "Cicatriz de acne — icepick",
@@ -91,8 +87,87 @@ export const FOTOTIPO_LABEL: Record<Fototipo, string> = {
   VI: "VI — nunca queima, pele negra",
 };
 
-export const GRAVIDADES = ["leve", "moderada", "grave"] as const;
-export type Gravidade = (typeof GRAVIDADES)[number];
+/**
+ * Escala de grau de cada indicação.
+ *
+ * "Leve, moderada, grave" sem régua não quer dizer nada: cicatriz de acne
+ * grave e melasma grave são coisas diferentes, e duas pessoas marcavam o
+ * mesmo caso de jeitos diferentes. Cada indicação tem a sua escala, com a
+ * descrição de cada nível na tela. Indicação sem escala (null) não pergunta
+ * grau: nela a gravidade pesa pouco nos parâmetros.
+ *
+ * Os `valor` são gravados nas consultas: não renomeie.
+ */
+export type OpcaoGrau = { valor: string; rotulo: string; descricao: string };
+export type Escala = { nome: string; pergunta: string; opcoes: OpcaoGrau[] };
+
+const GOODMAN_BARON: Escala = {
+  nome: "Goodman & Baron",
+  pergunta: "Grau das cicatrizes (Goodman & Baron)",
+  opcoes: [
+    { valor: "1", rotulo: "1 — Macular", descricao: "Só mancha (eritema ou pigmento), sem relevo." },
+    { valor: "2", rotulo: "2 — Leve", descricao: "Não aparece à distância social; a maquiagem cobre." },
+    { valor: "3", rotulo: "3 — Moderada", descricao: "Aparece à distância social; a maquiagem não cobre, mas se nivela ao esticar a pele." },
+    { valor: "4", rotulo: "4 — Grave", descricao: "Aparece à distância e não se nivela ao esticar a pele." },
+  ],
+};
+
+const ESTRIAS: Escala = {
+  nome: "largura e quantidade",
+  pergunta: "Como são as estrias",
+  opcoes: [
+    { valor: "finas_poucas", rotulo: "Finas e poucas", descricao: "Estreitas, em pequeno número." },
+    { valor: "largas_ou_numerosas", rotulo: "Largas ou numerosas", descricao: "Uma das duas coisas: largas, ou muitas." },
+    { valor: "largas_e_numerosas", rotulo: "Largas e numerosas", descricao: "Largas, muitas e com atrofia evidente da pele." },
+  ],
+};
+
+export const ESCALAS: Record<Indicacao, Escala | null> = {
+  rejuvenescimento: {
+    nome: "Glogau",
+    pergunta: "Grau de fotoenvelhecimento (Glogau)",
+    opcoes: [
+      { valor: "I", rotulo: "I — Sem rugas", descricao: "Fotodano inicial: discromia leve, textura, linhas finas." },
+      { valor: "II", rotulo: "II — Rugas em movimento", descricao: "Rugas só com a mímica; lentigos iniciais." },
+      { valor: "III", rotulo: "III — Rugas em repouso", descricao: "Rugas visíveis parado; discromia e telangiectasias." },
+      { valor: "IV", rotulo: "IV — Só rugas", descricao: "Rugas por toda a face; pele amarelada ou acinzentada, lesões actínicas." },
+    ],
+  },
+  cicatriz_acne_rolling: GOODMAN_BARON,
+  cicatriz_acne_boxcar: GOODMAN_BARON,
+  cicatriz_acne_icepick: GOODMAN_BARON,
+  cicatriz_cirurgica_traumatica: {
+    nome: "aspecto da cicatriz",
+    pergunta: "Como é a cicatriz",
+    opcoes: [
+      { valor: "plana", rotulo: "Plana", descricao: "No nível da pele; incomoda a cor ou a textura." },
+      { valor: "elevada", rotulo: "Elevada (hipertrófica)", descricao: "Acima da pele, dentro dos limites da lesão original." },
+      { valor: "deprimida", rotulo: "Deprimida (atrófica)", descricao: "Abaixo do nível da pele." },
+      { valor: "retracao", rotulo: "Com retração ou aderência", descricao: "Repuxa a pele ao redor ou limita o movimento." },
+    ],
+  },
+  estrias_rubras: ESTRIAS,
+  estrias_albas: ESTRIAS,
+  lesoes_pigmentadas: null,
+  melasma: {
+    nome: "extensão e intensidade",
+    pergunta: "Extensão e intensidade do melasma",
+    opcoes: [
+      { valor: "leve", rotulo: "Leve", descricao: "Manchas claras numa área pequena." },
+      { valor: "moderado", rotulo: "Moderado", descricao: "Manchas evidentes numa ou duas áreas (ex.: malar)." },
+      { valor: "grave", rotulo: "Grave", descricao: "Manchas escuras e extensas em várias áreas da face." },
+    ],
+  },
+  poros_textura: null,
+  flacidez_palpebral: null,
+  queratoses_actinicas: null,
+  outra: null,
+};
+
+export function opcaoGrau(i: Indicacao, grau: string | null): OpcaoGrau | null {
+  if (!grau) return null;
+  return ESCALAS[i]?.opcoes.find((o) => o.valor === grau) ?? null;
+}
 
 export const DOWNTIMES = ["minimo", "moderado", "maximo_resultado"] as const;
 export type Downtime = (typeof DOWNTIMES)[number];
@@ -284,7 +359,8 @@ export type EntradaConsulta = {
   idadeCicatriz: IdadeCicatriz | null;
   regiao: Regiao;
   extensao: Extensao;
-  gravidade: Gravidade;
+  /** Valor da escala da indicação (ver ESCALAS); null = não informado ou sem escala. */
+  grau: string | null;
   fototipo: Fototipo;
   idade: number | null;
   caracteristicasPele: CaracteristicaPele[];
@@ -301,13 +377,13 @@ export type EntradaConsulta = {
 };
 
 export const ENTRADA_PADRAO: EntradaConsulta = {
-  indicacao: "rejuvenescimento_moderado",
+  indicacao: "rejuvenescimento",
   melasmaTipo: null,
   melasmaRefratario: null,
   idadeCicatriz: null,
   regiao: "face_total",
   extensao: "regiao_inteira",
-  gravidade: "moderada",
+  grau: null,
   fototipo: "III",
   idade: null,
   caracteristicasPele: [],
@@ -339,6 +415,8 @@ export function normalizarEntrada(
     melasmaTipo: melasma ? (e.melasmaTipo ?? "nao_sei") : null,
     melasmaRefratario: melasma ? (e.melasmaRefratario ?? false) : null,
     idadeCicatriz: ehCicatriz(e.indicacao) ? e.idadeCicatriz : null,
+    // Grau de outra escala (trocou a indicação depois de marcar) não vale.
+    grau: opcaoGrau(e.indicacao, e.grau)?.valor ?? null,
     sessaoAnterior: subsequente
       ? { ...SESSAO_ANTERIOR_VAZIA, ...(e.sessaoAnterior ?? {}) }
       : null,
@@ -412,9 +490,36 @@ export type Recomendacao = {
   perguntas_pendentes: string[];
 };
 
+/** A locação da agenda à qual a consulta está ligada. */
+export type VinculoLocacao = {
+  id: string;
+  /** rentals.client — o médico ou a clínica que alugou. */
+  medico: string;
+  /** yyyy-mm-dd */
+  data: string;
+  equipamento: string | null;
+  especialidade: string | null;
+};
+
+/** O que o médico de fato usou, que pode diferir da recomendação. */
+export type ParametrosRealizados = {
+  modo: ModoEmissao | null;
+  potencia: number | null;
+  dwell: number | null;
+  spacing: number | null;
+  stack: number | null;
+  varredura: ModoVarredura | null;
+  passadas: number | null;
+  notas: string;
+  /** ISO; preenchido pelo servidor ao gravar. */
+  registradoEm: string | null;
+};
+
 /** O que a rota devolve à tela. */
 export type RespostaConsulta = {
   id: string | null;
+  locacao: VinculoLocacao | null;
+  realizado: ParametrosRealizados | null;
   recomendacao: Recomendacao;
   /** Avisos que o código acrescentou depois de conferir a resposta da IA. */
   verificacoes: string[];
@@ -424,3 +529,26 @@ export type RespostaConsulta = {
   model: string | null;
   costUsd: number;
 };
+
+/** Uma consulta gravada, como a tela lista. */
+export type ConsultaGravada = {
+  createdAt: string;
+  entrada: EntradaConsulta;
+  resposta: RespostaConsulta;
+};
+
+/** Os parâmetros recomendados, como ponto de partida do registro do realizado. */
+export function realizadoAPartirDe(rec: Recomendacao): ParametrosRealizados {
+  const p = rec.parametros;
+  return {
+    modo: p?.modo_emissao.valor ?? null,
+    potencia: p?.potencia_w.valor ?? null,
+    dwell: p?.dwell_time_us.valor ?? null,
+    spacing: p?.spacing_um.valor ?? null,
+    stack: p?.smartstack.valor ?? null,
+    varredura: p?.modo_varredura.valor ?? null,
+    passadas: p?.passadas.valor ?? null,
+    notas: "",
+    registradoEm: null,
+  };
+}

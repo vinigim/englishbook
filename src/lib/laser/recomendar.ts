@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { estimateCostUsd } from "@/lib/ai/cost";
 import { IDS_BASE, KB_VERSAO } from "./base-conhecimento";
+import { lerLocacao } from "./consultas";
 import {
   motivoDeBloqueio,
   recomendacaoBloqueada,
@@ -73,10 +74,13 @@ type Resultado =
 export async function recomendarParametros(
   supabase: SupabaseClient,
   entradaBruta: EntradaConsulta,
-  opcoes: { forcar?: boolean } = {},
+  opcoes: { forcar?: boolean; rentalId?: string | null } = {},
 ): Promise<Resultado> {
   // Normalizada uma vez: é ela que vai para a IA, para o hash e para o banco.
   const entrada = normalizarEntrada(entradaBruta);
+  const rentalId = opcoes.rentalId ?? null;
+  // Lida uma vez, em paralelo com o resto: a resposta mostra médico e data.
+  const locacaoPromise = rentalId ? lerLocacao(supabase, rentalId) : Promise.resolve(null);
 
   // --- 1. Contraindicação absoluta: nem chama a IA ---------------------------
   const bloqueio = motivoDeBloqueio(entrada);
@@ -89,13 +93,17 @@ export async function recomendarParametros(
       verificacoes: [],
       bloqueadoPor: bloqueio,
       model: null,
-      tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      tokens: SEM_TOKENS,
       costUsd: 0,
+      rentalId,
+      reaproveitadaDe: null,
     });
     return {
       ok: true,
       resposta: {
         id,
+        locacao: await locacaoPromise,
+        realizado: null,
         recomendacao,
         verificacoes: [],
         bloqueadoPor: bloqueio,
@@ -110,7 +118,32 @@ export async function recomendarParametros(
   const hash = hashConsulta(entrada);
   if (!opcoes.forcar) {
     const anterior = await buscarPorHash(supabase, hash);
-    if (anterior) return { ok: true, resposta: { ...anterior, reaproveitada: true } };
+    if (anterior) {
+      // Cada pedido vira uma linha própria, para ter a sua locação e os seus
+      // parâmetros realizados; a resposta da IA é copiada, sem custo.
+      const id = await gravar(supabase, {
+        entrada,
+        hash,
+        recomendacao: anterior.recomendacao,
+        verificacoes: anterior.verificacoes,
+        bloqueadoPor: null,
+        model: anterior.model,
+        tokens: SEM_TOKENS,
+        costUsd: 0,
+        rentalId,
+        reaproveitadaDe: anterior.id,
+      });
+      return {
+        ok: true,
+        resposta: {
+          ...anterior,
+          id: id ?? anterior.id,
+          locacao: await locacaoPromise,
+          realizado: null,
+          reaproveitada: true,
+        },
+      };
+    }
   }
 
   // --- 3. Chamada à IA --------------------------------------------------------
@@ -220,12 +253,16 @@ export async function recomendarParametros(
     model,
     tokens,
     costUsd,
+    rentalId,
+    reaproveitadaDe: null,
   });
 
   return {
     ok: true,
     resposta: {
       id,
+      locacao: await locacaoPromise,
+      realizado: null,
       recomendacao,
       verificacoes,
       bloqueadoPor: null,
@@ -252,34 +289,49 @@ type Gravacao = {
   model: string | null;
   tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
   costUsd: number;
+  rentalId: string | null;
+  reaproveitadaDe: string | null;
 };
+
+const SEM_TOKENS = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
 async function gravar(
   supabase: SupabaseClient,
   g: Gravacao,
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(TABELA)
-    .insert({
-      entrada: g.entrada,
-      content_hash: g.hash,
-      kb_versao: KB_VERSAO,
-      prompt_versao: PROMPT_VERSAO,
-      recomendacao: g.recomendacao,
-      verificacoes: g.verificacoes,
-      bloqueado_por: g.bloqueadoPor,
-      model: g.model,
-      input_tokens: g.tokens.input,
-      output_tokens: g.tokens.output,
-      cache_read_tokens: g.tokens.cacheRead,
-      cache_write_tokens: g.tokens.cacheWrite,
-      cost_usd: g.costUsd,
-    })
-    .select("id")
-    .single();
+  const base = {
+    entrada: g.entrada,
+    content_hash: g.hash,
+    kb_versao: KB_VERSAO,
+    prompt_versao: PROMPT_VERSAO,
+    recomendacao: g.recomendacao,
+    verificacoes: g.verificacoes,
+    bloqueado_por: g.bloqueadoPor,
+    model: g.model,
+    input_tokens: g.tokens.input,
+    output_tokens: g.tokens.output,
+    cache_read_tokens: g.tokens.cacheRead,
+    cache_write_tokens: g.tokens.cacheWrite,
+    cost_usd: g.costUsd,
+  };
+  const inserir = (linha: Record<string, unknown>) =>
+    supabase.from(TABELA).insert(linha).select("id").single();
 
-  if (error) {
-    console.error("[laser-recomendar] falha ao gravar consulta", error.message);
+  let { data, error } = await inserir({
+    ...base,
+    rental_id: g.rentalId,
+    reaproveitada_de: g.reaproveitadaDe,
+  });
+
+  // Sem a migração 0022 as colunas novas não existem: grava sem elas, e a
+  // consulta só perde o vínculo com a locação.
+  if (error && /rental_id|reaproveitada_de/.test(error.message)) {
+    console.error("[laser-recomendar] 0022 não aplicada; gravando sem locação");
+    ({ data, error } = await inserir(base));
+  }
+
+  if (error || !data) {
+    console.error("[laser-recomendar] falha ao gravar consulta", error?.message);
     return null;
   }
   return data.id as string;
@@ -305,6 +357,8 @@ async function buscarPorHash(
 
   return {
     id: data.id as string,
+    locacao: null,
+    realizado: null,
     recomendacao: rec.data,
     verificacoes: (data.verificacoes as string[] | null) ?? [],
     bloqueadoPor: null,

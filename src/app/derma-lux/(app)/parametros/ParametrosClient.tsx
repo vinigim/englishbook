@@ -20,20 +20,22 @@ import {
   REGIAO_LABEL,
   VIABILIDADE_LABEL,
   normalizarEntrada,
+  type ConsultaGravada,
   type EntradaConsulta,
   type ParametroNumerico,
   type Recomendacao,
   type RespostaConsulta,
+  type VinculoLocacao,
 } from "@/lib/laser/tipos";
 import { FormularioCaso } from "./FormularioCaso";
+import {
+  ParametrosRealizadosCard,
+  SeletorLocacao,
+  VinculoDaConsulta,
+  rotuloLocacao,
+} from "./Locacao";
 
 export type FonteInfo = { titulo: string; origem: string; url: string | null };
-
-export type ConsultaGravada = {
-  createdAt: string;
-  entrada: EntradaConsulta;
-  resposta: RespostaConsulta;
-};
 
 const DATA_HORA = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
@@ -46,12 +48,16 @@ const DATA_HORA = new Intl.DateTimeFormat("pt-BR", {
 
 export function ParametrosClient({
   historico,
+  locacoes,
   fontes,
   semTabela,
+  semVinculo,
 }: {
   historico: ConsultaGravada[];
+  locacoes: VinculoLocacao[];
   fontes: Record<string, FonteInfo>;
   semTabela: boolean;
+  semVinculo: boolean;
 }) {
   const router = useRouter();
   const [entrada, setEntrada] = useState<EntradaConsulta>(ENTRADA_PADRAO);
@@ -60,6 +66,9 @@ export function ParametrosClient({
     useState<EntradaConsulta | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Fora de `entrada` de propósito: a locação não muda a recomendação, então
+  // não entra no hash nem invalida o reaproveitamento.
+  const [rentalId, setRentalId] = useState<string | null>(null);
 
   async function consultar(forcar = false) {
     setCarregando(true);
@@ -68,7 +77,7 @@ export function ParametrosClient({
       const res = await fetch("/api/laser/recomendar", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entrada, forcar }),
+        body: JSON.stringify({ entrada, forcar, rentalId }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -94,12 +103,26 @@ export function ParametrosClient({
     setEntrada(normalizarEntrada(c.entrada));
     setResposta(c.resposta);
     setEntradaDaResposta(c.entrada);
+    setRentalId(c.resposta.locacao?.id ?? null);
     setErro(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function aoAtualizar(c: ConsultaGravada) {
+    setResposta(c.resposta);
+    setRentalId(c.resposta.locacao?.id ?? null);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-8">
+      {semVinculo ? (
+        <Alert variant="warning" title="Vínculo com a locação desligado">
+          Rode a migração <code>0022_laser_consulta_locacao.sql</code> no
+          Supabase para ligar as consultas aos médicos e registrar o que foi
+          usado.
+        </Alert>
+      ) : null}
       {semTabela ? (
         <Alert variant="warning" title="Histórico desligado">
           Rode a migração <code>0021_laser_consultas.sql</code> no Supabase para
@@ -116,6 +139,11 @@ export function ParametrosClient({
           setEntrada={setEntrada}
           onEnviar={() => consultar(false)}
           carregando={carregando}
+          topo={
+            semVinculo ? null : (
+              <SeletorLocacao locacoes={locacoes} valor={rentalId} onChange={setRentalId} />
+            )
+          }
         />
 
         {/* ------------------------------------------------------------ */}
@@ -135,6 +163,9 @@ export function ParametrosClient({
               fontes={fontes}
               carregando={carregando}
               onRefazer={() => consultar(true)}
+              locacoes={locacoes}
+              semVinculo={semVinculo}
+              onAtualizada={aoAtualizar}
               formularioMudou={
                 JSON.stringify(normalizarEntrada(entrada)) !==
                 JSON.stringify(normalizarEntrada(entradaDaResposta))
@@ -154,40 +185,12 @@ export function ParametrosClient({
       {/* -------------------------------------------------------------- */}
       {/*  Histórico                                                      */}
       {/* -------------------------------------------------------------- */}
-      {historico.length > 0 ? (
-        <section>
-          <h2 className="font-display text-xl text-ink tracking-tight mb-3">
-            Consultas anteriores
-          </h2>
-          <ul className="divide-y divide-line border border-line bg-paper">
-            {historico.map((c) => (
-              <li key={c.resposta.id ?? c.createdAt}>
-                <button
-                  type="button"
-                  onClick={() => abrirDoHistorico(c)}
-                  className={cn(
-                    "w-full text-left px-4 py-3 hover:bg-line/50 transition-colors",
-                    "flex flex-wrap items-center gap-x-3 gap-y-1 text-sm",
-                    resposta?.id === c.resposta.id && "bg-line/50",
-                  )}
-                >
-                  <span className="text-muted tabular-nums">
-                    {DATA_HORA.format(new Date(c.createdAt))}
-                  </span>
-                  <span className="text-ink font-medium">
-                    {INDICACAO_LABEL[c.entrada.indicacao]}
-                  </span>
-                  <span className="text-muted">
-                    {REGIAO_LABEL[c.entrada.regiao]} · fototipo{" "}
-                    {c.entrada.fototipo}
-                  </span>
-                  <BadgeViabilidade v={c.resposta.recomendacao.viabilidade} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <Historico
+        recentes={historico}
+        selecionada={resposta?.id ?? null}
+        onAbrir={abrirDoHistorico}
+        buscaPorMedico={!semVinculo}
+      />
     </div>
   );
 }
@@ -208,6 +211,9 @@ function Resultado({
   carregando,
   onRefazer,
   formularioMudou,
+  locacoes,
+  semVinculo,
+  onAtualizada,
 }: {
   resposta: RespostaConsulta;
   entrada: EntradaConsulta;
@@ -215,6 +221,9 @@ function Resultado({
   carregando: boolean;
   onRefazer: () => void;
   formularioMudou: boolean;
+  locacoes: VinculoLocacao[];
+  semVinculo: boolean;
+  onAtualizada: (c: ConsultaGravada) => void;
 }) {
   const r = resposta.recomendacao;
   const p = r.parametros;
@@ -247,6 +256,14 @@ function Resultado({
           fototipo {entrada.fototipo} · {entrada.sessao === "primeira" ? "1ª sessão" : "sessão subsequente"}
         </p>
         <p className="text-ink">{r.resumo}</p>
+        {!semVinculo ? (
+          <VinculoDaConsulta
+            key={resposta.id ?? "nova"}
+            resposta={resposta}
+            locacoes={locacoes}
+            onAtualizada={onAtualizada}
+          />
+        ) : null}
         {formularioMudou ? (
           <p className="text-xs text-accent">
             O formulário mudou desde esta resposta. Clique em “Recomendar
@@ -349,6 +366,14 @@ function Resultado({
             />
           </dl>
         </Card>
+      ) : null}
+
+      {!semVinculo ? (
+        <ParametrosRealizadosCard
+          key={resposta.id ?? "nova"}
+          resposta={resposta}
+          onAtualizada={onAtualizada}
+        />
       ) : null}
 
       {!resposta.bloqueadoPor ? (
@@ -503,4 +528,147 @@ function Lista({ titulo, itens }: { titulo: string; itens: string[] }) {
       </ul>
     </Bloco>
   );
+}
+
+// ============================================================================
+//  Histórico, com busca por médico
+// ============================================================================
+function Historico({
+  recentes,
+  selecionada,
+  onAbrir,
+  buscaPorMedico,
+}: {
+  recentes: ConsultaGravada[];
+  selecionada: string | null;
+  onAbrir: (c: ConsultaGravada) => void;
+  buscaPorMedico: boolean;
+}) {
+  const [termo, setTermo] = useState("");
+  const [resultado, setResultado] = useState<{ termo: string; consultas: ConsultaGravada[] } | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function buscar() {
+    const t = termo.trim();
+    if (!t) return limpar();
+    setBuscando(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/laser/consultas?medico=${encodeURIComponent(t)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErro(json.message ?? json.error ?? "Falha ao buscar.");
+        return;
+      }
+      setResultado({ termo: t, consultas: json.consultas as ConsultaGravada[] });
+    } catch {
+      setErro("Falha de rede ao buscar.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  function limpar() {
+    setTermo("");
+    setResultado(null);
+    setErro(null);
+  }
+
+  const lista = resultado?.consultas ?? recentes;
+  if (!buscaPorMedico && recentes.length === 0) return null;
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+        <h2 className="font-display text-xl text-ink tracking-tight">
+          {resultado ? `Consultas de “${resultado.termo}”` : "Consultas anteriores"}
+        </h2>
+        {buscaPorMedico ? (
+          <form
+            className="flex gap-2 w-full sm:w-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              buscar();
+            }}
+          >
+            <input
+              className="h-9 px-3 bg-paper border border-line text-ink text-sm focus:outline-none focus:border-ink flex-1 sm:w-56"
+              placeholder="Buscar por médico"
+              value={termo}
+              onChange={(e) => setTermo(e.target.value)}
+            />
+            <Button size="sm" type="submit" loading={buscando}>
+              Buscar
+            </Button>
+            {resultado ? (
+              <Button size="sm" variant="ghost" type="button" onClick={limpar}>
+                Limpar
+              </Button>
+            ) : null}
+          </form>
+        ) : null}
+      </div>
+
+      {erro ? <Alert variant="danger">{erro}</Alert> : null}
+
+      {lista.length === 0 ? (
+        <p className="text-sm text-muted">
+          {resultado
+            ? "Nenhuma consulta ligada a uma locação com esse nome."
+            : "Nenhuma consulta ainda."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-line border border-line bg-paper">
+          {lista.map((c) => (
+            <li key={c.resposta.id ?? c.createdAt}>
+              <button
+                type="button"
+                onClick={() => onAbrir(c)}
+                className={cn(
+                  "w-full text-left px-4 py-3 hover:bg-line/50 transition-colors text-sm space-y-1",
+                  selecionada === c.resposta.id && "bg-line/50",
+                )}
+              >
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {c.resposta.locacao ? (
+                    <span className="text-ink font-medium">
+                      {rotuloLocacao(c.resposta.locacao)}
+                    </span>
+                  ) : (
+                    <span className="text-muted tabular-nums">
+                      {DATA_HORA.format(new Date(c.createdAt))}
+                    </span>
+                  )}
+                  <BadgeViabilidade v={c.resposta.recomendacao.viabilidade} />
+                  {c.resposta.realizado ? (
+                    <Badge variant="success">Realizado registrado</Badge>
+                  ) : null}
+                </span>
+                <span className="block text-muted">
+                  {INDICACAO_LABEL[c.entrada.indicacao]} · {REGIAO_LABEL[c.entrada.regiao]} ·
+                  fototipo {c.entrada.fototipo}
+                  {c.resposta.realizado ? ` · ${resumoRealizado(c)}` : ""}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function resumoRealizado(c: ConsultaGravada): string {
+  const r = c.resposta.realizado;
+  if (!r) return "";
+  return [
+    r.modo,
+    r.potencia != null ? `${r.potencia} W` : null,
+    r.dwell != null ? `${r.dwell} µs` : null,
+    r.spacing != null ? `${r.spacing} µm` : null,
+    r.stack != null ? `stack ${r.stack}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

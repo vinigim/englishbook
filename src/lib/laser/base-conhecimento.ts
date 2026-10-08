@@ -32,7 +32,7 @@
  * antes de tratá-lo como definitivo.
  */
 
-export const KB_VERSAO = 2;
+export const KB_VERSAO = 3;
 
 export const ORIGENS = [
   "fabricante",
@@ -269,37 +269,51 @@ Não foi encontrado protocolo publicado do SmartXide DOT específico para pálpe
   // ==========================================================================
   {
     id: "ind-rejuvenescimento",
-    titulo: "Rejuvenescimento e fotoenvelhecimento",
+    titulo: "Rejuvenescimento e fotoenvelhecimento por grau de Glogau",
     origem: "consenso",
-    texto: `- Leve (textura, linhas finas, poros): superficial. HP (CoolPeel) ou SP com potência baixa, dwell curto, spacing 500–700 µm, stack 1. Downtime de 2–4 dias.
-- Moderado (rugas, fotodano): SP, potência média, dwell 500–800 µs, spacing 500–700 µm, stack 1–2.
-- Intenso (rugas profundas, fototipos I–III): SP ou DP, potência mais alta, dwell 800–1.000 µs, spacing 400–600 µm, stack 2. Downtime de 7–10 dias.
-Séries de 2–4 sessões com 4–6 semanas de intervalo.`,
+    texto: `O grau de Glogau orienta a intensidade:
+- Glogau I (sem rugas: textura, poros, discromia leve): superficial. HP (CoolPeel) ou SP com potência baixa, dwell curto, spacing 500–700 µm, stack 1. Downtime de 2–4 dias.
+- Glogau II (rugas em movimento): SP, potência baixa a média, dwell 400–600 µs, spacing 500–700 µm, stack 1.
+- Glogau III (rugas em repouso): SP, potência média, dwell 500–800 µs, spacing 500–700 µm, stack 1–2.
+- Glogau IV (só rugas): SP ou DP, potência mais alta, dwell 800–1.000 µs, spacing 400–600 µm, stack 2, só em fototipo I–III; examinar lesões actínicas antes. Downtime de 7–10 dias.
+Séries de 2–4 sessões com 4–6 semanas de intervalo. Grau sem informação: trate como Glogau III na ponta conservadora.`,
   },
   {
     id: "ind-cicatriz-acne",
-    titulo: "Cicatrizes de acne por tipo",
+    titulo: "Cicatrizes de acne por tipo e grau de Goodman & Baron",
     origem: "consenso",
-    texto: `- Rolling: responde bem ao fracionado; combinar com subcisão melhora o resultado.
+    texto: `Por tipo:
+- Rolling: responde bem ao fracionado; combinar com subcisão melhora o resultado.
 - Boxcar: responde bem; boxcar profundo pede stack 2–3.
 - Icepick: estreita e profunda; o fracionado sozinho responde pouco. Use área mínima ou modo ponto, focal, com stack alto, ou combine com TCA CROSS ou punch.
 - Acne ativa na área: tratar antes; laser sobre acne inflamada piora.
+Por grau (escala qualitativa de Goodman & Baron):
+- Grau 1 (macular, só mancha): não é indicação de CO2 ablativo; mancha vermelha responde a laser vascular, pigmento a clareador. Se tratar, superficial.
+- Grau 2 (leve): fracionado superficial a médio, stack 1–2, 2–3 sessões.
+- Grau 3 (moderada, nivela ao esticar): é a melhor indicação do fracionado; stack 2–3, 3–4 sessões. Rolling: subcisão associada.
+- Grau 4 (grave, não nivela ao esticar): o laser sozinho rende pouco. Associe subcisão (rolling), TCA CROSS ou punch (icepick e boxcar profundos) e programe série mais longa; a primeira sessão continua conservadora.
 Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após a última.`,
   },
   {
     id: "ind-cicatriz-cirurgica",
-    titulo: "Cicatrizes cirúrgicas, traumáticas e hipertróficas",
+    titulo: "Cicatrizes cirúrgicas e traumáticas por aspecto",
     origem: "consenso",
-    texto: `- Cicatriz cirúrgica: pode começar cedo, 4–12 semanas após a cirurgia, quando o resultado tende a ser melhor.
-- Hipertrófica ou queloide: densidade baixa e profundidade maior; pode ser combinada com corticoide tópico ou injetado logo após a sessão (laser-assisted drug delivery).
+    texto: `- Plana (incomoda cor ou textura): fracionado superficial a médio, densidade média.
+- Elevada (hipertrófica): densidade baixa e profundidade maior; associar corticoide tópico ou intralesional logo após a sessão (laser-assisted drug delivery). Cicatriz ainda vermelha e ativa: densidade ainda menor.
+- Deprimida (atrófica): stack 2–3 sobre a cicatriz; considerar preenchimento ou subcisão associados.
+- Com retração ou aderência: o fracionado melhora a elasticidade, mas retração importante é cirúrgica (zetaplastia, liberação); o laser entra como complemento.
+- Momento: pode começar 4–12 semanas após a cirurgia, quando o resultado tende a ser melhor.
 - Histórico de queloide é fator de risco para a pele ao redor: teste em área pequena.`,
   },
   {
     id: "ind-estrias",
-    titulo: "Estrias",
+    titulo: "Estrias por tipo, largura e quantidade",
     origem: "consenso",
     texto: `- Albas (antigas, brancas): CO2 fracionado tem boa evidência; potência média, densidade média a alta dentro da estria, stack 2.
 - Rubras (recentes, avermelhadas): lasers vasculares costumam ser a primeira escolha; o CO2 funciona, mas com parâmetros mais leves.
+- Finas e poucas: tratamento só sobre as estrias (área pequena), 2–3 sessões.
+- Largas ou numerosas: série de 3–5 sessões; resultado parcial é a expectativa realista.
+- Largas e numerosas com atrofia: melhora modesta; combine expectativa, considere associações (PRP, drug delivery).
 - Corpo cicatriza devagar: intervalos de 6–8 semanas.`,
   },
   {
@@ -383,12 +397,16 @@ São estudos pequenos, com vias e concentrações diferentes; a direção é con
   },
   {
     id: "fator-gravidade",
-    titulo: "Gravidade da queixa",
+    titulo: "Grau da queixa: como usar as escalas",
     origem: "consenso",
-    texto: `- Leve: tratamento superficial (HP ou SP, stack 1), poucas sessões; não vale o risco de parâmetros profundos.
-- Moderada: o tratamento padrão da indicação.
-- Grave: precisa de mais profundidade e mais sessões, mas chegue lá aos poucos: primeira sessão ainda conservadora, depois suba o stack. Casos graves costumam pedir associação (subcisão, TCA CROSS, drug delivery).
-Gravidade alta nunca justifica, sozinha, ignorar a regra do fototipo ou da região.`,
+    texto: `Cada indicação tem a sua escala; o grau vem descrito no caso. Regras gerais:
+- Rejuvenescimento: escala de Glogau (I a IV), ver "ind-rejuvenescimento".
+- Cicatriz de acne: escala qualitativa de Goodman & Baron (1 a 4), ver "ind-cicatriz-acne".
+- Cicatriz cirúrgica ou traumática: aspecto (plana, elevada, deprimida, com retração), ver "ind-cicatriz-cirurgica".
+- Estrias: largura e quantidade, ver "ind-estrias".
+- Melasma: extensão e intensidade (leve, moderado, grave). Grau maior não autoriza parâmetro maior: no melasma o limite é o risco de HPI e rebote, não a intensidade da mancha. Grau maior pede mais sessões e manutenção mais rigorosa.
+Em todas: grau maior pede mais profundidade e mais sessões, mas chegue lá aos poucos (primeira sessão conservadora, depois suba o stack), e costuma pedir associação. O grau nunca justifica, sozinho, ignorar a regra do fototipo ou da região.
+Grau não informado: siga a ponta conservadora e pergunte o grau em "perguntas_pendentes" se ele mudaria a recomendação.`,
   },
   {
     id: "fator-caracteristicas-pele",

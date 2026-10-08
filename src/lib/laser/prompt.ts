@@ -12,7 +12,9 @@ import {
   REGIAO_LABEL,
   RESULTADO_ANTERIOR_LABEL,
   TIPO_MELASMA_LABEL,
+  ESCALAS,
   normalizarEntrada,
+  opcaoGrau,
   type EntradaConsulta,
 } from "./tipos";
 
@@ -20,7 +22,7 @@ import {
  * Mudar as instruções abaixo invalida as consultas gravadas de propósito:
  * PROMPT_VERSAO entra no hash, junto com KB_VERSAO.
  */
-export const PROMPT_VERSAO = 2;
+export const PROMPT_VERSAO = 3;
 
 const INSTRUCOES = `Você ajuda um médico a escolher os parâmetros do laser de CO2 fracionado SmartXide Punto (DEKA), com scanner HiScan DOT, para um caso concreto.
 
@@ -30,7 +32,7 @@ Quem lê a sua resposta é o médico que vai disparar o laser. Ele decide; você
 
 1. Use SOMENTE a base de conhecimento abaixo. Se ela não cobre algo, diga isso em "motivo_confianca" em vez de inventar.
 2. Primeiro decida se o CO2 fracionado é o tratamento certo para o caso. Se não for (por exemplo, melasma como queixa principal), a viabilidade é "nao_recomendado", "parametros" é null e "alternativas" diz o que fazer.
-3. Parta da indicação e dos detalhes dela (tipo de melasma e se é refratário, idade da cicatriz). Depois ajuste pela região e pela extensão, pelo fototipo, pelas características da pele, pelo histórico, pela idade, pela exposição solar prevista, pelos procedimentos combinados e pelo downtime aceito. A segurança (região, fototipo, pele, histórico, sol) vence a vontade de mais resultado e a gravidade.
+3. Parta da indicação, do grau na escala dela (ver o trecho "fator-gravidade") e dos detalhes dela (tipo de melasma e se é refratário, idade da cicatriz). Depois ajuste pela região e pela extensão, pelo fototipo, pelas características da pele, pelo histórico, pela idade, pela exposição solar prevista, pelos procedimentos combinados e pelo downtime aceito. A segurança (região, fototipo, pele, histórico, sol) vence a vontade de mais resultado e o grau da queixa.
 4. Primeira sessão: fique na ponta conservadora. Sessão subsequente: siga o trecho "fator-sessao-anterior". Se houve mancha (HPI) na anterior, nenhum parâmetro pode ser mais agressivo que o anterior.
 5. Todo valor tem de estar dentro das faixas do aparelho (trecho "equip-limites").
 6. Em cada "motivo", ligue o valor ao caso: diga qual fator do caso empurrou o número para cima ou para baixo. Evite frases genéricas.
@@ -54,6 +56,15 @@ export function buildSystemPrompt(): string {
   return `${INSTRUCOES}${baseParaPrompt()}`;
 }
 
+function linhaGrau(e: EntradaConsulta): string | null {
+  const escala = ESCALAS[e.indicacao];
+  if (!escala) return null;
+  const opcao = opcaoGrau(e.indicacao, e.grau);
+  return opcao
+    ? `Grau (${escala.nome}): ${opcao.rotulo} — ${opcao.descricao}`
+    : `Grau (${escala.nome}): não informado`;
+}
+
 /** O caso, como o modelo lê. Vai na mensagem do usuário, depois do cache. */
 export function descreverCaso(entrada: EntradaConsulta): string {
   const e = normalizarEntrada(entrada);
@@ -67,7 +78,7 @@ export function descreverCaso(entrada: EntradaConsulta): string {
       ? `Melasma refratário (≥ 3 meses de tópico adequado sem resposta): ${e.melasmaRefratario ? "sim" : "não"}`
       : null,
     e.idadeCicatriz ? `Idade da cicatriz: ${IDADE_CICATRIZ_LABEL[e.idadeCicatriz]}` : null,
-    `Gravidade: ${e.gravidade}`,
+    linhaGrau(e),
     `Região: ${REGIAO_LABEL[e.regiao]}`,
     `Extensão: ${EXTENSAO_LABEL[e.extensao]}`,
   ];

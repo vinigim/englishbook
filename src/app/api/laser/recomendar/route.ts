@@ -20,6 +20,8 @@ const bodySchema = z.object({
   entrada: entradaSchema,
   /** Ignora a consulta gravada e pergunta à IA de novo. */
   forcar: z.boolean().optional(),
+  /** Locação da agenda à qual a consulta fica ligada (médico e dia). */
+  rentalId: z.string().uuid().nullable().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
 
   const resultado = await recomendarParametros(supabase, parsed.data.entrada, {
     forcar: parsed.data.forcar,
+    rentalId: parsed.data.rentalId ?? null,
   });
 
   if (!resultado.ok) {

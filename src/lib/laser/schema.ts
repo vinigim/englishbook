@@ -11,7 +11,6 @@ import {
   RESULTADOS_ANTERIORES,
   TIPOS_MELASMA,
   FOTOTIPOS,
-  GRAVIDADES,
   HISTORICOS,
   INDICACOES,
   MODOS_EMISSAO,
@@ -261,14 +260,14 @@ export const sessaoAnteriorSchema = z.object({
  * Os `.default()` deixam passar consultas gravadas antes de os campos novos
  * existirem: o histórico da tela continua abrindo.
  */
-export const entradaSchema = z.object({
+const entradaObjeto = z.object({
   indicacao: z.enum(INDICACOES, { message: "Escolha a indicação." }),
   melasmaTipo: z.enum(TIPOS_MELASMA).nullable().default(null),
   melasmaRefratario: z.boolean().nullable().default(null),
   idadeCicatriz: z.enum(IDADES_CICATRIZ).nullable().default(null),
   regiao: z.enum(REGIOES, { message: "Escolha a região." }),
   extensao: z.enum(EXTENSOES).default("regiao_inteira"),
-  gravidade: z.enum(GRAVIDADES),
+  grau: z.string().max(40).nullable().default(null),
   fototipo: z.enum(FOTOTIPOS, { message: "Escolha o fototipo." }),
   idade: z.number().int().min(12).max(100).nullable().default(null),
   caracteristicasPele: z
@@ -291,4 +290,47 @@ export const entradaSchema = z.object({
     .trim()
     .max(2000, "As observações passam de 2000 caracteres.")
     .default(""),
+});
+
+/**
+ * Converte consultas gravadas antes das escalas de grau.
+ *
+ * Antes havia três indicações de rejuvenescimento e um campo "gravidade"
+ * genérico. As três viram "rejuvenescimento" com o Glogau equivalente, e a
+ * gravidade antiga é descartada: ela não tem correspondência com as escalas.
+ */
+const REJUVENESCIMENTO_ANTIGO: Record<string, string> = {
+  rejuvenescimento_leve: "I",
+  rejuvenescimento_moderado: "III",
+  rejuvenescimento_intenso: "IV",
+};
+
+function migrarEntradaAntiga(bruto: unknown): unknown {
+  if (!bruto || typeof bruto !== "object") return bruto;
+  const { gravidade: _descartada, ...resto } = bruto as Record<string, unknown>;
+  const glogau =
+    typeof resto.indicacao === "string"
+      ? REJUVENESCIMENTO_ANTIGO[resto.indicacao]
+      : undefined;
+  if (glogau) {
+    return { ...resto, indicacao: "rejuvenescimento", grau: resto.grau ?? glogau };
+  }
+  return resto;
+}
+
+export const entradaSchema = z.preprocess(migrarEntradaAntiga, entradaObjeto);
+
+// ============================================================================
+//  Parâmetros realizados
+// ============================================================================
+export const realizadoSchema = z.object({
+  modo: z.enum(MODOS_EMISSAO).nullable().default(null),
+  potencia: z.number().min(0).max(50).nullable().default(null),
+  dwell: z.number().min(0).max(3000).nullable().default(null),
+  spacing: z.number().min(0).max(1500).nullable().default(null),
+  stack: z.number().int().min(1).max(5).nullable().default(null),
+  varredura: z.enum(MODOS_VARREDURA).nullable().default(null),
+  passadas: z.number().int().min(1).max(5).nullable().default(null),
+  notas: z.string().trim().max(1000, "As notas passam de 1000 caracteres.").default(""),
+  registradoEm: z.string().nullable().default(null),
 });

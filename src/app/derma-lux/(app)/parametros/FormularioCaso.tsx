@@ -17,7 +17,6 @@ import {
   EXTENSAO_LABEL,
   FOTOTIPOS,
   FOTOTIPO_LABEL,
-  GRAVIDADES,
   HISTORICOS,
   HISTORICO_LABEL,
   IDADES_CICATRIZ,
@@ -31,6 +30,7 @@ import {
   SESSAO_ANTERIOR_VAZIA,
   TIPOS_MELASMA,
   TIPO_MELASMA_LABEL,
+  ESCALAS,
   ehCicatriz,
   ehMelasma,
   type EntradaConsulta,
@@ -39,8 +39,6 @@ import {
 
 const CAMPO =
   "w-full h-11 px-3 bg-paper border border-line text-ink focus:outline-none focus:border-ink";
-
-const GRAVIDADE_LABEL = { leve: "Leve", moderada: "Moderada", grave: "Grave" } as const;
 
 /**
  * O formulário do caso, em quatro blocos: o caso, o paciente, a sessão e o
@@ -53,11 +51,14 @@ export function FormularioCaso({
   setEntrada,
   onEnviar,
   carregando,
+  topo,
 }: {
   entrada: EntradaConsulta;
   setEntrada: (f: (e: EntradaConsulta) => EntradaConsulta) => void;
   onEnviar: () => void;
   carregando: boolean;
+  /** Seletor de locação; fica fora de `entrada` porque não muda a recomendação. */
+  topo?: React.ReactNode;
 }) {
   function set<K extends keyof EntradaConsulta>(k: K, v: EntradaConsulta[K]) {
     setEntrada((e) => ({ ...e, [k]: v }));
@@ -87,6 +88,7 @@ export function FormularioCaso({
 
   return (
     <Card variant="bordered" className="space-y-6 h-fit">
+      {topo ? <Secao titulo="Médico e locação">{topo}</Secao> : null}
       {/* ------------------------------------------------------------------ */}
       <Secao titulo="O caso">
         <Selecao
@@ -96,6 +98,12 @@ export function FormularioCaso({
           opcoes={INDICACOES}
           rotulos={INDICACAO_LABEL}
           onChange={(v) => set("indicacao", v)}
+        />
+
+        <EscolhaGrau
+          indicacao={entrada.indicacao}
+          valor={entrada.grau}
+          onChange={(v) => set("grau", v)}
         />
 
         {ehMelasma(entrada.indicacao) ? (
@@ -149,14 +157,6 @@ export function FormularioCaso({
           onChange={(v) => set("extensao", v)}
         />
 
-        <Selecao
-          id="gravidade"
-          rotulo="Gravidade"
-          valor={entrada.gravidade}
-          opcoes={GRAVIDADES}
-          rotulos={GRAVIDADE_LABEL}
-          onChange={(v) => set("gravidade", v)}
-        />
       </Secao>
 
       {/* ------------------------------------------------------------------ */}
@@ -310,6 +310,63 @@ export function FormularioCaso({
 // ============================================================================
 //  Peças do formulário
 // ============================================================================
+
+/**
+ * O grau na escala da indicação, com a descrição de cada nível à vista.
+ * Some quando a indicação não tem escala.
+ */
+function EscolhaGrau({
+  indicacao,
+  valor,
+  onChange,
+}: {
+  indicacao: EntradaConsulta["indicacao"];
+  valor: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const escala = ESCALAS[indicacao];
+  if (!escala) return null;
+  return (
+    <div>
+      <Label>{escala.pergunta}</Label>
+      <div className="space-y-1.5">
+        {escala.opcoes.map((o) => {
+          const marcado = valor === o.valor;
+          return (
+            <label
+              key={o.valor}
+              className={cn(
+                "flex items-start gap-2 border px-3 py-2 cursor-pointer text-sm",
+                marcado ? "border-ink bg-line/40" : "border-line",
+              )}
+            >
+              <input
+                type="radio"
+                name="grau"
+                className="mt-1"
+                checked={marcado}
+                onChange={() => onChange(o.valor)}
+              />
+              <span>
+                <span className="block font-medium text-ink">{o.rotulo}</span>
+                <span className="block text-xs text-muted">{o.descricao}</span>
+              </span>
+            </label>
+          );
+        })}
+        {valor ? (
+          <button
+            type="button"
+            className="text-xs text-muted underline hover:text-ink"
+            onClick={() => onChange(null)}
+          >
+            Não sei / limpar
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-4">
