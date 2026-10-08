@@ -8,6 +8,14 @@ import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import {
+  ComparaDwell,
+  ComparaModo,
+  ComparaPotencia,
+  ComparaSpacing,
+  ComparaStack,
+  type PerfilBase,
+} from "./IlustracaoPele";
+import {
   DOWNTIMES,
   DOWNTIME_LABEL,
   FOTOTIPOS,
@@ -422,6 +430,15 @@ function Resultado({
 }) {
   const r = resposta.recomendacao;
   const p = r.parametros;
+  // Os desenhos variam um parâmetro por vez e mantêm os outros no recomendado.
+  const base: PerfilBase | null = p
+    ? {
+        potencia: p.potencia_w.valor,
+        dwell: p.dwell_time_us.valor,
+        stack: Math.round(p.smartstack.valor),
+        modo: p.modo_emissao.valor,
+      }
+    : null;
 
   return (
     <div className="space-y-4">
@@ -476,11 +493,51 @@ function Resultado({
             Parâmetros
           </h3>
           <dl className="divide-y divide-line border-t border-line">
-            <LinhaTexto nome="Modo de emissão" valor={p.modo_emissao.valor} motivo={p.modo_emissao.motivo} />
-            <LinhaNumero nome="Potência" unidade="W" param={p.potencia_w} />
-            <LinhaNumero nome="Dwell time" unidade="µs" param={p.dwell_time_us} />
-            <LinhaNumero nome="Spacing (DOT pitch)" unidade="µm" param={p.spacing_um} />
-            <LinhaNumero nome="SmartStack" unidade="" param={p.smartstack} />
+            <LinhaTexto
+              nome="Modo de emissão"
+              valor={p.modo_emissao.valor}
+              motivo={p.modo_emissao.motivo}
+              ilustracao={<ComparaModo base={base!} />}
+            />
+            <LinhaNumero
+              nome="Potência"
+              unidade="W"
+              param={p.potencia_w}
+              ilustracao={
+                <ComparaPotencia
+                  base={base!}
+                  faixa={{ min: p.potencia_w.faixa_min, max: p.potencia_w.faixa_max }}
+                />
+              }
+            />
+            <LinhaNumero
+              nome="Dwell time"
+              unidade="µs"
+              param={p.dwell_time_us}
+              ilustracao={
+                <ComparaDwell
+                  base={base!}
+                  faixa={{ min: p.dwell_time_us.faixa_min, max: p.dwell_time_us.faixa_max }}
+                />
+              }
+            />
+            <LinhaNumero
+              nome="Spacing (DOT pitch)"
+              unidade="µm"
+              param={p.spacing_um}
+              ilustracao={
+                <ComparaSpacing
+                  valor={p.spacing_um.valor}
+                  faixa={{ min: p.spacing_um.faixa_min, max: p.spacing_um.faixa_max }}
+                />
+              }
+            />
+            <LinhaNumero
+              nome="SmartStack"
+              unidade=""
+              param={p.smartstack}
+              ilustracao={<ComparaStack base={base!} />}
+            />
             <LinhaTexto nome="Varredura" valor={p.modo_varredura.valor} motivo={p.modo_varredura.motivo} />
             <LinhaTexto nome="Forma da área" valor={p.forma_area.valor} motivo={p.forma_area.motivo} />
             <LinhaTexto
@@ -551,10 +608,12 @@ function LinhaNumero({
   nome,
   unidade,
   param,
+  ilustracao,
 }: {
   nome: string;
   unidade: string;
   param: ParametroNumerico;
+  ilustracao?: React.ReactNode;
 }) {
   const u = unidade ? ` ${unidade}` : "";
   return (
@@ -572,6 +631,7 @@ function LinhaNumero({
           </span>
         </p>
         <p className="text-sm text-ink/80 mt-0.5">{param.motivo}</p>
+        {ilustracao ? <VerNaPele>{ilustracao}</VerNaPele> : null}
       </dd>
     </div>
   );
@@ -581,10 +641,12 @@ function LinhaTexto({
   nome,
   valor,
   motivo,
+  ilustracao,
 }: {
   nome: string;
   valor: string;
   motivo: string;
+  ilustracao?: React.ReactNode;
 }) {
   return (
     <div className="px-6 py-3 grid gap-1 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-4">
@@ -592,7 +654,29 @@ function LinhaTexto({
       <dd>
         <p className="font-display text-xl text-ink">{valor}</p>
         <p className="text-sm text-ink/80 mt-0.5">{motivo}</p>
+        {ilustracao ? <VerNaPele>{ilustracao}</VerNaPele> : null}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * Fechado por padrão: com cinco desenhos abertos, a lista de parâmetros vira
+ * uma rolagem longa no celular, e o valor é o que se consulta primeiro.
+ */
+function VerNaPele({ children }: { children: React.ReactNode }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        aria-expanded={aberto}
+        className="mt-1.5 text-xs font-medium text-accent hover:text-ink underline"
+      >
+        {aberto ? "Esconder desenho" : "Ver na pele"}
+      </button>
+      {aberto ? children : null}
     </div>
   );
 }
