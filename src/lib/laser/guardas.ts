@@ -64,6 +64,7 @@ export function recomendacaoBloqueada(motivo: string): Recomendacao {
     confianca: "alta",
     motivo_confianca: "Contraindicação absoluta, aplicada pelo sistema sem consultar a IA.",
     perguntas_pendentes: [],
+    analise_foto: null,
   };
 }
 

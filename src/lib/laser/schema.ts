@@ -172,6 +172,35 @@ export const RECOMENDACAO_JSON_SCHEMA = {
       description:
         "Por que essa confiança: há estudo com o aparelho para este caso, ou é extrapolação?",
     },
+    analise_foto: {
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            achados: {
+              type: "array",
+              items: { type: "string" },
+              description: "O que se vê nas fotos, por área. Só o visível; sem diagnóstico.",
+            },
+            divergencias: {
+              type: "array",
+              items: { type: "string" },
+              description:
+                "Onde a foto contradiz o formulário (grau, extensão, acne ativa, área) e qual valor você seguiu.",
+            },
+            limitacoes: {
+              type: "array",
+              items: { type: "string" },
+              description: "O que a foto não deixou avaliar (luz, ângulo, foco, maquiagem).",
+            },
+          },
+          required: ["achados", "divergencias", "limitacoes"],
+          additionalProperties: false,
+        },
+        { type: "null" },
+      ],
+      description: "null quando não houver foto no caso.",
+    },
     perguntas_pendentes: {
       type: "array",
       items: { type: "string" },
@@ -192,6 +221,7 @@ export const RECOMENDACAO_JSON_SCHEMA = {
     "confianca",
     "motivo_confianca",
     "perguntas_pendentes",
+    "analise_foto",
   ],
   additionalProperties: false,
 } as const;
@@ -238,6 +268,15 @@ export const recomendacaoSchema = z.object({
   motivo_confianca: z.string(),
   // Ausente nas consultas gravadas antes de o campo existir.
   perguntas_pendentes: z.array(z.string()).default([]),
+  // Ausente nas consultas gravadas antes de o campo existir.
+  analise_foto: z
+    .object({
+      achados: z.array(z.string()),
+      divergencias: z.array(z.string()),
+      limitacoes: z.array(z.string()),
+    })
+    .nullable()
+    .default(null),
 });
 
 // ============================================================================

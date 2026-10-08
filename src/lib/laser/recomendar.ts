@@ -41,10 +41,12 @@ const TABELA = "laser_consultas";
  * antes (listas ordenadas, campos que não se aplicam zerados), para que marcar
  * as caixas em outra ordem não gere um hash diferente.
  */
-export function hashConsulta(e: EntradaConsulta): string {
+export function hashConsulta(e: EntradaConsulta, fotos: string[] = []): string {
   const chave = {
     entrada: normalizarEntrada(e),
     v: `kb${KB_VERSAO}-p${PROMPT_VERSAO}-${LASER_MODEL}`,
+    // Só entra quando há foto, para não mudar o hash das consultas sem foto.
+    ...(fotos.length > 0 ? { fotos: [...fotos].sort() } : {}),
   };
   return createHash("sha256").update(jsonOrdenado(chave)).digest("hex");
 }
@@ -67,6 +69,19 @@ function jsonOrdenado(valor: unknown): string {
   return JSON.stringify(valor ?? null);
 }
 
+/**
+ * Foto do paciente, já comprimida no navegador.
+ *
+ * Só existe durante a requisição: vai para a IA e é descartada. Nada daqui é
+ * gravado — nem a imagem, nem o base64. Fica só o `sha256`, dentro do hash da
+ * consulta, para a resposta não ser reaproveitada para outra foto.
+ */
+export type FotoEnviada = {
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  base64: string;
+  sha256: string;
+};
+
 type Resultado =
   | { ok: true; resposta: RespostaConsulta }
   | { ok: false; error: string; message: string };
@@ -74,8 +89,9 @@ type Resultado =
 export async function recomendarParametros(
   supabase: SupabaseClient,
   entradaBruta: EntradaConsulta,
-  opcoes: { forcar?: boolean; rentalId?: string | null } = {},
+  opcoes: { forcar?: boolean; rentalId?: string | null; fotos?: FotoEnviada[] } = {},
 ): Promise<Resultado> {
+  const fotos = opcoes.fotos ?? [];
   // Normalizada uma vez: é ela que vai para a IA, para o hash e para o banco.
   const entrada = normalizarEntrada(entradaBruta);
   const rentalId = opcoes.rentalId ?? null;
@@ -115,8 +131,10 @@ export async function recomendarParametros(
   }
 
   // --- 2. Mesma consulta já feita: devolve a gravada -------------------------
-  const hash = hashConsulta(entrada);
-  if (!opcoes.forcar) {
+  // Com foto, a resposta depende daquela imagem: o hash leva o sha256 dela, e
+  // não se reaproveita nada — nem se oferece esta resposta a outro caso.
+  const hash = hashConsulta(entrada, fotos.map((f) => f.sha256));
+  if (!opcoes.forcar && fotos.length === 0) {
     const anterior = await buscarPorHash(supabase, hash);
     if (anterior) {
       // Cada pedido vira uma linha própria, para ter a sua locação e os seus
@@ -171,7 +189,7 @@ export async function recomendarParametros(
         effort: "high",
         format: betaJSONSchemaOutputFormat(RECOMENDACAO_JSON_SCHEMA),
       },
-      messages: [{ role: "user", content: descreverCaso(entrada) }],
+      messages: [{ role: "user", content: montarMensagem(entrada, fotos) }],
     });
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) {
@@ -220,6 +238,8 @@ export async function recomendarParametros(
   const recomendacao: Recomendacao = {
     ...parsed.data,
     fontes: parsed.data.fontes.filter((id) => IDS_BASE.includes(id)),
+    // Sem foto não há o que analisar, diga o modelo o que disser.
+    analise_foto: fotos.length > 0 ? parsed.data.analise_foto : null,
   };
   const verificacoes = verificarRecomendacao(entrada, recomendacao);
 
@@ -271,6 +291,30 @@ export async function recomendarParametros(
       costUsd,
     },
   };
+}
+
+/**
+ * As fotos vêm antes do texto: o modelo lê melhor a imagem quando a pergunta
+ * chega depois dela. Tudo isso fica depois do bloco em cache.
+ */
+function montarMensagem(
+  entrada: EntradaConsulta,
+  fotos: FotoEnviada[],
+): string | Anthropic.Beta.BetaContentBlockParam[] {
+  const caso = descreverCaso(entrada);
+  if (fotos.length === 0) return caso;
+  return [
+    ...fotos.map(
+      (f): Anthropic.Beta.BetaContentBlockParam => ({
+        type: "image",
+        source: { type: "base64", media_type: f.mediaType, data: f.base64 },
+      }),
+    ),
+    {
+      type: "text",
+      text: `${caso}\n\nHá ${fotos.length} foto(s) do paciente acima, da área a tratar. Preencha "analise_foto".`,
+    },
+  ];
 }
 
 // ============================================================================

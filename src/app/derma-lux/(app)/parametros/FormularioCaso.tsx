@@ -52,6 +52,7 @@ export function FormularioCaso({
   onEnviar,
   carregando,
   topo,
+  fotos,
 }: {
   entrada: EntradaConsulta;
   setEntrada: (f: (e: EntradaConsulta) => EntradaConsulta) => void;
@@ -59,6 +60,8 @@ export function FormularioCaso({
   carregando: boolean;
   /** Seletor de locação; fica fora de `entrada` porque não muda a recomendação. */
   topo?: React.ReactNode;
+  /** Campo de fotos; também fora de `entrada`, porque a foto nunca é gravada. */
+  fotos?: React.ReactNode;
 }) {
   function set<K extends keyof EntradaConsulta>(k: K, v: EntradaConsulta[K]) {
     setEntrada((e) => ({ ...e, [k]: v }));
@@ -158,6 +161,8 @@ export function FormularioCaso({
         />
 
       </Secao>
+
+      {fotos ? <Secao titulo="Fotos">{fotos}</Secao> : null}
 
       {/* ------------------------------------------------------------------ */}
       <Secao titulo="O paciente">
