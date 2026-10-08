@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Alert, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input, Label } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import {
   ComparaDwell,
@@ -16,24 +15,17 @@ import {
   type PerfilBase,
 } from "./IlustracaoPele";
 import {
-  DOWNTIMES,
-  DOWNTIME_LABEL,
-  FOTOTIPOS,
-  FOTOTIPO_LABEL,
-  GRAVIDADES,
-  HISTORICOS,
-  HISTORICO_LABEL,
-  INDICACOES,
+  ENTRADA_PADRAO,
   INDICACAO_LABEL,
-  REGIOES,
   REGIAO_LABEL,
   VIABILIDADE_LABEL,
+  normalizarEntrada,
   type EntradaConsulta,
-  type Historico,
   type ParametroNumerico,
   type Recomendacao,
   type RespostaConsulta,
 } from "@/lib/laser/tipos";
+import { FormularioCaso } from "./FormularioCaso";
 
 export type FonteInfo = { titulo: string; origem: string; url: string | null };
 
@@ -42,22 +34,6 @@ export type ConsultaGravada = {
   entrada: EntradaConsulta;
   resposta: RespostaConsulta;
 };
-
-const ENTRADA_INICIAL: EntradaConsulta = {
-  indicacao: "rejuvenescimento_moderado",
-  regiao: "face_total",
-  fototipo: "III",
-  gravidade: "moderada",
-  downtime: "moderado",
-  sessao: "primeira",
-  respostaAnterior: "",
-  idade: null,
-  historico: [],
-  observacoes: "",
-};
-
-const SELECT_CLASS =
-  "w-full h-11 px-3 bg-paper border border-line text-ink focus:outline-none focus:border-ink";
 
 const DATA_HORA = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
@@ -78,25 +54,12 @@ export function ParametrosClient({
   semTabela: boolean;
 }) {
   const router = useRouter();
-  const [entrada, setEntrada] = useState<EntradaConsulta>(ENTRADA_INICIAL);
+  const [entrada, setEntrada] = useState<EntradaConsulta>(ENTRADA_PADRAO);
   const [resposta, setResposta] = useState<RespostaConsulta | null>(null);
   const [entradaDaResposta, setEntradaDaResposta] =
     useState<EntradaConsulta | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-
-  function set<K extends keyof EntradaConsulta>(k: K, v: EntradaConsulta[K]) {
-    setEntrada((e) => ({ ...e, [k]: v }));
-  }
-
-  function alternarHistorico(h: Historico) {
-    setEntrada((e) => ({
-      ...e,
-      historico: e.historico.includes(h)
-        ? e.historico.filter((x) => x !== h)
-        : [...e.historico, h],
-    }));
-  }
 
   async function consultar(forcar = false) {
     setCarregando(true);
@@ -127,7 +90,8 @@ export function ParametrosClient({
   }
 
   function abrirDoHistorico(c: ConsultaGravada) {
-    setEntrada(c.entrada);
+    // Consultas antigas não têm os campos novos: normalizar completa com o padrão.
+    setEntrada(normalizarEntrada(c.entrada));
     setResposta(c.resposta);
     setEntradaDaResposta(c.entrada);
     setErro(null);
@@ -147,189 +111,12 @@ export function ParametrosClient({
         {/* ------------------------------------------------------------ */}
         {/*  Formulário                                                   */}
         {/* ------------------------------------------------------------ */}
-        <Card variant="bordered" className="space-y-4 h-fit">
-          <div>
-            <Label htmlFor="indicacao">Indicação</Label>
-            <select
-              id="indicacao"
-              className={SELECT_CLASS}
-              value={entrada.indicacao}
-              onChange={(e) =>
-                set("indicacao", e.target.value as EntradaConsulta["indicacao"])
-              }
-            >
-              {INDICACOES.map((i) => (
-                <option key={i} value={i}>
-                  {INDICACAO_LABEL[i]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="regiao">Região</Label>
-            <select
-              id="regiao"
-              className={SELECT_CLASS}
-              value={entrada.regiao}
-              onChange={(e) =>
-                set("regiao", e.target.value as EntradaConsulta["regiao"])
-              }
-            >
-              {REGIOES.map((r) => (
-                <option key={r} value={r}>
-                  {REGIAO_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="fototipo">Fototipo (Fitzpatrick)</Label>
-            <select
-              id="fototipo"
-              className={SELECT_CLASS}
-              value={entrada.fototipo}
-              onChange={(e) =>
-                set("fototipo", e.target.value as EntradaConsulta["fototipo"])
-              }
-            >
-              {FOTOTIPOS.map((f) => (
-                <option key={f} value={f}>
-                  {FOTOTIPO_LABEL[f]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="gravidade">Gravidade</Label>
-              <select
-                id="gravidade"
-                className={SELECT_CLASS}
-                value={entrada.gravidade}
-                onChange={(e) =>
-                  set("gravidade", e.target.value as EntradaConsulta["gravidade"])
-                }
-              >
-                {GRAVIDADES.map((g) => (
-                  <option key={g} value={g}>
-                    {g[0].toUpperCase() + g.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="idade">Idade</Label>
-              <Input
-                id="idade"
-                type="number"
-                min={12}
-                max={100}
-                placeholder="opcional"
-                value={entrada.idade ?? ""}
-                onChange={(e) =>
-                  set("idade", e.target.value ? Number(e.target.value) : null)
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="downtime">Downtime aceito</Label>
-            <select
-              id="downtime"
-              className={SELECT_CLASS}
-              value={entrada.downtime}
-              onChange={(e) =>
-                set("downtime", e.target.value as EntradaConsulta["downtime"])
-              }
-            >
-              {DOWNTIMES.map((d) => (
-                <option key={d} value={d}>
-                  {DOWNTIME_LABEL[d]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <fieldset>
-            <Label>Sessão</Label>
-            <div className="flex gap-4 text-sm text-ink">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="sessao"
-                  checked={entrada.sessao === "primeira"}
-                  onChange={() => set("sessao", "primeira")}
-                />
-                Primeira
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="sessao"
-                  checked={entrada.sessao === "subsequente"}
-                  onChange={() => set("sessao", "subsequente")}
-                />
-                Já fez sessão antes
-              </label>
-            </div>
-            {entrada.sessao === "subsequente" ? (
-              <textarea
-                className={cn(SELECT_CLASS, "h-20 py-2 mt-2 text-sm")}
-                placeholder="Parâmetros usados e como a pele respondeu (dias de eritema, mancha, resultado)"
-                value={entrada.respostaAnterior}
-                maxLength={1000}
-                onChange={(e) => set("respostaAnterior", e.target.value)}
-              />
-            ) : null}
-          </fieldset>
-
-          <fieldset>
-            <Label>Histórico e fatores de risco</Label>
-            <div className="space-y-1.5 text-sm text-ink">
-              {HISTORICOS.map((h) => (
-                <label key={h} className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={entrada.historico.includes(h)}
-                    onChange={() => alternarHistorico(h)}
-                  />
-                  <span>{HISTORICO_LABEL[h]}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div>
-            <Label htmlFor="observacoes">Observações</Label>
-            <textarea
-              id="observacoes"
-              className={cn(SELECT_CLASS, "h-24 py-2 text-sm")}
-              placeholder="Detalhes do caso. Não escreva o nome do paciente."
-              value={entrada.observacoes}
-              maxLength={2000}
-              onChange={(e) => set("observacoes", e.target.value)}
-            />
-          </div>
-
-          <Button
-            className="w-full"
-            loading={carregando}
-            onClick={() => consultar(false)}
-          >
-            {carregando ? "Analisando o caso…" : "Recomendar parâmetros"}
-          </Button>
-          {carregando ? (
-            <p className="text-xs text-muted">
-              A IA lê a base inteira sobre o aparelho antes de responder. Leva
-              até 1 minuto.
-            </p>
-          ) : null}
-        </Card>
+        <FormularioCaso
+          entrada={entrada}
+          setEntrada={setEntrada}
+          onEnviar={() => consultar(false)}
+          carregando={carregando}
+        />
 
         {/* ------------------------------------------------------------ */}
         {/*  Resultado                                                    */}
@@ -349,7 +136,8 @@ export function ParametrosClient({
               carregando={carregando}
               onRefazer={() => consultar(true)}
               formularioMudou={
-                JSON.stringify(entrada) !== JSON.stringify(entradaDaResposta)
+                JSON.stringify(normalizarEntrada(entrada)) !==
+                JSON.stringify(normalizarEntrada(entradaDaResposta))
               }
             />
           ) : !erro ? (
@@ -484,6 +272,20 @@ function Resultado({
               <li key={a}>{a}</li>
             ))}
           </ul>
+        </Alert>
+      ) : null}
+
+      {r.perguntas_pendentes.length > 0 ? (
+        <Alert variant="info" title="Respostas que mudariam a recomendação">
+          <ul className="list-disc list-inside space-y-1">
+            {r.perguntas_pendentes.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted">
+            Se souber a resposta, acrescente nas observações ou no formulário e
+            consulte de novo.
+          </p>
         </Alert>
       ) : null}
 

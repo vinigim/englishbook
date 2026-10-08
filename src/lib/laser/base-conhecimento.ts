@@ -3,7 +3,7 @@
  *
  * Por que não é um RAG com busca vetorial
  * ---------------------------------------
- * A base inteira, com as instruções, tem por volta de 6 mil tokens. Isso cabe com folga no
+ * A base inteira, com as instruções, tem por volta de 9 mil tokens. Isso cabe com folga no
  * prompt, então o modelo lê TODOS os trechos em toda consulta: nenhuma
  * contraindicação fica de fora porque a busca não a achou. O bloco vai com
  * `cache_control`, então a partir da segunda consulta na mesma hora ele custa
@@ -32,7 +32,7 @@
  * antes de tratá-lo como definitivo.
  */
 
-export const KB_VERSAO = 1;
+export const KB_VERSAO = 2;
 
 export const ORIGENS = [
   "fabricante",
@@ -307,7 +307,59 @@ Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após
     titulo: "Manchas, lentigos e melasma",
     origem: "consenso",
     texto: `- Lentigos solares e manchas epidérmicas: ablação superficial, HP ou SP com dwell curto (≤ 300 µs), potência baixa a média, stack 1.
-- Melasma: CO2 ablativo NÃO é recomendado como tratamento do melasma. O calor pode piorar e causar rebote e HPI. Se o paciente tem melasma e outra queixa, use parâmetros mínimos fora das áreas de melasma, ou prefira outro método. Alternativas: tratamento tópico, ácido tranexâmico, tecnologias não ablativas de baixa energia.`,
+- Melasma: o CO2 fracionado NÃO é primeira linha nem monoterapia. A primeira abordagem é tópica (clareadores, fotoproteção) e ácido tranexâmico. O CO2 tem lugar no melasma REFRATÁRIO (≥ 3 meses de tratamento tópico adequado sem resposta), com parâmetros baixos e quase sempre como veículo para ácido tranexâmico aplicado logo após o laser. Ver o trecho "ind-melasma-protocolo".
+- Paciente com melasma e outra queixa: trate a outra queixa com parâmetros mínimos fora das áreas de melasma, ou prefira outro método.`,
+  },
+  {
+    id: "ind-melasma-protocolo",
+    titulo: "Melasma refratário: quando e como usar o CO2",
+    origem: "consenso",
+    texto: `Critérios para considerar o CO2 fracionado no melasma:
+- Refratário a ≥ 3 meses de tratamento tópico adequado com fotoproteção.
+- Paciente ciente do risco de piora, HPI e recidiva, e disposto a manter clareador depois.
+- Sem exposição solar intensa prevista.
+Como fazer, segundo os protocolos publicados:
+- Baixa densidade e pulso curto: na ordem de 12 W, spacing ~800 µm, dwell ~300 µs, stack 1, SmartTrack.
+- Ácido tranexâmico aplicado logo após o laser (tópico ou intradérmico): os estudos comparativos mostram o combinado melhor que o laser sozinho.
+- 3 sessões com intervalo de 4–6 semanas.
+- Clareador tópico de manutenção depois da série: sem ele a recidiva é a regra.
+Tipo de melasma: o dérmico e o misto têm pigmento mais profundo e respondem pior ao tópico, por isso aparecem mais entre os refratários; o epidérmico costuma responder ao tópico antes de precisar de laser.
+Fototipo IV–VI: risco ainda maior de HPI; teste em área pequena obrigatório.`,
+  },
+  {
+    id: "estudo-melasma-metanalise-2022",
+    titulo: "Meta-análise 2022 — lasers no melasma",
+    origem: "estudo",
+    fonte: {
+      label: "Laser therapy in the treatment of melasma: systematic review and meta-analysis (2022)",
+      url: "https://pubmed.ncbi.nlm.nih.gov/35122202/",
+    },
+    texto: `22 estudos, 694 pacientes. O CO2 fracionado ablativo reduziu o MASI (diferença média −9,36; IC 95% −12,51 a −6,21). O laser não ablativo de 1550 nm e o picossegundo não tiveram redução significativa nessa análise.
+Os autores destacam o risco de hiper e hipopigmentação pós-inflamatória em pele mais escura.`,
+  },
+  {
+    id: "estudo-melasma-revisoes",
+    titulo: "Revisões: recidiva e HPI do laser ablativo no melasma",
+    origem: "estudo",
+    fonte: {
+      label: "The use of ablative lasers in the treatment of facial melasma (An Bras Dermatol 2013)",
+      url: "https://new.scielo.br/j/abd/a/KqfcVBZwNfK36vHSzmBrMmM/?lang=en",
+    },
+    texto: `- Revisão brasileira (An Bras Dermatol, 2013; 75 pacientes em séries e ensaios pequenos): HPI e dificuldade de manter o resultado são as principais limitações; com CO2, melhores resultados com pulso curto e baixa densidade; creme clareador de manutenção foi necessário e eficaz; recomenda reservar o ablativo para casos refratários.
+- Revisão de lasers e luz no melasma (Int J Womens Dermatol, 2017): todos parecem eficazes, mas a recidiva com o tempo é alta; os ablativos fracionados têm risco muito alto de hipo e hiperpigmentação pós-inflamatória e devem ser usados com cautela.`,
+  },
+  {
+    id: "estudo-melasma-txa",
+    titulo: "CO2 fracionado com ácido tranexâmico no melasma",
+    origem: "estudo",
+    fonte: {
+      label: "Eassa et al., Lasers Med Sci 2025 (PubMed 40522526)",
+      url: "https://pubmed.ncbi.nlm.nih.gov/40522526/",
+    },
+    texto: `- Eassa et al., 2025: 40 pacientes, comparação entre os dois lados da face. CO2 fracionado de baixa potência seguido de ácido tranexâmico 10% de um lado e vitamina C 20% do outro. Os dois funcionaram, com vantagem para o ácido tranexâmico.
+- Estudo randomizado: CO2 fracionado sozinho × CO2 seguido de ácido tranexâmico 5%, 3 sessões com 4 semanas de intervalo; o combinado foi mais eficaz.
+- Ensaio registrado NCT03899233: CO2 a 12 W, spacing 800 µm (densidade 7,3%), dwell 300 µs, 3 sessões a cada 6 semanas, com ácido tranexâmico intradérmico.
+São estudos pequenos, com vias e concentrações diferentes; a direção é consistente, a magnitude não.`,
   },
   {
     id: "ind-outras",
@@ -316,6 +368,82 @@ Habitualmente 3 sessões com 4–6 semanas de intervalo, avaliando 3 meses após
     texto: `- Poros e textura: superficial a médio, densidade média, stack 1.
 - Flacidez palpebral leve: CO2 fracionado na pálpebra produz retração modesta; flacidez com excesso de pele é cirúrgica (blefaroplastia).
 - Queratoses actínicas (campo cancerizável): o CO2 fracionado é usado sozinho ou antes de terapia fotodinâmica, para aumentar a penetração do fotossensibilizante. Lesão suspeita de carcinoma não deve ser tratada com laser sem biópsia.`,
+  },
+
+  // ==========================================================================
+  //  Fatores do caso
+  // ==========================================================================
+  {
+    id: "fator-idade",
+    titulo: "Idade do paciente",
+    origem: "consenso",
+    texto: `- Acima de ~60 anos: pele mais fina, menos anexos e cicatrização mais lenta. Reduza densidade, prefira stack baixo e alongue o intervalo. A resposta em rugas costuma ser boa, mas o eritema dura mais.
+- Adolescentes e adultos jovens com cicatriz de acne: tolerância boa; o que pesa é a acne ainda ativa e o uso recente de isotretinoína.
+- Idade não muda o fototipo: um paciente jovem de fototipo V continua com risco alto de HPI.`,
+  },
+  {
+    id: "fator-gravidade",
+    titulo: "Gravidade da queixa",
+    origem: "consenso",
+    texto: `- Leve: tratamento superficial (HP ou SP, stack 1), poucas sessões; não vale o risco de parâmetros profundos.
+- Moderada: o tratamento padrão da indicação.
+- Grave: precisa de mais profundidade e mais sessões, mas chegue lá aos poucos: primeira sessão ainda conservadora, depois suba o stack. Casos graves costumam pedir associação (subcisão, TCA CROSS, drug delivery).
+Gravidade alta nunca justifica, sozinha, ignorar a regra do fototipo ou da região.`,
+  },
+  {
+    id: "fator-caracteristicas-pele",
+    titulo: "Características da pele",
+    origem: "consenso",
+    texto: `- Oleosa e espessa: muitas unidades pilossebáceas, cicatriza rápido; tolera parâmetros um pouco maiores dentro da faixa.
+- Fina ou atrófica: trate como pele fina (potência e densidade menores, stack 1–2), mesmo na face.
+- Sensível ou com rosácea: eritema mais longo e mais reativo; reduza dwell e densidade, avise do eritema prolongado.
+- Acne inflamatória ativa: trate a acne antes; laser sobre lesão inflamada piora a inflamação e o risco de infecção e cicatriz.
+- Fotodano intenso: boa indicação de rejuvenescimento; procure lesões suspeitas antes (biópsia se houver dúvida).`,
+  },
+  {
+    id: "fator-extensao",
+    titulo: "Região inteira × lesões isoladas",
+    origem: "consenso",
+    texto: `- Região inteira: áreas grandes encaixadas sem sobreposição, bordas com parâmetros reduzidos (feathering) para não deixar demarcação.
+- Lesões isoladas (cicatriz única, icepick, estria localizada): área pequena ou modo ponto, só sobre a lesão. Pode usar profundidade maior do que trataria a região inteira, porque a área total é pequena; mesmo assim respeite o fototipo.`,
+  },
+  {
+    id: "fator-exposicao-solar",
+    titulo: "Exposição solar prevista",
+    origem: "consenso",
+    texto: `A pele tratada fica mais sensível à luz até 4–6 semanas depois.
+- Baixa: segue o plano.
+- Moderada: reforce fotoproteção e prefira a ponta conservadora da faixa em fototipo III–VI.
+- Alta (trabalho ao sol, praia, viagem): o risco de HPI sobe muito; o mais seguro é adiar a sessão. Se não der para adiar, parâmetros mínimos e fotoproteção física.`,
+  },
+  {
+    id: "fator-associacoes",
+    titulo: "Procedimentos combinados na mesma sessão",
+    origem: "consenso",
+    texto: `- Drug delivery (ácido tranexâmico, vitamina C e outros ativos aplicados logo após o laser): o objetivo é abrir canais, não ablação profunda. Densidade baixa a média, dwell curto, stack 1. Use só produtos estéreis e próprios para aplicação em pele aberta.
+- Subcisão: na mesma sessão para cicatriz rolling; faça a subcisão antes do laser ou em outro dia se houver muito sangramento.
+- PRP: aplicado após o laser, ajuda a recuperação; não muda os parâmetros.
+- Corticoide intralesional: em cicatriz hipertrófica, logo após o laser; densidade baixa.
+- TCA CROSS: para icepick; não aplique o laser sobre o ponto tratado com TCA na mesma sessão.`,
+  },
+  {
+    id: "fator-idade-cicatriz",
+    titulo: "Idade da cicatriz",
+    origem: "consenso",
+    texto: `- Cicatriz cirúrgica ou traumática com menos de 6 meses: é o momento em que o laser rende mais. Pode começar 4–12 semanas após a cirurgia, com parâmetros moderados e densidade baixa.
+- 6–12 meses: ainda remodelando; tratamento padrão.
+- Mais de 12 meses: cicatriz madura; pede mais profundidade (stack) e mais sessões para o mesmo ganho.
+- Cicatriz hipertrófica ainda vermelha e elevada: densidade baixa, associar corticoide.`,
+  },
+  {
+    id: "fator-sessao-anterior",
+    titulo: "Usar a sessão anterior para decidir a próxima",
+    origem: "consenso",
+    texto: `Com os parâmetros da sessão anterior em mãos:
+- Cicatrizou no prazo, sem mancha, resultado parcial ou sem melhora: suba UM parâmetro em 10–20% (de preferência stack ou potência).
+- Resultado bom: mantenha; não há motivo para subir.
+- Teve HPI ou eritema muito prolongado (> 2× o esperado): repita ou reduza. Nenhum parâmetro mais agressivo que o anterior, e espere a mancha clarear antes da próxima sessão.
+- Sem o registro dos parâmetros anteriores: trate como primeira sessão.`,
   },
 
   // ==========================================================================

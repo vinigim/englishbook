@@ -1,8 +1,15 @@
 import { z } from "zod";
 import { IDS_BASE } from "./base-conhecimento";
 import {
+  ASSOCIACOES,
+  CARACTERISTICAS_PELE,
   CONFIANCAS,
   DOWNTIMES,
+  EXPOSICOES_SOLARES,
+  EXTENSOES,
+  IDADES_CICATRIZ,
+  RESULTADOS_ANTERIORES,
+  TIPOS_MELASMA,
   FOTOTIPOS,
   GRAVIDADES,
   HISTORICOS,
@@ -166,6 +173,12 @@ export const RECOMENDACAO_JSON_SCHEMA = {
       description:
         "Por que essa confiança: há estudo com o aparelho para este caso, ou é extrapolação?",
     },
+    perguntas_pendentes: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Perguntas ao médico cuja resposta mudaria a recomendação, cada uma dizendo o que mudaria. Vazio se nada faltou.",
+    },
   },
   required: [
     "viabilidade",
@@ -179,6 +192,7 @@ export const RECOMENDACAO_JSON_SCHEMA = {
     "fontes",
     "confianca",
     "motivo_confianca",
+    "perguntas_pendentes",
   ],
   additionalProperties: false,
 } as const;
@@ -223,26 +237,58 @@ export const recomendacaoSchema = z.object({
   fontes: z.array(z.string()),
   confianca: z.enum(CONFIANCAS),
   motivo_confianca: z.string(),
+  // Ausente nas consultas gravadas antes de o campo existir.
+  perguntas_pendentes: z.array(z.string()).default([]),
 });
 
 // ============================================================================
 //  Entrada do formulário
 // ============================================================================
+const numeroOpcional = (min: number, max: number) =>
+  z.number().min(min).max(max).nullable().default(null);
+
+export const sessaoAnteriorSchema = z.object({
+  potencia: numeroOpcional(1, 50),
+  dwell: numeroOpcional(100, 3000),
+  spacing: numeroOpcional(100, 1500),
+  stack: numeroOpcional(1, 5),
+  diasEritema: numeroOpcional(0, 90),
+  teveHpi: z.boolean().default(false),
+  resultado: z.enum(RESULTADOS_ANTERIORES).nullable().default(null),
+});
+
+/**
+ * Os `.default()` deixam passar consultas gravadas antes de os campos novos
+ * existirem: o histórico da tela continua abrindo.
+ */
 export const entradaSchema = z.object({
   indicacao: z.enum(INDICACOES, { message: "Escolha a indicação." }),
+  melasmaTipo: z.enum(TIPOS_MELASMA).nullable().default(null),
+  melasmaRefratario: z.boolean().nullable().default(null),
+  idadeCicatriz: z.enum(IDADES_CICATRIZ).nullable().default(null),
   regiao: z.enum(REGIOES, { message: "Escolha a região." }),
-  fototipo: z.enum(FOTOTIPOS, { message: "Escolha o fototipo." }),
+  extensao: z.enum(EXTENSOES).default("regiao_inteira"),
   gravidade: z.enum(GRAVIDADES),
-  downtime: z.enum(DOWNTIMES),
+  fototipo: z.enum(FOTOTIPOS, { message: "Escolha o fototipo." }),
+  idade: z.number().int().min(12).max(100).nullable().default(null),
+  caracteristicasPele: z
+    .array(z.enum(CARACTERISTICAS_PELE))
+    .max(CARACTERISTICAS_PELE.length)
+    .default([]),
+  historico: z.array(z.enum(HISTORICOS)).max(HISTORICOS.length),
   sessao: z.enum(SESSOES),
+  sessaoAnterior: sessaoAnteriorSchema.nullable().default(null),
   respostaAnterior: z
     .string()
     .trim()
-    .max(1000, "A resposta anterior passa de 1000 caracteres."),
-  idade: z.number().int().min(12).max(100).nullable(),
-  historico: z.array(z.enum(HISTORICOS)).max(HISTORICOS.length),
+    .max(1000, "A resposta anterior passa de 1000 caracteres.")
+    .default(""),
+  associacoes: z.array(z.enum(ASSOCIACOES)).max(ASSOCIACOES.length).default([]),
+  downtime: z.enum(DOWNTIMES),
+  exposicaoSolar: z.enum(EXPOSICOES_SOLARES).default("baixa"),
   observacoes: z
     .string()
     .trim()
-    .max(2000, "As observações passam de 2000 caracteres."),
+    .max(2000, "As observações passam de 2000 caracteres.")
+    .default(""),
 });

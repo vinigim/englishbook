@@ -3,8 +3,8 @@ import {
   BASE_CONHECIMENTO,
   ORIGEM_LABEL,
 } from "@/lib/laser/base-conhecimento";
-import { recomendacaoSchema } from "@/lib/laser/schema";
-import type { EntradaConsulta, RespostaConsulta } from "@/lib/laser/tipos";
+import { entradaSchema, recomendacaoSchema } from "@/lib/laser/schema";
+import { normalizarEntrada, type RespostaConsulta } from "@/lib/laser/tipos";
 import { ParametrosClient, type ConsultaGravada, type FonteInfo } from "./ParametrosClient";
 
 export const dynamic = "force-dynamic";
@@ -44,9 +44,12 @@ export default async function ParametrosPage() {
       model: (row.model as string | null) ?? null,
       costUsd: Number(row.cost_usd ?? 0),
     };
+    // Consultas gravadas antes dos campos novos ganham os valores padrão.
+    const entrada = entradaSchema.safeParse(row.entrada);
+    if (!entrada.success) continue;
     historico.push({
       createdAt: row.created_at as string,
-      entrada: row.entrada as EntradaConsulta,
+      entrada: normalizarEntrada(entrada.data),
       resposta,
     });
   }
