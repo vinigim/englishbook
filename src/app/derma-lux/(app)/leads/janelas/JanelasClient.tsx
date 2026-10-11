@@ -8,6 +8,7 @@ import { copiarNaHora } from "@/lib/copiar";
 import { instagramDirectUrl } from "@/lib/leads/instagram";
 import { cn } from "@/lib/utils";
 import type { Candidato, Janela, ResultadoJanelas } from "../../../janelas";
+import { registrarOfertaJanela } from "../../../janelas-actions";
 import { relativeDays } from "../../../leads-shared";
 import { fmtDayHeading, toWhatsAppNumber } from "../../../shared";
 
@@ -36,6 +37,14 @@ function gravarOferecidos(s: Set<string>) {
   }
 }
 
+/** O que o banco sabe de uma oferta mandada com link (0023). */
+export type EstadoOferta = {
+  cliques: number;
+  primeiro_clique_em: string | null;
+  respondida_em: string | null;
+  resposta_lead_id: string | null;
+};
+
 const PERIODO_LABEL = { dia: "dia inteiro livre", manha: "manhã livre", tarde: "tarde livre" };
 
 function diaCurto(iso: string): string {
@@ -43,7 +52,13 @@ function diaCurto(iso: string): string {
   return `${dow.replace("-feira", "")}, ${day}`;
 }
 
-export function JanelasClient({ resultado }: { resultado: ResultadoJanelas }) {
+export function JanelasClient({
+  resultado,
+  ofertas,
+}: {
+  resultado: ResultadoJanelas;
+  ofertas: Record<string, EstadoOferta>;
+}) {
   const { janelas, semCidade, leadsSemCidade } = resultado;
   const [oferecidos, setOferecidos] = useState<Set<string>>(new Set());
 
@@ -70,7 +85,13 @@ export function JanelasClient({ resultado }: { resultado: ResultadoJanelas }) {
         </Alert>
       ) : (
         janelas.map((j) => (
-          <JanelaCard key={j.chave} janela={j} oferecidos={oferecidos} alternar={alternar} />
+          <JanelaCard
+            key={j.chave}
+            janela={j}
+            oferecidos={oferecidos}
+            alternar={alternar}
+            ofertas={ofertas}
+          />
         ))
       )}
 
@@ -105,10 +126,12 @@ function JanelaCard({
   janela,
   oferecidos,
   alternar,
+  ofertas,
 }: {
   janela: Janela;
   oferecidos: Set<string>;
   alternar: (chave: string) => void;
+  ofertas: Record<string, EstadoOferta>;
 }) {
   const [verDdd, setVerDdd] = useState(false);
   const cidades = Array.from(
@@ -147,6 +170,7 @@ function JanelaCard({
               c={c}
               oferecido={oferecidos.has(`${janela.chave}|${c.leadId}`)}
               alternar={alternar}
+              oferta={c.codigo ? ofertas[c.codigo] : undefined}
             />
           ))}
         </ul>
@@ -175,6 +199,7 @@ function JanelaCard({
                   c={c}
                   oferecido={oferecidos.has(`${janela.chave}|${c.leadId}`)}
                   alternar={alternar}
+                  oferta={c.codigo ? ofertas[c.codigo] : undefined}
                 />
               ))}
             </ul>
@@ -190,20 +215,48 @@ function CandidatoLinha({
   c,
   oferecido,
   alternar,
+  oferta,
 }: {
   janela: Janela;
   c: Candidato;
   oferecido: boolean;
   alternar: (chave: string) => void;
+  oferta: EstadoOferta | undefined;
 }) {
   const [aberto, setAberto] = useState(false);
-  const [copiado, setCopiado] = useState(false);
+  const [copiado, setCopiado] = useState<"whatsapp" | "instagram" | null>(null);
+  const [erroOferta, setErroOferta] = useState<string | null>(null);
   const numero = c.whatsapp === false ? null : toWhatsAppNumber(c.telefone);
 
-  function copiar() {
-    if (!copiarNaHora(c.mensagem)) void navigator.clipboard.writeText(c.mensagem).catch(() => {});
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
+  function copiar(texto: string, qual: "whatsapp" | "instagram") {
+    // Síncrona primeiro: no iPhone o link do Instagram tira a página da frente
+    // antes de a Clipboard API terminar (ver LeadDetailClient).
+    if (!copiarNaHora(texto)) void navigator.clipboard.writeText(texto).catch(() => {});
+    setCopiado(qual);
+    setTimeout(() => setCopiado(null), 2000);
+  }
+
+  /**
+   * A versão do direct leva o link. A cópia sai na hora, com o código já
+   * pronto; a gravação da oferta vai em paralelo e não segura o toque. Se
+   * falhar, o link ainda abre o WhatsApp, só com texto genérico.
+   */
+  function copiarParaInstagram() {
+    copiar(c.mensagemInstagram, "instagram");
+    if (!c.codigo || !c.ancora.cidade) return;
+    setErroOferta(null);
+    void registrarOfertaJanela({
+      leadId: c.leadId,
+      equipId: janela.equipId,
+      data: janela.date,
+      periodo: janela.periodo,
+      equipNome: janela.equipNome,
+      cidade: `${c.ancora.cidade.nome}/${c.ancora.cidade.uf}`,
+    })
+      .then((r) => {
+        if (!r.ok) setErroOferta(r.error ?? "A oferta não foi gravada.");
+      })
+      .catch(() => setErroOferta("A oferta não foi gravada."));
   }
 
   return (
@@ -246,16 +299,28 @@ function CandidatoLinha({
         {c.instagram ? (
           <a
             href={instagramDirectUrl(c.instagram)}
-            onClick={copiar}
+            onClick={copiarParaInstagram}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-ink underline hover:text-accent"
           >
-            Copiar e abrir no Instagram
+            {copiado === "instagram" ? "Copiado ✓" : "Copiar e abrir no Instagram"}
           </a>
+        ) : c.codigo ? (
+          <button
+            type="button"
+            onClick={copiarParaInstagram}
+            className="text-ink underline hover:text-accent"
+          >
+            {copiado === "instagram" ? "Copiado ✓" : "Copiar para o Instagram"}
+          </button>
         ) : null}
-        <button type="button" onClick={copiar} className="text-ink underline hover:text-accent">
-          {copiado ? "Copiado ✓" : "Copiar mensagem"}
+        <button
+          type="button"
+          onClick={() => copiar(c.mensagem, "whatsapp")}
+          className="text-ink underline hover:text-accent"
+        >
+          {copiado === "whatsapp" ? "Copiado ✓" : "Copiar mensagem"}
         </button>
         <button
           type="button"
@@ -274,11 +339,48 @@ function CandidatoLinha({
         </label>
       </div>
 
+      {oferta ? <SituacaoDaOferta oferta={oferta} /> : null}
+      {erroOferta ? <p className="mt-1 text-xs text-accent">{erroOferta}</p> : null}
+
       {aberto ? (
         <pre className="mt-2 whitespace-pre-wrap font-sans text-sm bg-line/40 p-3 text-ink">
-          {c.mensagem}
+          {c.codigo ? c.mensagemInstagram : c.mensagem}
         </pre>
       ) : null}
     </li>
   );
+}
+
+/**
+ * O que aconteceu com o link do direct. São fatos: o toque passou pelo nosso
+ * servidor, e a resposta chegou no WhatsApp com o código.
+ */
+function SituacaoDaOferta({ oferta }: { oferta: EstadoOferta }) {
+  if (oferta.respondida_em) {
+    return (
+      <p className="mt-1 text-sm font-medium text-ink">
+        ✅ Respondeu no WhatsApp {relativeDays(oferta.respondida_em)}
+        {oferta.resposta_lead_id ? (
+          <>
+            {" · "}
+            <Link
+              href={`/derma-lux/leads/${oferta.resposta_lead_id}`}
+              className="underline hover:text-accent"
+            >
+              abrir a conversa
+            </Link>
+          </>
+        ) : null}
+      </p>
+    );
+  }
+  if (oferta.cliques > 0) {
+    return (
+      <p className="mt-1 text-sm text-ink">
+        👆 Tocou no link {oferta.cliques === 1 ? "1 vez" : `${oferta.cliques} vezes`} (
+        {relativeDays(oferta.primeiro_clique_em)}), mas a mensagem ainda não chegou
+      </p>
+    );
+  }
+  return <p className="mt-1 text-xs text-muted">🔗 Link copiado, ainda sem toque</p>;
 }

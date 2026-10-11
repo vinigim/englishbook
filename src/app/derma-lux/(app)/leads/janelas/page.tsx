@@ -1,9 +1,12 @@
+import { headers } from "next/headers";
 import { Alert } from "@/components/ui/Badge";
+import { createClient } from "@/lib/supabase/server";
 import { getDermaLuxData } from "../../../data";
+import { numeroDaLux } from "../../../janela-link";
 import { calcularJanelas, DESCONTO_JANELA, HORIZONTE_DIAS, RAIO_KM } from "../../../janelas";
 import { getLeadsInbox } from "../../../leads-data";
 import { VoltarAoRadar } from "../VoltarAoRadar";
-import { JanelasClient } from "./JanelasClient";
+import { JanelasClient, type EstadoOferta } from "./JanelasClient";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +21,57 @@ function hojeSaoPaulo(): string {
   );
 }
 
+/**
+ * "https://<domínio>/j/", do próprio pedido: o link sai com o domínio em que o
+ * painel está aberto, sem mais uma variável de ambiente para manter.
+ */
+async function baseDoLink(): Promise<string | null> {
+  if (!numeroDaLux()) return null;
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return null;
+  const proto = h.get("x-forwarded-proto")?.split(",")[0] ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}/j/`;
+}
+
+/** Cliques e respostas das ofertas na tela. Sem a 0023, nenhuma. */
+async function estadosDasOfertas(codigos: string[]): Promise<Record<string, EstadoOferta>> {
+  if (codigos.length === 0) return {};
+  const supabase = await createClient();
+  const saida: Record<string, EstadoOferta> = {};
+  // Em lotes: o filtro vai na URL (ver ID_CHUNK em leads-data.ts).
+  for (let i = 0; i < codigos.length; i += 150) {
+    const { data, error } = await supabase
+      .from("janela_ofertas")
+      .select("codigo, cliques, primeiro_clique_em, respondida_em, resposta_lead_id")
+      .in("codigo", codigos.slice(i, i + 150));
+    if (error) return {};
+    for (const o of (data ?? []) as (EstadoOferta & { codigo: string })[]) saida[o.codigo] = o;
+  }
+  return saida;
+}
+
 export default async function JanelasPage() {
-  const [{ equipment, rentals, blocks }, rows] = await Promise.all([
+  const [{ equipment, rentals, blocks }, rows, linkBase] = await Promise.all([
     getDermaLuxData(),
     getLeadsInbox(),
+    baseDoLink(),
   ]);
 
-  const resultado = calcularJanelas({ equipment, rentals, blocks, rows, hoje: hojeSaoPaulo() });
+  const resultado = calcularJanelas({
+    equipment,
+    rentals,
+    blocks,
+    rows,
+    hoje: hojeSaoPaulo(),
+    linkBase,
+  });
+  const ofertas = await estadosDasOfertas(
+    resultado.janelas
+      .flatMap((j) => [...j.candidatos, ...j.porDdd])
+      .map((c) => c.codigo)
+      .filter((c): c is string => c !== null),
+  );
 
   return (
     <div>
@@ -45,7 +92,15 @@ export default async function JanelasPage() {
         </Alert>
       ) : null}
 
-      <JanelasClient resultado={resultado} />
+      {!linkBase ? (
+        <Alert variant="info" className="mb-4">
+          Para a mensagem do Instagram levar um link que abre o WhatsApp da Lux com o interesse
+          já escrito, configure <code>LUX_WHATSAPP</code> (o número comercial, com DDD) na
+          Vercel e refaça o deploy.
+        </Alert>
+      ) : null}
+
+      <JanelasClient resultado={resultado} ofertas={ofertas} />
     </div>
   );
 }

@@ -15,7 +15,7 @@ import {
   type EstadoContato,
 } from "./leads-shared";
 import type { LeadInboxRow } from "./leads-types";
-import { fmtDayHeading } from "./shared";
+import { codigoDaJanela, diaFalado } from "./janela-link";
 import type { Block, Equipment, Rental } from "./types";
 
 /**
@@ -81,6 +81,13 @@ export type Candidato = {
    * tabela de municípios (200 KB) para o navegador.
    */
   mensagem: string;
+  /**
+   * A versão do direct: a mesma mensagem com o link que abre o WhatsApp da
+   * Lux já escrito. Igual a `mensagem` quando não há link (sem LUX_WHATSAPP).
+   */
+  mensagemInstagram: string;
+  /** Código da oferta no link (`/j/<codigo>`). Nulo sem link. */
+  codigo: string | null;
 };
 
 export type Janela = {
@@ -137,6 +144,7 @@ export function calcularJanelas({
   blocks,
   rows,
   hoje,
+  linkBase = null,
 }: {
   equipment: Equipment[];
   rentals: Rental[];
@@ -144,6 +152,11 @@ export function calcularJanelas({
   rows: LeadInboxRow[];
   /** yyyy-mm-dd em São Paulo. */
   hoje: string;
+  /**
+   * "https://<domínio>/j/" quando o link do Instagram está ligado. Nulo deixa
+   * a mensagem do direct sem link.
+   */
+  linkBase?: string | null;
 }): ResultadoJanelas {
   const limite = somarDias(hoje, HORIZONTE_DIAS);
   const porLeadId = new Map(rows.map((r) => [r.lead.id, r]));
@@ -269,6 +282,8 @@ export function calcularJanelas({
         contato: estadoContato(lead),
         pontos: Math.round(pontos * 10) / 10,
         mensagem: "",
+        mensagemInstagram: "",
+        codigo: null,
       };
       (cidade ? candidatos : porDdd).push(c);
     }
@@ -287,20 +302,19 @@ export function calcularJanelas({
       totalCandidatos: candidatos.length,
       totalPorDdd: porDdd.length,
     };
-    for (const c of [...janela.candidatos, ...janela.porDdd]) c.mensagem = mensagemDaJanela(janela, c);
+    for (const c of [...janela.candidatos, ...janela.porDdd]) {
+      c.mensagem = mensagemDaJanela(janela, c);
+      c.codigo = linkBase ? codigoDaJanela(c.leadId, janela.equipId, janela.date) : null;
+      c.mensagemInstagram = c.codigo
+        ? `${c.mensagem}\n\nPara garantir, é só tocar aqui que abre o nosso WhatsApp com tudo escrito: ${linkBase}${c.codigo}`
+        : c.mensagem;
+    }
     janelas.push(janela);
   }
 
   janelas.sort((a, b) => a.date.localeCompare(b.date) || a.equipNome.localeCompare(b.equipNome));
   semCidade.sort((a, b) => a.date.localeCompare(b.date));
   return { janelas, semCidade, leadsSemCidade };
-}
-
-/** "quinta, dia 15/10" — como se fala no WhatsApp. */
-function diaFalado(iso: string): string {
-  const { dow } = fmtDayHeading(iso);
-  const [, m, d] = iso.split("-");
-  return `${dow.replace("-feira", "")}, dia ${d}/${m}`;
 }
 
 /** Sábado e domingo são masculinos: "o sábado", "no domingo". */

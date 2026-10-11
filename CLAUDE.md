@@ -91,7 +91,10 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
 7. **Janelas da rota** — `/derma-lux/leads/janelas`, logic in `janelas.ts`. A free day
    next to a booked rental (same device) is offered at 15% off to leads within 100 km
    (straight line). Cities come from `src/lib/geo/` (static IBGE table, server-only —
-   never import it from a client component).
+   never import it from a client component). The Instagram version carries a public
+   short link `/j/<codigo>` (outside the middleware) that opens the company WhatsApp
+   (`LUX_WHATSAPP`) with the interest pre-written; clicks and replies with the code
+   land in `janela_ofertas` (`0023`).
 
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
 button calls it: bulk sending through an unofficial provider is what gets numbers
