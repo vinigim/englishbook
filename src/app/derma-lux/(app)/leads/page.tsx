@@ -45,7 +45,13 @@ export default async function LeadsPage() {
         </div>
 
         <div className="flex flex-col items-start sm:items-end gap-2">
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/derma-lux/leads/janelas"
+              className="text-sm font-medium text-ink hover:text-accent underline transition-colors"
+            >
+              Janelas da rota
+            </Link>
             <Link
               href="/derma-lux/leads/importar"
               className="text-sm text-muted hover:text-ink underline transition-colors"

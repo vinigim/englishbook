@@ -413,6 +413,45 @@ original, usado como chave de `Record` em vários pontos. O rótulo na tela viro
 **"Devo responder"** porque "Esperando resposta" dizia o contrário do que o
 filtro faz.
 
+## Janelas da rota
+
+`/derma-lux/leads/janelas` (link "Janelas da rota" no topo do Radar). O laser
+vai até o médico, então cada locação marcada põe o equipamento numa cidade, num
+dia. O dia vizinho livre, para quem está perto, sai quase de graça: é a janela.
+
+- **Janela** = dia anterior ou seguinte a uma locação dos próximos 30 dias, com
+  o mesmo equipamento sem locação. Fechamento de meio período deixa só a outra
+  metade; fechamento do dia inteiro elimina a janela. Hoje não conta.
+- **Perto** = até **100 km em linha reta** (`RAIO_KM`) entre a cidade da
+  locação e a do lead. A estrada costuma ser 20–30% maior.
+- **Desconto** = **15% na locação** (`DESCONTO_JANELA`), escolhido pelo dono. A
+  mensagem fala em porcentagem e nunca num valor em reais, para não sair preço
+  fora da tabela.
+- **Ordem** (código puro em `janelas.ts`): já alugou +5, temperatura (quente 3,
+  morno 2), interesse no mesmo equipamento +2, "responder ele" +1, e a
+  distância só desempata (100 km = −1). Saem descartados, frio confirmado,
+  adiados, grupos, o próprio cliente da locação-âncora e quem já tem locação
+  naquele dia. Cada janela mostra os 25 primeiros.
+- **Mensagem** fixa, sem IA e sem custo, com "Abrir no WhatsApp", "Copiar e
+  abrir no Instagram" e "Copiar". "Já ofereci" é um lembrete no navegador
+  (`localStorage`), não um fato, pela mesma regra de "De quem é a bola".
+
+**De onde vem a cidade.** Sem API de geocodificação: `src/lib/geo/` tem os
+5.570 municípios do IBGE com coordenadas e DDD (`municipios-dados.ts`, gerado
+de kelvins/municipios-brasileiros, MIT). Da locação, a cidade é procurada no
+endereço livre da agenda (pedaços que começam por "Rua", "Jardim" etc. são
+ignorados, e com UF escrita só vale cidade daquela UF); sem achar, vale a
+cidade do lead conciliado à locação. Do lead, é a coluna `city`/`uf` da
+planilha. Homônimos se resolvem pela UF e depois pelo DDD; se ainda sobrar
+dúvida, a cidade fica desconhecida em vez de chutada.
+
+Locação sem cidade reconhecida aparece num aviso no pé da tela: basta terminar o
+endereço com "Cidade - UF". Lead sem cidade aparece numa lista à parte da
+janela quando o DDD do telefone é o da cidade da locação.
+
+A tabela de municípios só é lida no servidor: a mensagem é montada lá, e a tela
+importa apenas os tipos de `janelas.ts`.
+
 ## Fixo tem WhatsApp?
 
 Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não — e

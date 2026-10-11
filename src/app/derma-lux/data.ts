@@ -24,6 +24,7 @@ type RawRental = {
   tips_used: string | null;
   sterilized: boolean | null;
   specialized_technique: boolean | null;
+  wa_lead_id?: string | null;
 };
 
 function toRental(r: RawRental): Rental {
@@ -44,6 +45,7 @@ function toRental(r: RawRental): Rental {
     tips_used: r.tips_used ?? null,
     sterilized: r.sterilized ?? null,
     specialized_technique: r.specialized_technique ?? null,
+    wa_lead_id: r.wa_lead_id ?? null,
   };
 }
 

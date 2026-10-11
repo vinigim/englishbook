@@ -22,6 +22,8 @@ export type Rental = {
   tips_used: string | null;
   sterilized: boolean | null;
   specialized_technique: boolean | null;
+  /** O lead do Radar que fez esta locação (0014). Nulo = não conciliado. */
+  wa_lead_id: string | null;
 };
 
 export type BlockPeriod = "full" | "morning" | "afternoon";

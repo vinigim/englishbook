@@ -88,6 +88,11 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
    account, once per number, stored in `wa_leads.whatsapp_existe` (`0020`). The lead
    page runs it on open; the inbox has a batch button.
 
+7. **Janelas da rota** — `/derma-lux/leads/janelas`, logic in `janelas.ts`. A free day
+   next to a booked rental (same device) is offered at 15% off to leads within 100 km
+   (straight line). Cities come from `src/lib/geo/` (static IBGE table, server-only —
+   never import it from a client component).
+
 Sending is deliberately **not** wired to the UI. `provider.sendText()` exists but no
 button calls it: bulk sending through an unofficial provider is what gets numbers
 banned, so messages go out through the owner's own WhatsApp.
