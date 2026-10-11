@@ -413,6 +413,75 @@ original, usado como chave de `Record` em vários pontos. O rótulo na tela viro
 **"Devo responder"** porque "Esperando resposta" dizia o contrário do que o
 filtro faz.
 
+## Janelas da rota
+
+`/derma-lux/leads/janelas` (link "Janelas da rota" no topo do Radar). O laser
+vai até o médico, então cada locação marcada põe o equipamento numa cidade, num
+dia. O dia vizinho livre, para quem está perto, sai quase de graça: é a janela.
+
+- **Janela** = dia anterior ou seguinte a uma locação dos próximos 30 dias, com
+  o mesmo equipamento sem locação. Fechamento de meio período deixa só a outra
+  metade; fechamento do dia inteiro elimina a janela. Hoje não conta.
+- **Perto** = até **100 km em linha reta** (`RAIO_KM`) entre a cidade da
+  locação e a do lead. A estrada costuma ser 20–30% maior.
+- **Desconto** = **15% na locação** (`DESCONTO_JANELA`), escolhido pelo dono. A
+  mensagem fala em porcentagem e nunca num valor em reais, para não sair preço
+  fora da tabela.
+- **Ordem** (código puro em `janelas.ts`): já alugou +5, temperatura (quente 3,
+  morno 2), interesse no mesmo equipamento +2, "responder ele" +1, e a
+  distância só desempata (100 km = −1). Saem descartados, frio confirmado,
+  adiados, grupos, o próprio cliente da locação-âncora e quem já tem locação
+  naquele dia. Cada janela mostra os 25 primeiros.
+- **Mensagem** fixa, sem IA e sem custo, com "Abrir no WhatsApp", "Copiar e
+  abrir no Instagram" e "Copiar". "Já ofereci" é um lembrete no navegador
+  (`localStorage`), não um fato, pela mesma regra de "De quem é a bola".
+
+**De onde vem a cidade.** Sem API de geocodificação: `src/lib/geo/` tem os
+5.570 municípios do IBGE com coordenadas e DDD (`municipios-dados.ts`, gerado
+de kelvins/municipios-brasileiros, MIT). Da locação, a cidade é procurada no
+endereço livre da agenda (pedaços que começam por "Rua", "Jardim" etc. são
+ignorados, e com UF escrita só vale cidade daquela UF); sem achar, vale a
+cidade do lead conciliado à locação. Do lead, é a coluna `city`/`uf` da
+planilha. Homônimos se resolvem pela UF e depois pelo DDD; se ainda sobrar
+dúvida, a cidade fica desconhecida em vez de chutada.
+
+Locação sem cidade reconhecida aparece num aviso no pé da tela: basta terminar o
+endereço com "Cidade - UF". Lead sem cidade aparece numa lista à parte da
+janela quando o DDD do telefone é o da cidade da locação.
+
+A tabela de municípios só é lida no servidor: a mensagem é montada lá, e a tela
+importa apenas os tipos de `janelas.ts`.
+
+### Link do Instagram para o WhatsApp da Lux
+
+Pelo direct, responder custava ao médico copiar um número e trocar de app. A
+mensagem da janela para o Instagram termina com um link curto,
+`https://<domínio>/j/K7P3QX`, que abre o **WhatsApp da Lux** já com
+"Vi no Instagram a janela do SmartXide Punto (quinta, dia 15/10, à tarde,
+região de Araçatuba/SP) e tenho interesse. Código: K7P3QX". Ele só toca em
+enviar.
+
+- **Configuração:** `LUX_WHATSAPP` (o número comercial, com DDD) na Vercel e a
+  migração `0023_janela_ofertas.sql`. Sem o número, a mensagem sai sem link e
+  a tela avisa. O domínio do link é o mesmo em que o painel está aberto.
+- **Código:** 6 caracteres sem 0/O/1/I/L, derivado de lead + equipamento + dia
+  (`codigoDaJanela()`), então a mensagem fica pronta antes do toque e a cópia
+  no iPhone não espera o banco. A oferta é gravada em paralelo quando o dono
+  toca em "Copiar e abrir no Instagram" (ou "Copiar para o Instagram", para
+  lead sem @).
+- **Três fatos, nenhum suposto:** a oferta existe (copiada), o médico tocou no
+  link (`cliques`, contado pela rota pública com a service role) e a mensagem
+  com o código chegou (`respondida_em`, gravado pela ingestão do WhatsApp com o
+  lead de onde ela veio). A tela mostra o mais avançado dos três, com o atalho
+  para a conversa nova.
+- **A rota `/j/` é pública** e fica fora do middleware. Ela não devolve nada
+  do lead: quem chutar um código vê só dia e cidade de uma janela. Qualquer
+  falha (código desconhecido, tabela ausente, chave de serviço faltando) ainda
+  leva ao WhatsApp, com texto genérico.
+- **Limite do Instagram:** numa solicitação de mensagem (quem não segue a
+  conta), o Instagram pode mostrar o link sem deixar tocar até o médico aceitar
+  a conversa.
+
 ## Fixo tem WhatsApp?
 
 Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não — e

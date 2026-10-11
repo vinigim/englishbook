@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { waJidPhone, waPhoneKey } from "@/lib/leads/phone";
+import { CODIGO_NA_MENSAGEM } from "@/app/derma-lux/janela-link";
 import type { NormalizedMessage } from "./provider";
 
 /**
@@ -277,7 +278,41 @@ export async function ingestMessages(
     resultado.mensagensGravadas += (data ?? []).length;
   }
 
+  await registrarRespostasDeJanela(admin, grupos.values(), idPorChave);
+
   return resultado;
+}
+
+/**
+ * Mensagem recebida com "Código: K7P3QX" veio do link de uma janela
+ * (`/j/<codigo>`). Grava na oferta quando e de qual lead ela chegou — quase
+ * sempre outro registro, porque o lead do Instagram costuma não ter o
+ * WhatsApp na planilha.
+ *
+ * Só a primeira resposta conta, então o backfill reprocessar a mesma mensagem
+ * não muda nada. Falha aqui não derruba a ingestão: a mensagem já está
+ * gravada, e a oferta é um extra (pode nem existir a tabela, antes da 0023).
+ */
+async function registrarRespostasDeJanela(
+  admin: SupabaseClient,
+  grupos: Iterable<{ phoneKey: string; mensagens: NormalizedMessage[] }>,
+  idPorChave: Map<string, string>,
+) {
+  for (const g of grupos) {
+    const leadId = idPorChave.get(g.phoneKey);
+    if (!leadId) continue;
+    for (const msg of g.mensagens) {
+      if (msg.direction !== "in") continue;
+      const achado = (msg.body ?? msg.caption ?? "").match(CODIGO_NA_MENSAGEM);
+      if (!achado) continue;
+      const { error } = await admin
+        .from("janela_ofertas")
+        .update({ respondida_em: msg.sentAt, resposta_lead_id: leadId })
+        .eq("codigo", achado[1].toUpperCase())
+        .is("respondida_em", null);
+      if (error) console.error("[wa-ingest] resposta de janela:", error.message);
+    }
+  }
 }
 
 function emLotes<T>(items: T[], size: number): T[][] {

@@ -10,6 +10,8 @@ export const config = {
     // Webhooks ficam de fora: eles se autenticam sozinhos (assinatura do
     // Stripe, segredo compartilhado do WhatsApp) e não têm sessão de usuário.
     // Passar por aqui só acrescentaria uma chamada de rede a cada evento.
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/whatsapp|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // O mesmo vale para o link das janelas (/j/<codigo>), tocado por médicos
+    // sem login.
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/whatsapp|j/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
