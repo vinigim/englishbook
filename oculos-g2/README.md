@@ -30,7 +30,8 @@ do app.
 ```bash
 cd oculos-g2
 npm install
-cp .env.example .env.local   # e ponha o endereço do painel
+# sem .env.local, o app usa o painel de produção (https://lux-derma.vercel.app);
+# para testar contra o painel local: VITE_LUX_URL=http://<ip-do-pc>:3000 no .env.local
 npm run dev                  # Vite em :5173
 npm run sim                  # simulador do G2 apontando para o Vite
 npm run qr                   # QR para abrir no app Even (modo dev) no celular
@@ -40,8 +41,8 @@ O celular e o computador precisam estar na mesma rede para o modo dev.
 
 ## Publicar
 
-1. Troque `https://SEU-DOMINIO-DO-PAINEL` em `app.json` (whitelist de rede)
-   pelo endereço real do painel. Deve ser o mesmo de `VITE_LUX_URL`.
+1. A whitelist de rede do `app.json` já aponta para `https://lux-derma.vercel.app`.
+   Se o domínio mudar, troque lá e no padrão de `src/main.ts`.
 2. `npm run pack` gera `lux-parametros.ehpk`.
 3. Envie em hub.evenrealities.com (conta Even Realities). Para uso interno,
    o app pode ficar privado/em teste sem passar pela loja.

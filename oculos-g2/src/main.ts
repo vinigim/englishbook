@@ -27,7 +27,8 @@ import { BYTES_ITEM, CABECALHO, CORPO, TELA, caberNaLinha, paginar, type Tela } 
  *   na lista, toque duplo recarrega
  */
 
-const BASE = (import.meta.env.VITE_LUX_URL ?? "").replace(/\/$/, "");
+// O painel em produção; VITE_LUX_URL troca (dev local, simulador).
+const BASE = (import.meta.env.VITE_LUX_URL || "https://lux-derma.vercel.app").replace(/\/$/, "");
 const CHAVE_CODIGO = "lux-codigo";
 
 // ============================================================================
