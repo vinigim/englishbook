@@ -30,6 +30,8 @@ const CORS = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "content-type",
   "Cache-Control": "no-store",
+  // Sem o charset, o Safari mostra os acentos embaralhados ao abrir a URL.
+  "Content-Type": "application/json; charset=utf-8",
 };
 
 function erro(status: number, error: string, message: string) {

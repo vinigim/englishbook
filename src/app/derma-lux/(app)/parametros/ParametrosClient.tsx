@@ -34,6 +34,7 @@ import { FormularioCaso } from "./FormularioCaso";
 import { AnaliseFotoCard, CampoFotos, type FotoLocal } from "./Fotos";
 import {
   ParametrosRealizadosCard,
+  CodigoOculos,
   SeletorLocacao,
   VinculoDaConsulta,
   rotuloLocacao,
@@ -73,6 +74,7 @@ export function ParametrosClient({
   // Fora de `entrada` de propósito: a locação não muda a recomendação, então
   // não entra no hash nem invalida o reaproveitamento.
   const [rentalId, setRentalId] = useState<string | null>(null);
+  const locacaoEscolhida = locacoes.find((l) => l.id === rentalId) ?? null;
   // Só na memória do navegador; vão na requisição e não voltam.
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
 
@@ -173,7 +175,12 @@ export function ParametrosClient({
           carregando={carregando}
           topo={
             semVinculo ? null : (
-              <SeletorLocacao locacoes={locacoes} valor={rentalId} onChange={setRentalId} />
+              <>
+                <SeletorLocacao locacoes={locacoes} valor={rentalId} onChange={setRentalId} />
+                {locacaoEscolhida ? (
+                  <CodigoOculos key={locacaoEscolhida.id} locacao={locacaoEscolhida} />
+                ) : null}
+              </>
             )
           }
           fotos={<CampoFotos fotos={fotos} setFotos={setFotos} />}
