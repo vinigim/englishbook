@@ -162,6 +162,34 @@ function paginaRealizado(r: ParametrosRealizados): PaginaOculos {
   return { titulo: "Registrado como usado", linhas };
 }
 
+/**
+ * Código pessoal: a lista mistura locações e dias, então cada linha começa
+ * pela data (a da locação, ou a da consulta quando não há locação) e a
+ * primeira tela diz de quem era.
+ */
+export function consultaParaOculosPessoal(c: ConsultaGravada): ConsultaOculos {
+  const base = consultaParaOculos(c);
+  const loc = c.resposta.locacao;
+  const dia = loc
+    ? dataBR(loc.data).slice(0, 5)
+    : DIA_MES.format(new Date(c.createdAt));
+  const [primeira, ...resto] = base.paginas;
+  const quem = loc
+    ? [loc.medico, loc.equipamento].filter(Boolean).join(" · ")
+    : "Sem locação";
+  return {
+    ...base,
+    titulo: `${dia} · ${base.titulo}`,
+    paginas: [{ ...primeira, linhas: [quem, ...primeira.linhas] }, ...resto],
+  };
+}
+
+const DIA_MES = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+});
+
 export function consultaParaOculos(c: ConsultaGravada): ConsultaOculos {
   const { recomendacao: rec, verificacoes, bloqueadoPor, realizado } = c.resposta;
   const avisos = bloqueadoPor ? [] : [...rec.alertas, ...verificacoes];

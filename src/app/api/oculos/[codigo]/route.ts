@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
-import { listarConsultasDaLocacao, paraVinculo } from "@/lib/laser/consultas";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { listarConsultas, listarConsultasDaLocacao, paraVinculo } from "@/lib/laser/consultas";
 import {
   CODIGO_OCULOS,
   DIAS_DEPOIS,
   consultaParaOculos,
+  consultaParaOculosPessoal,
   dataBR,
   dentroDaJanela,
   normalizarCodigo,
@@ -22,6 +24,9 @@ export const dynamic = "force-dynamic";
  * credencial, e só vale perto do dia da locação. Devolve só o que vai na
  * tela do óculos: médico, dia, equipamento e os parâmetros das consultas
  * ligadas, sem fotos nem observações do caso.
+ *
+ * Dois tipos de código, mesmo formato: o pessoal do dono (0025), que abre as
+ * consultas recentes sem prazo, e o da locação (0024), conferido depois.
  *
  * CORS aberto e sem cookie: o app roda numa WebView com origem própria.
  */
@@ -65,6 +70,9 @@ export async function GET(
   }
   const admin = adminResult.admin;
 
+  const pessoal = await respostaPessoal(admin, codigo);
+  if (pessoal) return pessoal;
+
   const { data, error } = await admin
     .from("laser_oculos_acessos")
     .select("rental_id, rental:rentals(id, client, date, specialty, equipment:equipment(name))")
@@ -106,6 +114,43 @@ export async function GET(
       equipamento: locacao.equipamento,
     },
     consultas: consultas.map(consultaParaOculos),
+  };
+  return NextResponse.json(resposta, { headers: CORS });
+}
+
+/**
+ * Código pessoal do dono (0025): as consultas mais recentes, com ou sem
+ * locação, sem janela de datas. null quando o código não é pessoal (ou a
+ * tabela ainda não existe), e aí a rota segue para o código por locação.
+ */
+async function respostaPessoal(admin: SupabaseClient, codigo: string) {
+  const { data, error } = await admin
+    .from("laser_oculos_pessoal")
+    .select("user_id")
+    .eq("codigo", codigo)
+    .maybeSingle();
+  if (error) {
+    console.error("[oculos] leitura do código pessoal:", error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  const { consultas, erro: erroLeitura } = await listarConsultas(admin, { limite: 20 });
+  if (erroLeitura) {
+    return erro(500, "db_error", "Falha ao ler as consultas. Tente de novo.");
+  }
+
+  const { error: erroAcesso } = await admin
+    .from("laser_oculos_pessoal")
+    .update({ ultimo_acesso_em: new Date().toISOString() })
+    .eq("user_id", data.user_id);
+  if (erroAcesso) console.error("[oculos] último acesso pessoal:", erroAcesso.message);
+
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const resposta: RespostaOculos = {
+    versao: 1,
+    locacao: { medico: "Consultas recentes", data: dataBR(hoje), equipamento: null },
+    consultas: consultas.map(consultaParaOculosPessoal),
   };
   return NextResponse.json(resposta, { headers: CORS });
 }

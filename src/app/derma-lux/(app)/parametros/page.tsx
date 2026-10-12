@@ -4,6 +4,7 @@ import {
   ORIGEM_LABEL,
 } from "@/lib/laser/base-conhecimento";
 import { listarConsultas, listarLocacoes } from "@/lib/laser/consultas";
+import { OculosPessoal } from "./OculosPessoal";
 import { ParametrosClient, type FonteInfo } from "./ParametrosClient";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export default async function ParametrosPage() {
             ? ` · US$ ${gastoTotal.toFixed(2)} gastos nas últimas ${historico.length} consultas`
             : ""}
         </p>
+        <OculosPessoal />
       </div>
 
       <ParametrosClient
