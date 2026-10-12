@@ -215,7 +215,7 @@ const ACESSO = new Intl.DateTimeFormat("pt-BR", {
  * O código que o médico digita no app do óculos para ver os parâmetros das
  * consultas desta locação. Um por locação; vale da véspera a dois dias depois.
  */
-function CodigoOculos({ locacao }: { locacao: VinculoLocacao }) {
+export function CodigoOculos({ locacao }: { locacao: VinculoLocacao }) {
   const [estado, setEstado] = useState<EstadoCodigo | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
