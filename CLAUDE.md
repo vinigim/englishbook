@@ -24,6 +24,7 @@ lasers to doctors and aesthetic clinics. It has two areas, both behind the same 
 | `/derma-lux` | Rental agenda: equipment, rentals, availability, schedule blocks |
 | `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI |
 | `/derma-lux/parametros` | AI recommender for SmartXide Punto (CO2 laser) settings |
+| `oculos-g2/` | Even G2 glasses app showing a rental's saved settings (own `package.json`) |
 
 `/` redirects to `/derma-lux` (`next.config.mjs`). UI language is pt-BR throughout.
 
@@ -131,6 +132,12 @@ for every SmartXide Punto setting with its reason and the knowledge-base ids it 
   `src/lib/laser/fotos.ts`, passed to the model and never stored anywhere. Only the
   model's text (`analise_foto`) is saved. A consultation with photos is never reused
   from or offered to the content-hash cache.
+
+- **Even G2 glasses** (`0024`, `oculos-g2/`) — a staff-generated 8-char code per rental
+  (`laser_oculos_acessos`) opens `GET /api/oculos/<codigo>`: public, service role, CORS
+  open, valid from the day before the rental to two days after. It returns display-ready
+  text built by `src/lib/laser/oculos.ts`; the glasses app (separate Vite project, excluded
+  from the root `tsconfig`) only paginates and draws. Read-only, never calls the AI.
 
 ### Two caching layers in the AI pipeline (this is the owner's money)
 
