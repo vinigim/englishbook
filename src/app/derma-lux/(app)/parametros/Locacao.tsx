@@ -193,6 +193,110 @@ export function VinculoDaConsulta({
         </div>
       )}
       {erro ? <p className="text-xs text-accent mt-1">{erro}</p> : null}
+      {resposta.locacao && !editando ? <CodigoOculos key={resposta.locacao.id} locacao={resposta.locacao} /> : null}
+    </div>
+  );
+}
+
+// ============================================================================
+//  Código do óculos Even G2
+// ============================================================================
+type EstadoCodigo = { codigo: string | null; ultimoAcessoEm: string | null };
+
+const ACESSO = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/**
+ * O código que o médico digita no app do óculos para ver os parâmetros das
+ * consultas desta locação. Um por locação; vale da véspera a dois dias depois.
+ */
+function CodigoOculos({ locacao }: { locacao: VinculoLocacao }) {
+  const [estado, setEstado] = useState<EstadoCodigo | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function chamar(metodo: "GET" | "POST" | "DELETE") {
+    setCarregando(true);
+    setErro(null);
+    try {
+      const url =
+        metodo === "POST"
+          ? "/api/laser/oculos"
+          : `/api/laser/oculos?rentalId=${encodeURIComponent(locacao.id)}`;
+      const res = await fetch(url, {
+        method: metodo,
+        headers: metodo === "POST" ? { "content-type": "application/json" } : undefined,
+        body: metodo === "POST" ? JSON.stringify({ rentalId: locacao.id }) : undefined,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return setErro(json.message ?? json.error ?? "Falha ao falar com o servidor.");
+      setEstado({ codigo: json.codigo ?? null, ultimoAcessoEm: json.ultimoAcessoEm ?? null });
+    } catch {
+      setErro("Falha de rede.");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 text-xs text-muted">
+      {estado === null ? (
+        <button
+          type="button"
+          className="text-accent underline hover:text-ink disabled:opacity-50"
+          disabled={carregando}
+          onClick={() => chamar("GET")}
+        >
+          Código para o óculos Even G2
+        </button>
+      ) : estado.codigo ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>
+            Óculos G2:{" "}
+            <span className="font-mono text-sm text-ink tracking-widest">
+              {estado.codigo.slice(0, 4)}-{estado.codigo.slice(4)}
+            </span>
+          </span>
+          <span>
+            vale da véspera até 2 dias depois de {dataBR(locacao.data)}
+            {estado.ultimoAcessoEm
+              ? ` · aberto no óculos em ${ACESSO.format(new Date(estado.ultimoAcessoEm))}`
+              : " · ainda não aberto"}
+          </span>
+          <button
+            type="button"
+            className="text-accent underline hover:text-ink disabled:opacity-50"
+            disabled={carregando}
+            onClick={() => chamar("POST")}
+          >
+            Gerar outro
+          </button>
+          <button
+            type="button"
+            className="text-accent underline hover:text-ink disabled:opacity-50"
+            disabled={carregando}
+            onClick={() => chamar("DELETE")}
+          >
+            Cortar acesso
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>
+            Sem código para o óculos. O médico digita o código no app do G2 e vê
+            os parâmetros das consultas desta locação.
+          </span>
+          <Button size="sm" variant="secondary" loading={carregando} onClick={() => chamar("POST")}>
+            Gerar código
+          </Button>
+        </div>
+      )}
+      {erro ? <p className="text-accent mt-1">{erro}</p> : null}
     </div>
   );
 }

@@ -1,0 +1,23 @@
+{
+  "name": "lux-oculos-g2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "sim": "evenhub-simulator http://localhost:5173",
+    "qr": "evenhub qr --port 5173",
+    "pack": "npm run build && evenhub pack app.json dist --output lux-parametros.ehpk"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "0.0.16",
+    "@evenrealities/pretext": "0.1.4"
+  },
+  "devDependencies": {
+    "@evenrealities/evenhub-cli": "0.1.14",
+    "@evenrealities/evenhub-simulator": "0.9.5",
+    "typescript": "5.9.3",
+    "vite": "6.4.4"
+  }
+}

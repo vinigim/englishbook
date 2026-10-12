@@ -152,6 +152,26 @@ export async function lerConsulta(
   return paraConsulta(data as unknown as LinhaConsulta);
 }
 
+/** As consultas ligadas a uma locação, as mais recentes primeiro. */
+export async function listarConsultasDaLocacao(
+  supabase: SupabaseClient,
+  rentalId: string,
+): Promise<ConsultaGravada[] | null> {
+  const { data, error } = await supabase
+    .from(TABELA)
+    .select(`${CAMPOS_BASE}, parametros_realizados, reaproveitada_de, rental:rentals(${LOCACAO})`)
+    .eq("rental_id", rentalId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    console.error("[laser-consultas] falha ao listar as da locação", error.message);
+    return null;
+  }
+  return ((data ?? []) as unknown as LinhaConsulta[])
+    .map(paraConsulta)
+    .filter((c): c is ConsultaGravada => c !== null);
+}
+
 /**
  * Locações que podem ser ligadas a uma consulta: dos últimos 90 dias aos
  * próximos 60, as mais próximas de hoje primeiro.

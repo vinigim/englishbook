@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lux Derma · Parâmetros</title>
+    <style>
+      :root {
+        --verde: #1c3d31;
+        --terracota: #b5573a;
+        --papel: #f7f3ec;
+        --tinta: #1f2421;
+        --suave: #6b6f69;
+        --linha: #ddd5c8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 20px 16px 32px;
+        font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--papel);
+        color: var(--tinta);
+      }
+      header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+      .marca {
+        width: 34px; height: 34px; display: grid; place-items: center;
+        background: var(--terracota); color: #fff; font-weight: 700; font-size: 14px;
+      }
+      h1 { font-size: 18px; margin: 0; color: var(--verde); }
+      label { display: block; font-size: 13px; color: var(--suave); margin-bottom: 6px; }
+      .linha { display: flex; gap: 8px; }
+      input {
+        flex: 1; min-width: 0; height: 46px; padding: 0 12px;
+        font: 600 20px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.12em; text-transform: uppercase;
+        border: 1px solid var(--linha); background: #fff; color: var(--tinta);
+      }
+      input:focus { outline: none; border-color: var(--verde); }
+      button {
+        height: 46px; padding: 0 16px; border: 0; cursor: pointer;
+        background: var(--verde); color: #fff; font: 600 15px/1 system-ui, sans-serif;
+      }
+      .secundario { background: transparent; color: var(--verde); border: 1px solid var(--verde); }
+      #status { margin: 18px 0 8px; font-size: 15px; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li button {
+        width: 100%; height: auto; min-height: 46px; padding: 10px 12px; margin-top: 6px;
+        text-align: left; background: #fff; color: var(--tinta);
+        border: 1px solid var(--linha); font-weight: 500; line-height: 1.35;
+      }
+      .ajuda { margin-top: 22px; font-size: 13px; color: var(--suave); }
+      .ajuda b { color: var(--tinta); font-weight: 600; }
+      #aviso { margin-top: 14px; padding: 10px 12px; font-size: 13px; background: #fff; border-left: 3px solid var(--terracota); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="marca" aria-hidden="true">LD</div>
+      <h1>Parâmetros CO2 no óculos</h1>
+    </header>
+
+    <form id="form">
+      <label for="codigo">Código da locação</label>
+      <div class="linha">
+        <input id="codigo" autocomplete="off" autocapitalize="characters" spellcheck="false"
+               placeholder="K7M2-QX9P" maxlength="12" />
+        <button type="submit">Abrir</button>
+      </div>
+    </form>
+
+    <p id="status">Abrindo...</p>
+    <ul id="consultas"></ul>
+    <p><button id="recarregar" type="button" class="secundario">Recarregar</button></p>
+
+    <div class="ajuda">
+      <p>No óculos: <b>toque</b> abre a consulta e avança, <b>deslizar</b> passa as
+        telas, <b>toque duplo</b> volta para a lista (na lista, recarrega).</p>
+      <p>O código vale da véspera até dois dias depois da locação. Os parâmetros
+        são ponto de partida: a decisão é sempre do médico.</p>
+    </div>
+    <p id="aviso" hidden>Fora do app Even: só esta tela funciona, o óculos não recebe nada.</p>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
