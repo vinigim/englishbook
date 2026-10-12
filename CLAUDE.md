@@ -138,6 +138,9 @@ for every SmartXide Punto setting with its reason and the knowledge-base ids it 
   open, valid from the day before the rental to two days after. It returns display-ready
   text built by `src/lib/laser/oculos.ts`; the glasses app (separate Vite project, excluded
   from the root `tsconfig`) only paginates and draws. Read-only, never calls the AI.
+  The owner uses a **personal code** instead (`0025`, `laser_oculos_pessoal`, one per
+  staff user, shown at the top of the page): no date window, opens the 20 most recent
+  consultations. The route checks personal codes first, then rental codes.
 
 ### Two caching layers in the AI pipeline (this is the owner's money)
 
