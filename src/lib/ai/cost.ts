@@ -18,7 +18,9 @@ type Preco = {
 
 const PRECOS: Record<string, Preco> = {
   "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1 },
+  // Mantido para o custo das análises antigas, gravadas com este modelo.
   "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2 },
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5 },
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
 };
