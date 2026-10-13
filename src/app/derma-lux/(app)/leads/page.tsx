@@ -58,6 +58,13 @@ export default async function LeadsPage() {
             >
               Importar planilha
             </Link>
+            {/* <a> e não <Link>: é um download, não uma navegação. */}
+            <a
+              href="/api/leads/exportar"
+              className="text-sm text-muted hover:text-ink underline transition-colors"
+            >
+              Exportar planilha
+            </a>
             <Link
               href="/derma-lux/leads/nao-identificadas"
               className="text-sm text-muted hover:text-ink underline transition-colors"

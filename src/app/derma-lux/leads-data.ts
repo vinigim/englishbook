@@ -304,3 +304,49 @@ export async function getAnalysisSpend(): Promise<{
   const total = rows.reduce((acc, r) => acc + Number(r.cost_usd ?? 0), 0);
   return { total, count: rows.length };
 }
+
+/** Tamanho da página do PostgREST: acima disso ele corta em silêncio. */
+const PAGINA = 1000;
+
+/**
+ * Todos os leads (inclusive arquivados, sem grupos) com a análise mais recente
+ * e o resumo da agenda, para a planilha de exportação. Sem o teto da caixa de
+ * entrada: pagina até acabar.
+ */
+export async function getLeadsParaExportar(): Promise<
+  Pick<LeadInboxRow, "lead" | "analysis" | "rentals">[]
+> {
+  const supabase = await createClient();
+
+  const leads: Lead[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from("wa_leads")
+      .select("*")
+      .eq("is_group", false)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error) throw new Error(error.message);
+    leads.push(...((data ?? []) as Lead[]));
+    if (!data || data.length < PAGINA) break;
+  }
+
+  const ids = leads.map((l) => l.id);
+  const [analyses, rentals] = await Promise.all([
+    emLotes<LeadAnalysis>(ids, (lote) =>
+      supabase.from("wa_latest_analyses").select(ANALYSIS_COLS).in("lead_id", lote),
+    ),
+    emLotes<LeadRentals>(ids, (lote) =>
+      supabase.from("wa_lead_rentals").select(RENTALS_COLS).in("lead_id", lote),
+    ),
+  ]);
+
+  const analisePorLead = new Map(analyses.map((a) => [a.lead_id, a]));
+  const agendaPorLead = new Map(rentals.map((r) => [r.lead_id, r]));
+  return leads.map((lead) => ({
+    lead,
+    analysis: analisePorLead.get(lead.id) ?? null,
+    rentals: agendaPorLead.get(lead.id) ?? null,
+  }));
+}

@@ -490,6 +490,18 @@ enviar.
   conta), o Instagram pode mostrar o link sem deixar tocar até o médico aceitar
   a conversa.
 
+## Exportar planilha
+
+"Exportar planilha", no topo do Radar, baixa um `.xlsx` com a carteira inteira
+(`/api/leads/exportar`, só `lux_staff`): os dados da importação mais tudo o que
+o Radar juntou depois — Instagram escolhido, verificação do WhatsApp, situação,
+de quem é a vez, temperatura, leitura da IA (estágio, objeções, ação, resumo,
+rascunho), datas de contato, locações da agenda e as instruções para a IA.
+Entram também os arquivados (coluna "Arquivado"); grupos ficam de fora. As
+colunas originais da planilha (`extra`) voltam no fim com o cabeçalho de
+origem. Os cabeçalhos principais são os que a importação reconhece e os demais
+evitam as palavras dela, então o arquivo pode ser reimportado.
+
 ## Fixo tem WhatsApp?
 
 Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não — e
