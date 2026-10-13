@@ -141,13 +141,13 @@ Para mudar o comportamento de **todos** os leads (ser mais assertivo em geral,
 por exemplo), o lugar é `src/lib/ai/prompt.ts` — e aí é preciso subir
 `PROMPT_VERSION`, o que reanalisa a base inteira.
 
-**Protocolo de parâmetros grátis.** No primeiro contato e no follow-up de
-quem não respondeu, o rascunho oferece de graça o protocolo de parâmetros do
-SmartXide Punto para um caso do médico (indicação, região, fototipo), feito no
-`/derma-lux/parametros`. O argumento é o freio de quem nunca alugou: não saber
-que parâmetro usar. Só vale para CO2 (ou interesse desconhecido), e a
-sequência de follow-up muda de ângulo a cada toque em vez de repetir a oferta.
-Regras em `src/lib/ai/prompt.ts` (PROMPT_VERSION 6).
+**Primeiro contato: o aluguel, e por que é fácil.** O rascunho do primeiro
+contato abre pelo produto (aluguel do SmartXide Punto por dia, levado e
+instalado no consultório) e usa os parâmetros prontos por paciente como o
+diferencial de facilidade, não como a oferta. Os parâmetros grátis de um caso
+entram no 2º toque, como prova; o 3º traz uma data, o 4º se despede. Só o CO2
+fala em parâmetros. Regras e um modelo de mensagem em `src/lib/ai/prompt.ts`
+(PROMPT_VERSION 7).
 
 **Cache por hash.** Antes de chamar a API, o sistema calcula um hash da
 conversa + dados do lead + versão do prompt. Se já existe análise com aquele
