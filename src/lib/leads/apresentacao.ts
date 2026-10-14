@@ -6,7 +6,7 @@
  * pelo WhatsApp: para esses, a mensagem da IA continua no "Copiar mensagem".
  */
 const CORPO = `Sou Vinicius, da Lux Derma, empresa de Penápolis-SP.
-Estamos oferecendo para locação o Laser de CO2 Fracionado SmartXide Punto (DEKA, Itália — última geração), indicado para rejuvenescimento, cicatrizes, resurfacing e como complemento à cirurgia plástica, inclusive blefaroplastia.
+Estamos oferecendo para locação o Laser de CO2 Fracionado da DEKA (Itália — última geração), indicado para rejuvenescimento, cicatrizes, resurfacing e como complemento à cirurgia plástica, inclusive blefaroplastia.
 A locação é por hora, turno ou procedimento, sem precisar investir na compra do equipamento: levamos até a clínica e acompanhamos todo o uso.
 Faz sentido para a rotina de vocês? Posso passar os detalhes e as condições. 😊`;
 
