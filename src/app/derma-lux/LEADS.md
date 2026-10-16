@@ -408,7 +408,7 @@ no chip ligado o desliga:
 - **Com / Sem Instagram**: tem `instagramDoLead()`, a mesma fonte do botão da ficha.
 - **Já mandei / Não mandei no WhatsApp**: `last_outbound_at`, ou seja, só a
   mensagem nossa trazida pela sincronização (a mesma régua de `estadoContato`).
-  Quem o WhatsApp **confirmou** não ter conta fica fora dos dois. Fixo ainda não
+  Quem o WhatsApp **confirmou** não ter conta (fixo ou celular) fica fora dos dois. Número ainda não
   verificado continua em "Não mandei".
 
 Descartado fica fora dos quatro chips.
@@ -514,9 +514,10 @@ colunas originais da planilha (`extra`) voltam no fim com o cabeçalho de
 origem. Os cabeçalhos principais são os que a importação reconhece e os demais
 evitam as palavras dela, então o arquivo pode ser reimportado.
 
-## Fixo tem WhatsApp?
+## O número tem WhatsApp?
 
-Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não — e
+Telefone fixo às vezes tem WhatsApp (o Business aceita fixo) e às vezes não, e
+celular também falha (número antigo, de recepção, desativado) — e
 o aplicativo só conta depois do toque, com o aviso "isn't on WhatsApp". O painel
 pergunta antes, ao próprio WhatsApp, pela rota `/chat/whatsappNumbers` da
 Evolution (o `onWhatsApp` do Baileys, a mesma consulta que o app faz). É a
@@ -524,17 +525,19 @@ resposta de verdade, não um palpite pelo formato do número.
 
 - **Fixo** = 55 + DDD + 8 dígitos começando em 2–5 (`ehFixoBR()`). Celular
   antigo sem o 9º dígito também tem 12 dígitos, mas começa em 6–9.
-- **A ficha verifica sozinha** ao abrir um fixo ainda não verificado. Sem
+- **A ficha verifica sozinha** ao abrir um lead sem conversa e ainda não
+  verificado, fixo ou celular. Sem
   WhatsApp, o botão "Abrir no WhatsApp" some e entra "Ligar". "Verificar de
   novo" refaz a consulta.
-- **"Verificar fixos no WhatsApp"**, na caixa de entrada, faz a carteira toda:
-  lotes de 25, no máximo 100 por clique. Card de fixo sem WhatsApp ganha o selo
-  "fixo sem WhatsApp".
+- **"Verificar números no WhatsApp"**, na caixa de entrada, faz a carteira toda
+  (fixo e celular, descartado fora): lotes de 25, no máximo 100 por clique. Card
+  sem WhatsApp ganha o selo "sem WhatsApp" e sai de "Não mandei no WhatsApp".
 - **Uma consulta por número.** A resposta fica em `wa_leads.whatsapp_existe` /
   `whatsapp_verificado_em` (migração 0020). Lead com conversa sincronizada nem é
   consultado: a conversa já prova a conta.
-- Celular não é verificado: quase todo celular tem, e consultar a carteira
-  inteira seria volume à toa (ver "Risco de banimento").
+- Celular passou a ser verificado porque celular sem WhatsApp enchia o filtro
+  "Não mandei no WhatsApp". O volume continua limitado: só quem nunca teve
+  conversa, uma vez por número, 100 por clique (ver "Risco de banimento").
 
 ## Mensagens novas não aparecem
 

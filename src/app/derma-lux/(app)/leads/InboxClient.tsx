@@ -127,9 +127,10 @@ function grupoInstagram(row: LeadInboxRow): "com" | "sem" | null {
  * a sincronização trazer de volta uma mensagem nossa (`last_outbound_at`).
  * Copiar o rascunho ou abrir o wa.me não conta.
  *
- * Fora: descartado e quem o WhatsApp CONFIRMOU não ter conta. Fixo ainda não
- * verificado continua em "Não mandei" — a mesma régua de "Nunca abordado sem
- * WhatsApp", e o botão de verificação em lote tira a dúvida.
+ * Fora: descartado e quem o WhatsApp CONFIRMOU não ter conta, fixo ou celular.
+ * Número ainda não verificado continua em "Não mandei" — a mesma régua de
+ * "Nunca abordado sem WhatsApp" —, e "Verificar números no WhatsApp" (ou abrir
+ * a ficha) tira a dúvida.
  */
 function grupoWhatsApp(row: LeadInboxRow): "enviei" | "nao_enviei" | null {
   if (descartado(row)) return null;
@@ -615,7 +616,7 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
               "isn't on WhatsApp". */}
           {temWhatsApp(lead) === false ? (
             <Badge variant="neutral" className="whitespace-nowrap">
-              fixo sem WhatsApp
+              sem WhatsApp
             </Badge>
           ) : null}
         </div>

@@ -84,9 +84,9 @@ Full documentation in `src/app/derma-lux/LEADS.md`. The short version:
    (`instagram_sent_at`). Copying
    the draft and opening `wa.me` do not.
 
-6. **Landline check** — `verificarWhatsApp()` asks WhatsApp (Evolution
-   `/chat/whatsappNumbers`) whether a Brazilian landline (`ehFixoBR()`) has an
-   account, once per number, stored in `wa_leads.whatsapp_existe` (`0020`). The lead
+6. **WhatsApp check** — `verificarWhatsApp()` asks WhatsApp (Evolution
+   `/chat/whatsappNumbers`) whether a number (landline or mobile) with no synced
+   conversation has an account, once per number, stored in `wa_leads.whatsapp_existe` (`0020`). The lead
    page runs it on open; the inbox has a batch button.
 
 7. **Janelas da rota** — `/derma-lux/leads/janelas`, logic in `janelas.ts`. A free day

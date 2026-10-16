@@ -197,15 +197,15 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
   }
 
   /**
-   * Pergunta ao WhatsApp quais fixos têm conta, em lotes de 25.
+   * Pergunta ao WhatsApp quais números (fixo e celular) têm conta, em lotes de 25.
    *
    * Para em 4 lotes por clique: consultar número desconhecido em volume é
    * padrão de spam para o WhatsApp, e o dono decide se continua.
    */
-  async function verificarFixos() {
+  async function verificarNumeros() {
     setOcupado("whatsapp");
     setErro(null);
-    setStatus("Verificando fixos no WhatsApp…");
+    setStatus("Verificando números no WhatsApp…");
     try {
       let com = 0;
       let sem = 0;
@@ -226,9 +226,9 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
       }
       setStatus(
         restantes === 0 && com + sem === 0
-          ? "Nenhum fixo por verificar."
+          ? "Nenhum número por verificar."
           : [
-              `${com} fixo(s) com WhatsApp`,
+              `${com} número(s) com WhatsApp`,
               `${sem} sem`,
               restantes > 0 ? `${restantes} ainda na fila — clique de novo` : null,
             ]
@@ -402,12 +402,12 @@ export function InboxActions({ pendentes }: { pendentes: number }) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={verificarFixos}
+          onClick={verificarNumeros}
           loading={ocupado === "whatsapp"}
           disabled={ocupado !== null}
-          title="Pergunta ao WhatsApp quais telefones fixos têm conta"
+          title="Pergunta ao WhatsApp quais telefones têm conta"
         >
-          Verificar fixos no WhatsApp
+          Verificar números no WhatsApp
         </Button>
 
         <Button
