@@ -401,6 +401,18 @@ mudar o estado: **frio confirmado** sai de "Devo responder" e **descartado** sai
 de "Nunca abordado". Por isso a soma dos três chips pode ficar abaixo do total.
 A ficha do lead continua mostrando o estado real.
 
+**Terceira linha: canais**, calculada (o dono não marca nada) e combinável com
+as outras duas por interseção. São dois grupos independentes, e clicar de novo
+no chip ligado o desliga:
+
+- **Com / Sem Instagram**: tem `instagramDoLead()`, a mesma fonte do botão da ficha.
+- **Já mandei / Não mandei no WhatsApp**: `last_outbound_at`, ou seja, só a
+  mensagem nossa trazida pela sincronização (a mesma régua de `estadoContato`).
+  Quem o WhatsApp **confirmou** não ter conta fica fora dos dois. Fixo ainda não
+  verificado continua em "Não mandei".
+
+Descartado fica fora dos quatro chips.
+
 A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estava
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
 de concordar para a tela não mentir.

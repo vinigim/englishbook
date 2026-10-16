@@ -89,6 +89,55 @@ const FILTROS_SITUACAO: { id: FiltroSituacao; label: string }[] = [
   { id: "descartado", label: "Descartado" },
 ];
 
+/**
+ * Canais: a terceira linha, calculada — o dono não marca nada aqui.
+ *
+ * Dois grupos independentes na mesma linha, cada um com o seu "todos", porque
+ * a pergunta útil é combinada: "tem Instagram e ainda não recebeu WhatsApp".
+ * Como as outras linhas, combina por interseção.
+ *
+ * Descartado fica fora dos quatro chips: já foi posto de lado, não importa por
+ * qual canal. Situação EFETIVA, a mesma do filtro "Descartado".
+ */
+type FiltroInstagram = "todos" | "com" | "sem";
+type FiltroWhatsApp = "todos" | "enviei" | "nao_enviei";
+
+const FILTROS_INSTAGRAM: { id: Exclude<FiltroInstagram, "todos">; label: string }[] = [
+  { id: "com", label: "Com Instagram" },
+  { id: "sem", label: "Sem Instagram" },
+];
+
+const FILTROS_WHATSAPP: { id: Exclude<FiltroWhatsApp, "todos">; label: string }[] = [
+  { id: "enviei", label: "Já mandei no WhatsApp" },
+  { id: "nao_enviei", label: "Não mandei no WhatsApp" },
+];
+
+function descartado(row: LeadInboxRow): boolean {
+  return situacaoEfetiva(row.lead, row.rentals) === "descartado";
+}
+
+/** "com" / "sem" Instagram, ou null para descartado. Mesma fonte do botão da ficha. */
+function grupoInstagram(row: LeadInboxRow): "com" | "sem" | null {
+  if (descartado(row)) return null;
+  return instagramDoLead(row.lead) ? "com" : "sem";
+}
+
+/**
+ * Já mandamos mensagem pelo WhatsApp? Só o fato conta, como em estadoContato():
+ * a sincronização trazer de volta uma mensagem nossa (`last_outbound_at`).
+ * Copiar o rascunho ou abrir o wa.me não conta.
+ *
+ * Fora: descartado e quem o WhatsApp CONFIRMOU não ter conta. Fixo ainda não
+ * verificado continua em "Não mandei" — a mesma régua de "Nunca abordado sem
+ * WhatsApp", e o botão de verificação em lote tira a dúvida.
+ */
+function grupoWhatsApp(row: LeadInboxRow): "enviei" | "nao_enviei" | null {
+  if (descartado(row)) return null;
+  if (row.lead.last_outbound_at) return "enviei";
+  if (temWhatsApp(row.lead) === false) return null;
+  return "nao_enviei";
+}
+
 function instagramArroba(lead: LeadInboxRow["lead"]): string | null {
   const handle = instagramDoLead(lead);
   return handle ? `@${handle}` : null;
@@ -105,6 +154,14 @@ const ESTADO_DO_FILTRO = {
 
 function lerFiltro(v: string | null): Filtro {
   return FILTROS.some((f) => f.id === v) ? (v as Filtro) : "todos";
+}
+
+function lerInstagram(v: string | null): FiltroInstagram {
+  return v === "com" || v === "sem" ? v : "todos";
+}
+
+function lerWhatsApp(v: string | null): FiltroWhatsApp {
+  return v === "enviei" || v === "nao_enviei" ? v : "todos";
 }
 
 function lerSituacao(v: string | null): FiltroSituacao {
@@ -181,12 +238,20 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   const [situacao, setSituacao] = useState<FiltroSituacao>(() =>
     lerSituacao(params.get("situacao")),
   );
+  const [instagram, setInstagram] = useState<FiltroInstagram>(() =>
+    lerInstagram(params.get("instagram")),
+  );
+  const [whatsapp, setWhatsapp] = useState<FiltroWhatsApp>(() =>
+    lerWhatsApp(params.get("whatsapp")),
+  );
   const [busca, setBusca] = useState(() => params.get("busca") ?? "");
 
   useEffect(() => {
     const q = new URLSearchParams();
     if (filtro !== "todos") q.set("filtro", filtro);
     if (situacao !== "todas") q.set("situacao", situacao);
+    if (instagram !== "todos") q.set("instagram", instagram);
+    if (whatsapp !== "todos") q.set("whatsapp", whatsapp);
     if (busca.trim()) q.set("busca", busca);
     const query = q.toString();
     // replaceState, e não router.replace: cada tecla da busca viraria uma
@@ -198,7 +263,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       query ? `${window.location.pathname}?${query}` : window.location.pathname,
     );
     guardarFiltrosDoRadar(query);
-  }, [filtro, situacao, busca]);
+  }, [filtro, situacao, instagram, whatsapp, busca]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -211,6 +276,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       ) {
         return false;
       }
+
+      if (instagram !== "todos" && grupoInstagram(row) !== instagram) return false;
+      if (whatsapp !== "todos" && grupoWhatsApp(row) !== whatsapp) return false;
 
       if (filtro === "sem_analise" && row.analysis) return false;
       // Os três estados de contato são excludentes, então um `switch` de
@@ -278,7 +346,11 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
     // mais novas primeiro, para ver o que acabou de chegar. A busca não conta
     // como filtro. Lead sem mensagem vai para o fim nas duas ordens; empates
     // mantêm a ordem de prioridade do servidor (o sort é estável).
-    const antigasPrimeiro = filtro !== "todos" || situacao !== "todas";
+    const antigasPrimeiro =
+      filtro !== "todos" ||
+      situacao !== "todas" ||
+      instagram !== "todos" ||
+      whatsapp !== "todos";
     return filtrados.slice().sort((a, b) => {
       const ta = ultimaMensagemMs(a);
       const tb = ultimaMensagemMs(b);
@@ -287,7 +359,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       }
       return antigasPrimeiro ? ta - tb : tb - ta;
     });
-  }, [rows, filtro, situacao, busca]);
+  }, [rows, filtro, situacao, instagram, whatsapp, busca]);
 
   const contagem = useMemo(() => {
     const c: Record<Filtro, number> = {
@@ -336,6 +408,42 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
     return c;
   }, [rows]);
 
+  const contagemCanais = useMemo(() => {
+    const c = { com: 0, sem: 0, enviei: 0, nao_enviei: 0 };
+    for (const row of rows) {
+      const ig = grupoInstagram(row);
+      if (ig) c[ig] += 1;
+      const wa = grupoWhatsApp(row);
+      if (wa) c[wa] += 1;
+    }
+    return c;
+  }, [rows]);
+
+  // Clicar no chip já ligado desliga o grupo: cada grupo tem o seu "todos"
+  // implícito, sem gastar mais dois chips na linha.
+  const chipCanal = (
+    id: keyof typeof contagemCanais,
+    label: string,
+    ligado: boolean,
+    alternar: () => void,
+  ) => (
+    <button
+      key={id}
+      type="button"
+      onClick={alternar}
+      aria-pressed={ligado}
+      className={cn(
+        "shrink-0 px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-colors",
+        ligado
+          ? "bg-ink text-paper border-ink"
+          : "bg-paper text-ink border-line hover:border-ink",
+      )}
+    >
+      {label}
+      <span className="ml-1.5 opacity-60">{contagemCanais[id]}</span>
+    </button>
+  );
+
   return (
     <div>
       <div className="mb-4 space-y-2">
@@ -381,6 +489,21 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
               <span className="ml-1.5 opacity-60">{contagemSituacao[f.id]}</span>
             </button>
           ))}
+        </div>
+
+        {/* Terceira linha: canais. Calculada, combina com as outras duas. */}
+        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+          {FILTROS_INSTAGRAM.map((f) =>
+            chipCanal(f.id, f.label, instagram === f.id, () =>
+              setInstagram(instagram === f.id ? "todos" : f.id),
+            ),
+          )}
+          <span aria-hidden className="shrink-0 w-px self-stretch bg-line mx-1" />
+          {FILTROS_WHATSAPP.map((f) =>
+            chipCanal(f.id, f.label, whatsapp === f.id, () =>
+              setWhatsapp(whatsapp === f.id ? "todos" : f.id),
+            ),
+          )}
         </div>
 
         <input
