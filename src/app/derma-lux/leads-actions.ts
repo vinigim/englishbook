@@ -449,11 +449,8 @@ export async function registerDraftCopied(
 //  Tem WhatsApp?
 // ============================================================================
 
-/** Fixo brasileiro no formato do banco: 55 + DDD + 8 dígitos começando em 2–5. */
-const FIXO_BR_REGEX = "^55[0-9]{2}[2-5][0-9]{7}$";
-
 /**
- * Por clique do "Verificar fixos". Baixo de propósito: consultar muito número
+ * Por clique do "Verificar números". Baixo de propósito: consultar muito número
  * desconhecido de uma vez é padrão de spam para o WhatsApp — ver LEADS.md,
  * "Risco de banimento".
  */
@@ -463,7 +460,7 @@ export type VerificacaoResult = ActionResult & {
   verificados?: number;
   comWhatsApp?: number;
   semWhatsApp?: number;
-  /** Fixos ainda sem verificação, depois deste lote. */
+  /** Números ainda sem verificação, depois deste lote. */
   restantes?: number;
   /** Só no modo de um lead: a resposta para ele. */
   existe?: boolean;
@@ -483,8 +480,11 @@ function erroDeVerificacao(err: unknown): string {
  * Pergunta ao WhatsApp se o telefone tem conta e grava a resposta.
  *
  * Com `id`: verifica aquele lead, mesmo que já verificado (é o "Verificar de
- * novo" da ficha). Sem `id`: o próximo lote de fixos nunca verificados e sem
- * conversa — conversa sincronizada já prova que a conta existe.
+ * novo" da ficha). Sem `id`: o próximo lote de números nunca verificados e sem
+ * conversa — conversa sincronizada já prova que a conta existe. Fixo E
+ * celular: começou só com fixo, mas celular sem WhatsApp também aparece (número
+ * antigo, de recepção, desativado) e enchia o filtro "Não mandei no WhatsApp".
+ * Descartado não entra: não vale gastar consulta com quem foi posto de lado.
  *
  * Número que o provedor não respondeu fica como estava: gravar "não tem" por
  * falta de resposta esconderia o botão do WhatsApp de quem tem.
@@ -516,7 +516,7 @@ export async function verificarWhatsApp(
       .is("wa_jid", null)
       .is("last_inbound_at", null)
       .is("last_outbound_at", null)
-      .filter("phone_e164", "match", FIXO_BR_REGEX);
+      .or("status.is.null,status.neq.descartado");
 
   try {
     const { data, error } = id

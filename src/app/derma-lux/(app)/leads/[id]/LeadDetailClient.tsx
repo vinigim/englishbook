@@ -273,12 +273,14 @@ export function LeadDetailClient({
         : null;
 
   /**
-   * Fixo pode ou não ter WhatsApp, e o aplicativo só conta depois do toque
-   * ("isn't on WhatsApp"). Então a ficha pergunta sozinha ao abrir, uma vez
-   * por número — a resposta fica gravada e as próximas aberturas não
-   * consultam de novo. Celular não é consultado: quase todo celular tem.
+   * O número pode ou não ter WhatsApp, e o aplicativo só conta depois do
+   * toque ("isn't on WhatsApp"). Então a ficha pergunta sozinha ao abrir, uma
+   * vez por número — a resposta fica gravada e as próximas aberturas não
+   * consultam de novo. Vale para celular também: começou só com fixo, mas
+   * celular antigo ou de recepção sem WhatsApp aparece com frequência.
    */
   const fixo = ehFixoBR(lead.phone_e164);
+  const tipoTelefone = fixo ? "fixo" : "celular";
   const whatsapp = temWhatsApp(lead);
   const [verificando, setVerificando] = useState(false);
   const [erroWhatsApp, setErroWhatsApp] = useState<string | null>(null);
@@ -299,12 +301,12 @@ export function LeadDetailClient({
   }
 
   useEffect(() => {
-    if (!fixo || whatsapp !== null || autoVerificado.current) return;
+    if (!lead.phone_e164 || whatsapp !== null || autoVerificado.current) return;
     autoVerificado.current = true;
     void verificar();
     // Só na montagem: a nova resposta chega por props, e o ref impede uma
     // segunda consulta automática se ela falhar.
-  }, [fixo, whatsapp]);
+  }, [lead.phone_e164, whatsapp]);
 
   // O ig.me não aceita texto na URL como o wa.me. Então o texto vai pela
   // área de transferência, copiado no mesmo toque que abre o direct — é o que
@@ -919,30 +921,32 @@ export function LeadDetailClient({
               ) : null}
             </div>
 
-            {fixo ? (
+            {/* Celular só ganha a linha quando há algo a dizer: "com WhatsApp,
+                já há conversa" repetido em todo celular seria ruído. */}
+            {fixo || verificando || erroWhatsApp || lead.whatsapp_verificado_em ? (
               <p className="text-xs text-muted mt-3">
                 {verificando ? (
-                  "Telefone fixo — verificando se tem WhatsApp…"
+                  `Telefone ${tipoTelefone} — verificando se tem WhatsApp…`
                 ) : erroWhatsApp ? (
                   <>
-                    Não consegui verificar se este fixo tem WhatsApp:{" "}
+                    Não consegui verificar se este {tipoTelefone} tem WhatsApp:{" "}
                     {erroWhatsApp}{" "}
                   </>
                 ) : whatsapp === false ? (
                   <>
                     <strong className="text-ink">
-                      Este fixo não tem WhatsApp
+                      Este {tipoTelefone} não tem WhatsApp
                     </strong>{" "}
                     — o próprio WhatsApp respondeu,{" "}
                     {relativeDays(lead.whatsapp_verificado_em ?? null)}.{" "}
                   </>
                 ) : lead.whatsapp_existe && lead.whatsapp_verificado_em ? (
                   <>
-                    Telefone fixo com WhatsApp — confirmado{" "}
+                    Telefone {tipoTelefone} com WhatsApp — confirmado{" "}
                     {relativeDays(lead.whatsapp_verificado_em)}.{" "}
                   </>
                 ) : whatsapp ? (
-                  "Telefone fixo com WhatsApp — já há conversa por lá."
+                  `Telefone ${tipoTelefone} com WhatsApp — já há conversa por lá.`
                 ) : null}
                 {!verificando && (erroWhatsApp || lead.whatsapp_verificado_em) ? (
                   <button
