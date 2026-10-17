@@ -414,7 +414,8 @@ no chip ligado o desliga:
   Quem o WhatsApp **confirmou** não ter conta (fixo ou celular) fica fora dos dois. Número ainda não
   verificado continua em "Não mandei".
 
-Descartado fica fora dos quatro chips.
+Descartado e cliente ativo ficam fora de todos os chips de canal (cliente
+inativo continua: é para reabordar).
 
 A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estava
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
