@@ -99,12 +99,13 @@ const FILTROS_SITUACAO: { id: FiltroSituacao; label: string }[] = [
  * Descartado fica fora dos quatro chips: já foi posto de lado, não importa por
  * qual canal. Situação EFETIVA, a mesma do filtro "Descartado".
  */
-type FiltroInstagram = "todos" | "com" | "sem";
+type FiltroInstagram = "todos" | "com" | "sem" | "nao_enviei_ig";
 type FiltroWhatsApp = "todos" | "enviei" | "nao_enviei";
 
 const FILTROS_INSTAGRAM: { id: Exclude<FiltroInstagram, "todos">; label: string }[] = [
   { id: "com", label: "Com Instagram" },
   { id: "sem", label: "Sem Instagram" },
+  { id: "nao_enviei_ig", label: "Não mandei no Instagram" },
 ];
 
 const FILTROS_WHATSAPP: { id: Exclude<FiltroWhatsApp, "todos">; label: string }[] = [
@@ -120,6 +121,22 @@ function descartado(row: LeadInboxRow): boolean {
 function grupoInstagram(row: LeadInboxRow): "com" | "sem" | null {
   if (descartado(row)) return null;
   return instagramDoLead(row.lead) ? "com" : "sem";
+}
+
+/**
+ * "Não mandei no Instagram": um recorte de "Com Instagram" — tem o @ e ainda
+ * não recebeu nada pelo direct. Enviado é o botão "Já enviei pelo Instagram"
+ * (`instagram_sent_at`), porque o direct não sincroniza. Não olha o WhatsApp:
+ * para cruzar os dois canais, combine com o grupo do WhatsApp.
+ */
+function naoMandeiNoInstagram(row: LeadInboxRow): boolean {
+  return grupoInstagram(row) === "com" && !row.lead.instagram_sent_at;
+}
+
+function noFiltroInstagram(row: LeadInboxRow, f: FiltroInstagram): boolean {
+  if (f === "todos") return true;
+  if (f === "nao_enviei_ig") return naoMandeiNoInstagram(row);
+  return grupoInstagram(row) === f;
 }
 
 /**
@@ -158,7 +175,7 @@ function lerFiltro(v: string | null): Filtro {
 }
 
 function lerInstagram(v: string | null): FiltroInstagram {
-  return v === "com" || v === "sem" ? v : "todos";
+  return v === "com" || v === "sem" || v === "nao_enviei_ig" ? v : "todos";
 }
 
 function lerWhatsApp(v: string | null): FiltroWhatsApp {
@@ -278,7 +295,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         return false;
       }
 
-      if (instagram !== "todos" && grupoInstagram(row) !== instagram) return false;
+      if (!noFiltroInstagram(row, instagram)) return false;
       if (whatsapp !== "todos" && grupoWhatsApp(row) !== whatsapp) return false;
 
       if (filtro === "sem_analise" && row.analysis) return false;
@@ -410,10 +427,11 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   }, [rows]);
 
   const contagemCanais = useMemo(() => {
-    const c = { com: 0, sem: 0, enviei: 0, nao_enviei: 0 };
+    const c = { com: 0, sem: 0, nao_enviei_ig: 0, enviei: 0, nao_enviei: 0 };
     for (const row of rows) {
       const ig = grupoInstagram(row);
       if (ig) c[ig] += 1;
+      if (naoMandeiNoInstagram(row)) c.nao_enviei_ig += 1;
       const wa = grupoWhatsApp(row);
       if (wa) c[wa] += 1;
     }

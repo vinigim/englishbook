@@ -406,6 +406,9 @@ as outras duas por interseção. São dois grupos independentes, e clicar de nov
 no chip ligado o desliga:
 
 - **Com / Sem Instagram**: tem `instagramDoLead()`, a mesma fonte do botão da ficha.
+- **Não mandei no Instagram**: recorte de "Com Instagram" sem `instagram_sent_at`
+  (o botão "Já enviei pelo Instagram"). Não olha o WhatsApp; para cruzar, combine
+  com o grupo do WhatsApp.
 - **Já mandei / Não mandei no WhatsApp**: `last_outbound_at`, ou seja, só a
   mensagem nossa trazida pela sincronização (a mesma régua de `estadoContato`).
   Quem o WhatsApp **confirmou** não ter conta (fixo ou celular) fica fora dos dois. Número ainda não
