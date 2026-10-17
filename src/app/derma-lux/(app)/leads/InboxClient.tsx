@@ -96,8 +96,10 @@ const FILTROS_SITUACAO: { id: FiltroSituacao; label: string }[] = [
  * a pergunta útil é combinada: "tem Instagram e ainda não recebeu WhatsApp".
  * Como as outras linhas, combina por interseção.
  *
- * Descartado fica fora dos quatro chips: já foi posto de lado, não importa por
- * qual canal. Situação EFETIVA, a mesma do filtro "Descartado".
+ * Descartado e cliente ativo ficam fora de todos os chips de canal: um já foi
+ * posto de lado, o outro já está fechado — nenhum dos dois é prospecção.
+ * Cliente inativo continua, porque é para reabordar. Situação EFETIVA, a mesma
+ * dos filtros "Descartado" e "Cliente ativo".
  */
 type FiltroInstagram = "todos" | "com" | "sem" | "nao_enviei_ig";
 type FiltroWhatsApp = "todos" | "enviei" | "nao_enviei";
@@ -113,13 +115,14 @@ const FILTROS_WHATSAPP: { id: Exclude<FiltroWhatsApp, "todos">; label: string }[
   { id: "nao_enviei", label: "Não mandei no WhatsApp" },
 ];
 
-function descartado(row: LeadInboxRow): boolean {
-  return situacaoEfetiva(row.lead, row.rentals) === "descartado";
+function foraDosCanais(row: LeadInboxRow): boolean {
+  const situacao = situacaoEfetiva(row.lead, row.rentals);
+  return situacao === "descartado" || situacao === "cliente";
 }
 
-/** "com" / "sem" Instagram, ou null para descartado. Mesma fonte do botão da ficha. */
+/** "com" / "sem" Instagram, ou null para descartado e cliente ativo. Mesma fonte do botão da ficha. */
 function grupoInstagram(row: LeadInboxRow): "com" | "sem" | null {
-  if (descartado(row)) return null;
+  if (foraDosCanais(row)) return null;
   return instagramDoLead(row.lead) ? "com" : "sem";
 }
 
@@ -144,13 +147,13 @@ function noFiltroInstagram(row: LeadInboxRow, f: FiltroInstagram): boolean {
  * a sincronização trazer de volta uma mensagem nossa (`last_outbound_at`).
  * Copiar o rascunho ou abrir o wa.me não conta.
  *
- * Fora: descartado e quem o WhatsApp CONFIRMOU não ter conta, fixo ou celular.
+ * Fora: descartado, cliente ativo e quem o WhatsApp CONFIRMOU não ter conta, fixo ou celular.
  * Número ainda não verificado continua em "Não mandei" — a mesma régua de
  * "Nunca abordado sem WhatsApp" —, e "Verificar números no WhatsApp" (ou abrir
  * a ficha) tira a dúvida.
  */
 function grupoWhatsApp(row: LeadInboxRow): "enviei" | "nao_enviei" | null {
-  if (descartado(row)) return null;
+  if (foraDosCanais(row)) return null;
   if (row.lead.last_outbound_at) return "enviei";
   if (temWhatsApp(row.lead) === false) return null;
   return "nao_enviei";
