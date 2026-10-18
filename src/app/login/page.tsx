@@ -1,12 +1,21 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Alerta, Button, Card } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <Login />
+    </Suspense>
+  );
+}
+
+function Login() {
   const router = useRouter();
+  const semAcesso = useSearchParams().get("erro") === "sem_acesso";
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -37,6 +46,7 @@ export default function LoginPage() {
             <label className="label" htmlFor="senha">Senha</label>
             <input id="senha" type="password" className="input" value={senha} onChange={(e) => setSenha(e.target.value)} required />
           </div>
+          {semAcesso && !erro && <Alerta tipo="erro">Esta conta não tem acesso ao radar.</Alerta>}
           {erro && <Alerta tipo="erro">{erro}</Alerta>}
           <Button type="submit" className="w-full" disabled={carregando}>
             {carregando ? "Entrando…" : "Entrar"}

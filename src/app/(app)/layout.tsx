@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { usuarioAtual } from "@/lib/supabase/server";
 import { BotaoSair } from "./botao-sair";
 
 const LINKS = [
@@ -11,12 +11,11 @@ const LINKS = [
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
+  const { supabase, user, bloqueado } = await usuarioAtual();
+  if (!user) redirect(bloqueado ? "/login?erro=sem_acesso" : "/login");
 
-  // Primeiro acesso: cria o perfil com os termos padrão.
-  await supabase.from("perfil").upsert({ user_id: data.user.id }, { onConflict: "user_id", ignoreDuplicates: true });
+  // Primeiro acesso: cria o perfil com os termos padrão (e entra na busca diária).
+  await supabase.from("perfil").upsert({ user_id: user.id }, { onConflict: "user_id", ignoreDuplicates: true });
 
   return (
     <div className="min-h-screen">

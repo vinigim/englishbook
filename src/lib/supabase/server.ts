@@ -21,9 +21,24 @@ export async function createClient() {
   );
 }
 
-/** Usuário logado ou null. Use em Server Actions e Route Handlers. */
+/**
+ * E-mails que podem usar o radar (EMAILS_PERMITIDOS, separados por vírgula).
+ * Importa quando o projeto Supabase é compartilhado com outro sistema: qualquer
+ * conta de lá conseguiria entrar aqui e gastar a sua chave da Anthropic.
+ * Sem a variável, qualquer usuário autenticado entra.
+ */
+export function emailPermitido(email: string | undefined): boolean {
+  const lista = (process.env.EMAILS_PERMITIDOS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return lista.length === 0 || (!!email && lista.includes(email.toLowerCase()));
+}
+
+/** Usuário logado e permitido, ou null. Use em layouts, Server Actions e Route Handlers. */
 export async function usuarioAtual() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  return { supabase, user: data.user };
+  const user = data.user && emailPermitido(data.user.email) ? data.user : null;
+  return { supabase, user, bloqueado: Boolean(data.user && !user) };
 }
