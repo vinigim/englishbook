@@ -274,6 +274,44 @@ export async function marcarInstagramEnviado(
 }
 
 /**
+ * "Instagram não encontrado": nem o dono nem a IA acharam o perfil.
+ *
+ * Tira o lead de "Sem Instagram" e da fila da busca em lote, e o põe no chip
+ * "Instagram não encontrado". Não mexe em `needs_analysis`: a IA não lê esta
+ * marca. Salvar um @ depois vence a marca, sem precisar limpá-la.
+ */
+export async function marcarInstagramNaoEncontrado(
+  id: string,
+  naoEncontrado: boolean,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({
+      instagram_nao_encontrado_em: naoEncontrado ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      ok: false,
+      error: /instagram_nao_encontrado_em/.test(error.message)
+        ? "Falta rodar a migração 0026_instagram_nao_encontrado.sql no Supabase."
+        : error.message,
+    };
+  }
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
+/**
  * Grava o Instagram do lead — hoje, o perfil que o dono escolheu entre os
  * candidatos da busca com IA.
  *

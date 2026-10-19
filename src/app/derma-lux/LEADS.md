@@ -406,6 +406,10 @@ as outras duas por interseção. São dois grupos independentes, e clicar de nov
 no chip ligado o desliga:
 
 - **Com / Sem Instagram**: tem `instagramDoLead()`, a mesma fonte do botão da ficha.
+- **Instagram não encontrado**: o dono marcou que não achou o perfil
+  (`instagram_nao_encontrado_em`, migração `0026`), na ficha ou em "Nenhum é ele"
+  da busca em lote. Sai de "Sem Instagram" e da fila da busca com IA; "desfazer"
+  na ficha o devolve. Um @ salvo depois vence a marca, sem precisar limpá-la.
 - **Não mandei no Instagram**: recorte de "Com Instagram" sem `instagram_sent_at`
   (o botão "Já enviei pelo Instagram"). Não olha o WhatsApp; para cruzar, combine
   com o grupo do WhatsApp.

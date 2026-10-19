@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { instagramProfileUrl } from "@/lib/leads/instagram";
 import { gravarRejeitados, lerRejeitados } from "@/lib/leads/instagram-rejeitados";
-import { definirInstagram } from "../../leads-actions";
+import { definirInstagram, marcarInstagramNaoEncontrado } from "../../leads-actions";
 import { instagramDoLead, leadDisplayName } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
 
@@ -113,7 +113,14 @@ export function BuscaInstagramLote({
   }
 
   const pendentes = useMemo(
-    () => fila.filter((r) => !instagramDoLead(r.lead) && !achados[r.lead.id]),
+    // Marcado como "não encontrado" já foi procurado: não gasta busca de novo.
+    () =>
+      fila.filter(
+        (r) =>
+          !instagramDoLead(r.lead) &&
+          !r.lead.instagram_nao_encontrado_em &&
+          !achados[r.lead.id],
+      ),
     [fila, achados],
   );
 
@@ -122,7 +129,12 @@ export function BuscaInstagramLote({
     () =>
       todos.filter((r) => {
         const a = achados[r.lead.id];
-        return a && a.candidatos.length > 0 && !instagramDoLead(r.lead);
+        return (
+          a &&
+          a.candidatos.length > 0 &&
+          !instagramDoLead(r.lead) &&
+          !r.lead.instagram_nao_encontrado_em
+        );
       }),
     [todos, achados],
   );
@@ -256,6 +268,19 @@ export function BuscaInstagramLote({
     router.refresh();
   }
 
+  /** Nenhum candidato é ele: tira o lead da conferência e da fila de vez. */
+  async function naoEncontrado(leadId: string) {
+    setSalvando(leadId);
+    setErro(null);
+    const r = await marcarInstagramNaoEncontrado(leadId, true);
+    setSalvando(null);
+    if (!r.ok) {
+      setErro(r.error ?? "Não consegui salvar.");
+      return;
+    }
+    router.refresh();
+  }
+
   function rebuscarSemResultado() {
     atualizar((m) =>
       Object.fromEntries(Object.entries(m).filter(([, a]) => a.candidatos.length > 0)),
@@ -360,6 +385,14 @@ export function BuscaInstagramLote({
                       </div>
                     </div>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => naoEncontrado(id)}
+                    disabled={salvando !== null}
+                    className="text-xs text-muted underline hover:text-ink"
+                  >
+                    Nenhum é ele — Instagram não encontrado
+                  </button>
                 </li>
               );
             })}
