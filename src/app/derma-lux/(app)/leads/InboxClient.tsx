@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
@@ -294,6 +294,38 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
     guardarFiltrosDoRadar(query);
   }, [filtro, situacao, instagram, whatsapp, busca]);
 
+  // Cada linha de chips rola na horizontal no celular, e um chip ligado lá no
+  // fim ficava fora da tela: a lista vinha vazia sem nada aparentemente
+  // selecionado. Rola cada linha até o chip ligado — só a linha, não a página.
+  const barra = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    barra.current
+      ?.querySelectorAll<HTMLElement>('[aria-pressed="true"]')
+      .forEach((chip) => {
+        const linha = chip.parentElement;
+        if (!linha) return;
+        const fora =
+          chip.offsetLeft < linha.scrollLeft ||
+          chip.offsetLeft + chip.offsetWidth > linha.scrollLeft + linha.clientWidth;
+        if (fora) linha.scrollTo({ left: chip.offsetLeft - 8, behavior: "smooth" });
+      });
+  }, [filtro, situacao, instagram, whatsapp]);
+
+  const algumFiltro =
+    filtro !== "todos" ||
+    situacao !== "todas" ||
+    instagram !== "todos" ||
+    whatsapp !== "todos" ||
+    busca.trim() !== "";
+
+  function limparFiltros() {
+    setFiltro("todos");
+    setSituacao("todas");
+    setInstagram("todos");
+    setWhatsapp("todos");
+    setBusca("");
+  }
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
@@ -483,17 +515,18 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
   return (
     <div>
-      <div className="mb-4 space-y-2">
+      <div ref={barra} className="mb-4 space-y-2">
         {/*
           No celular os chips rolam na horizontal em vez de quebrar em três
           linhas — senão o primeiro lead só apareceria abaixo da dobra.
         */}
-        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+        <div className="relative flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
           {FILTROS.map((f) => (
             <button
               key={f.id}
               type="button"
               onClick={() => setFiltro(f.id)}
+              aria-pressed={filtro === f.id}
               className={cn(
                 "shrink-0 px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-colors",
                 filtro === f.id
@@ -509,12 +542,13 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
         {/* Segunda linha: situação. Dimensão independente da temperatura —
             combinar as duas é o que permite "cliente ativo e quente". */}
-        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+        <div className="relative flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
           {FILTROS_SITUACAO.map((f) => (
             <button
               key={f.id}
               type="button"
               onClick={() => setSituacao(f.id)}
+              aria-pressed={situacao === f.id}
               className={cn(
                 "shrink-0 px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-colors",
                 situacao === f.id
@@ -529,7 +563,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         </div>
 
         {/* Terceira linha: canais. Calculada, combina com as outras duas. */}
-        <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+        <div className="relative flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
           {FILTROS_INSTAGRAM.map((f) =>
             chipCanal(f.id, f.label, instagram === f.id, () =>
               setInstagram(instagram === f.id ? "todos" : f.id),
@@ -561,6 +595,14 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       {visiveis.length === 0 ? (
         <p className="text-muted text-sm py-8 text-center">
           Nenhum lead corresponde a este filtro.
+          {algumFiltro ? (
+            <>
+              {" "}
+              <button type="button" onClick={limparFiltros} className="underline hover:text-ink">
+                Limpar filtros
+              </button>
+            </>
+          ) : null}
         </p>
       ) : (
         <ul className="space-y-2">
