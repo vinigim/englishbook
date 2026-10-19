@@ -278,7 +278,8 @@ export async function marcarInstagramEnviado(
  *
  * Tira o lead de "Sem Instagram" e da fila da busca em lote, e o põe no chip
  * "Instagram não encontrado". Não mexe em `needs_analysis`: a IA não lê esta
- * marca. Salvar um @ depois vence a marca, sem precisar limpá-la.
+ * marca. A busca com IA também marca sozinha quando volta vazia; salvar um @
+ * (`definirInstagram`) limpa a marca.
  */
 export async function marcarInstagramNaoEncontrado(
   id: string,
@@ -354,6 +355,15 @@ export async function definirInstagram(
   }
 
   if (error) return { ok: false, error: error.message };
+
+  // Achou: sai de "Instagram não encontrado". O @ já venceria a marca na
+  // tela; limpar é para o dado não mentir. Sem a 0026 a coluna não existe, e
+  // o erro não importa.
+  await supabase
+    .from("wa_leads")
+    .update({ instagram_nao_encontrado_em: null })
+    .eq("id", id)
+    .not("instagram_nao_encontrado_em", "is", null);
 
   revalidateLead(id);
   return { ok: true };

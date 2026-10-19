@@ -21,6 +21,8 @@ type Resultado = {
   descartados: number;
   consultas: string[];
   observacao: string | null;
+  /** A rota marcou "Instagram não encontrado" (busca vazia, lead sem @). */
+  naoEncontrado?: boolean;
   pesquisas: number;
   custoUsd: number;
   modelo?: string;
@@ -113,6 +115,8 @@ export function BuscarInstagram({
         return;
       }
       setResultado(json as Resultado);
+      // A rota marcou "Instagram não encontrado": a ficha precisa mostrar.
+      if (json.naoEncontrado) router.refresh();
     } catch {
       setErro("Falha de rede na busca.");
     } finally {
@@ -225,6 +229,9 @@ export function BuscarInstagram({
             <p className="text-xs text-muted">
               Nenhum perfil confiável encontrado.
               {resultado.observacao ? ` ${resultado.observacao}` : ""}
+              {resultado.naoEncontrado
+                ? " Marcado como Instagram não encontrado até você salvar um @."
+                : ""}
             </p>
           ) : (
             <ul className="space-y-2">

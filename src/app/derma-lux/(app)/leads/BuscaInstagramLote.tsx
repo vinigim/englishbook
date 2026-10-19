@@ -143,7 +143,14 @@ export function BuscaInstagramLote({
     () =>
       todos.filter((r) => {
         const a = achados[r.lead.id];
-        return a && a.candidatos.length === 0 && !instagramDoLead(r.lead);
+        // Os marcados como "não encontrado" têm chip próprio; voltam à fila
+        // pelo "desfazer" da ficha, não por aqui.
+        return (
+          a &&
+          a.candidatos.length === 0 &&
+          !instagramDoLead(r.lead) &&
+          !r.lead.instagram_nao_encontrado_em
+        );
       }).length,
     [todos, achados],
   );
@@ -237,6 +244,9 @@ export function BuscaInstagramLote({
 
     setStatus(`${parar.current ? "Parado" : "Pronto"}: ${resumo()}`);
     setRodando(false);
+    // Busca vazia vira "Instagram não encontrado" na rota: os contadores e os
+    // chips precisam ler isso do servidor.
+    router.refresh();
   }
 
   function rejeitar(leadId: string, handle: string) {
