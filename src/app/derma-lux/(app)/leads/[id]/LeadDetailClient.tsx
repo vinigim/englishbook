@@ -61,6 +61,7 @@ import {
 } from "../../../leads-actions";
 import type { LeadDetail, WaMessage } from "../../../leads-types";
 import { BuscarInstagram } from "./BuscarInstagram";
+import { InstagramNaoEncontrado } from "./InstagramNaoEncontrado";
 import { urlDoRadar } from "../filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
@@ -488,11 +489,17 @@ export function LeadDetailClient({
                 </button>
               </p>
             ) : (
-              <BuscarInstagram
-                leadId={lead.id}
-                nomes={nomesParaInstagram}
-                especialidade={lead.specialty}
-              />
+              <>
+                <BuscarInstagram
+                  leadId={lead.id}
+                  nomes={nomesParaInstagram}
+                  especialidade={lead.specialty}
+                />
+                <InstagramNaoEncontrado
+                  leadId={lead.id}
+                  marcadoEm={lead.instagram_nao_encontrado_em ?? null}
+                />
+              </>
             )}
             {instagram && trocarInstagram ? (
               <BuscarInstagram

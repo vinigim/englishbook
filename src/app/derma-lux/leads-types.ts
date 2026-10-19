@@ -38,6 +38,11 @@ export type Lead = {
   /** O dono escolheu o @ na ficha; a planilha não o troca. Nulo = veio da planilha. */
   instagram_escolhido_em?: string | null;
   /**
+   * O dono marcou que não achou o Instagram (0026). Um @ salvo depois vence.
+   * Opcional para não quebrar antes da migração rodar.
+   */
+  instagram_nao_encontrado_em?: string | null;
+  /**
    * Quando o dono marcou que mandou mensagem pelo direct (0016).
    *
    * Manual porque envio pelo Instagram não volta em sincronização nenhuma —

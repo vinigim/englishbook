@@ -101,12 +101,13 @@ const FILTROS_SITUACAO: { id: FiltroSituacao; label: string }[] = [
  * Cliente inativo continua, porque é para reabordar. Situação EFETIVA, a mesma
  * dos filtros "Descartado" e "Cliente ativo".
  */
-type FiltroInstagram = "todos" | "com" | "sem" | "nao_enviei_ig";
+type FiltroInstagram = "todos" | "com" | "sem" | "nao_encontrado" | "nao_enviei_ig";
 type FiltroWhatsApp = "todos" | "enviei" | "nao_enviei";
 
 const FILTROS_INSTAGRAM: { id: Exclude<FiltroInstagram, "todos">; label: string }[] = [
   { id: "com", label: "Com Instagram" },
   { id: "sem", label: "Sem Instagram" },
+  { id: "nao_encontrado", label: "Instagram não encontrado" },
   { id: "nao_enviei_ig", label: "Não mandei no Instagram" },
 ];
 
@@ -120,10 +121,15 @@ function foraDosCanais(row: LeadInboxRow): boolean {
   return situacao === "descartado" || situacao === "cliente";
 }
 
-/** "com" / "sem" Instagram, ou null para descartado e cliente ativo. Mesma fonte do botão da ficha. */
-function grupoInstagram(row: LeadInboxRow): "com" | "sem" | null {
+/**
+ * "com" / "sem" / "nao_encontrado", ou null para descartado e cliente ativo.
+ * O @ vem da mesma fonte do botão da ficha e vence a marca de não encontrado:
+ * achado depois, o lead volta para "Com Instagram" sem ninguém limpar nada.
+ */
+function grupoInstagram(row: LeadInboxRow): "com" | "sem" | "nao_encontrado" | null {
   if (foraDosCanais(row)) return null;
-  return instagramDoLead(row.lead) ? "com" : "sem";
+  if (instagramDoLead(row.lead)) return "com";
+  return row.lead.instagram_nao_encontrado_em ? "nao_encontrado" : "sem";
 }
 
 /**
@@ -178,7 +184,9 @@ function lerFiltro(v: string | null): Filtro {
 }
 
 function lerInstagram(v: string | null): FiltroInstagram {
-  return v === "com" || v === "sem" || v === "nao_enviei_ig" ? v : "todos";
+  return v === "com" || v === "sem" || v === "nao_encontrado" || v === "nao_enviei_ig"
+    ? v
+    : "todos";
 }
 
 function lerWhatsApp(v: string | null): FiltroWhatsApp {
@@ -430,7 +438,14 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
   }, [rows]);
 
   const contagemCanais = useMemo(() => {
-    const c = { com: 0, sem: 0, nao_enviei_ig: 0, enviei: 0, nao_enviei: 0 };
+    const c = {
+      com: 0,
+      sem: 0,
+      nao_encontrado: 0,
+      nao_enviei_ig: 0,
+      enviei: 0,
+      nao_enviei: 0,
+    };
     for (const row of rows) {
       const ig = grupoInstagram(row);
       if (ig) c[ig] += 1;

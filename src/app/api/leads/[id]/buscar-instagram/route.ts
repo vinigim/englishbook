@@ -1,10 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { DRAFT_MODEL, TRIAGE_MODEL, isAiConfigured } from "@/lib/ai/anthropic";
 import { buscarInstagram } from "@/lib/ai/buscar-instagram";
-import { extraFields, formatPhoneBR } from "@/app/derma-lux/leads-shared";
+import {
+  extraFields,
+  formatPhoneBR,
+  instagramDoLead,
+} from "@/app/derma-lux/leads-shared";
 import { toInstagramHandle } from "@/lib/leads/instagram";
 import type { Lead } from "@/app/derma-lux/leads-types";
 
@@ -15,7 +20,9 @@ export const maxDuration = 60;
 /**
  * "Buscar Instagram com IA", na ficha do lead.
  *
- * Só devolve candidatos; não grava nada. Também serve para trocar um @ que
+ * Devolve candidatos e não grava nenhum @. A única escrita é a marca
+ * "Instagram não encontrado" (0026), quando a busca volta vazia para um lead
+ * sem @: decisão do dono, para o lead sair de "Sem Instagram" sozinho. Também serve para trocar um @ que
  * está errado: o corpo pode trazer `excluir`, os perfis que não servem. Salvar é outro toque, na action
  * `definirInstagram`, depois de o dono conferir o perfil.
  *
@@ -88,7 +95,9 @@ export async function POST(
   // Cliente do usuário: a RLS (lux_staff) decide se ele pode ver o lead.
   const { data, error } = await supabase
     .from("wa_leads")
-    .select("sheet_name, display_name, clinic_name, specialty, city, uf, phone_e164, extra")
+    .select(
+      "sheet_name, display_name, clinic_name, specialty, city, uf, phone_e164, extra, instagram",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) {
@@ -99,7 +108,15 @@ export async function POST(
 
   const lead = data as Pick<
     Lead,
-    "sheet_name" | "display_name" | "clinic_name" | "specialty" | "city" | "uf" | "phone_e164" | "extra"
+    | "sheet_name"
+    | "display_name"
+    | "clinic_name"
+    | "specialty"
+    | "city"
+    | "uf"
+    | "phone_e164"
+    | "extra"
+    | "instagram"
   >;
 
   // Nome só com letra: o display_name às vezes é o próprio LID do WhatsApp.
@@ -143,7 +160,27 @@ export async function POST(
     console.log(
       `[buscar-instagram] lead ${id} (${resultado.modelo}): ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
-    return NextResponse.json(resultado);
+
+    // Busca vazia num lead sem @: marca "Instagram não encontrado". Lead que
+    // já tem @ (o "perfil errado?") não é marcado — o @ dele continua valendo.
+    // Falha aqui não derruba a resposta: os candidatos (nenhum) já são o
+    // resultado, e sem a migração 0026 a coluna simplesmente não existe.
+    let naoEncontrado = false;
+    if (resultado.candidatos.length === 0 && !instagramDoLead(lead)) {
+      const { error: erroMarca } = await supabase
+        .from("wa_leads")
+        .update({ instagram_nao_encontrado_em: new Date().toISOString() })
+        .eq("id", id);
+      if (erroMarca) {
+        console.error("[buscar-instagram] falha ao marcar não encontrado:", erroMarca.message);
+      } else {
+        naoEncontrado = true;
+        revalidatePath("/derma-lux/leads");
+        revalidatePath(`/derma-lux/leads/${id}`);
+      }
+    }
+
+    return NextResponse.json({ ...resultado, naoEncontrado });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Falha na busca.";
     console.error("[buscar-instagram] falha:", message);
