@@ -48,6 +48,8 @@ const idSchema = z.string().uuid("ID inválido");
 export type ReanalyzeResult = ActionResult & {
   /** A IA escreveu mensagem, ou recusou? A tela precisa saber para dar retorno. */
   gerouRascunho?: boolean;
+  /** O texto escrito, para a tela abrir o WhatsApp sem esperar o refresh. */
+  rascunho?: string | null;
   acao?: RecommendedAction | null;
 };
 
@@ -130,6 +132,7 @@ export async function reanalyzeLead(
       return {
         ok: true,
         gerouRascunho: Boolean(resultado.record.draft_message),
+        rascunho: resultado.record.draft_message ?? null,
         acao: resultado.record.recommended_action,
       };
     }

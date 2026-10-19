@@ -377,7 +377,33 @@ export function LeadDetailClient({
     });
   }
 
-  function analisar(gerarRascunho: boolean, onde: Onde, exigirMensagem = false) {
+  /**
+   * Abre a conversa do lead no WhatsApp com o texto pronto, sem toque.
+   *
+   * Chamada depois da IA escrever, então não há mais o toque do usuário: o
+   * navegador bloqueia aba nova (window.open) nessa hora. No celular vai pelo
+   * esquema `whatsapp://` na própria aba — o sistema abre o app (o iPhone
+   * pergunta antes) e o painel fica onde está. No computador tenta o wa.me em
+   * aba nova; bloqueado, sobra o botão "Abrir no WhatsApp", que continua ali.
+   *
+   * Abrir não é enviar: nada é marcado aqui (ver estadoContato).
+   */
+  function abrirWhatsAppSozinho(texto: string): boolean {
+    if (!numero) return false;
+    const msg = encodeURIComponent(texto);
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      window.location.href = `whatsapp://send?phone=${numero}&text=${msg}`;
+      return true;
+    }
+    return window.open(`https://wa.me/${numero}?text=${msg}`, "_blank") !== null;
+  }
+
+  function analisar(
+    gerarRascunho: boolean,
+    onde: Onde,
+    exigirMensagem = false,
+    abrirWhatsApp = false,
+  ) {
     executar(onde, async () => {
       const r = await reanalyzeLead(lead.id, {
         force: true,
@@ -397,6 +423,18 @@ export function LeadDetailClient({
       // Sem isto, uma recusa da IA é indistinguível de um botão quebrado:
       // o spinner some e nada muda na tela.
       if (r.gerouRascunho) {
+        // "Gerar mensagem assim mesmo": já abre o WhatsApp com o texto. Sem
+        // WhatsApp confirmado, abrir só levaria ao aviso "isn't on WhatsApp".
+        if (abrirWhatsApp && r.rascunho && whatsapp !== false) {
+          const abriu = abrirWhatsAppSozinho(ajustarSaudacao(r.rascunho));
+          return {
+            onde,
+            tipo: "info",
+            texto: abriu
+              ? "Mensagem gerada — abrindo o WhatsApp. Se não abrir, toque em \"Abrir no WhatsApp\"."
+              : "Mensagem gerada abaixo. O navegador não deixou abrir o WhatsApp sozinho: toque em \"Abrir no WhatsApp\".",
+          };
+        }
         return { onde, tipo: "info", texto: "Mensagem gerada abaixo." };
       }
       if (r.acao) {
@@ -870,7 +908,7 @@ export function LeadDetailClient({
                   size="sm"
                   variant="secondary"
                   loading={pendente}
-                  onClick={() => analisar(true, "mensagem", true)}
+                  onClick={() => analisar(true, "mensagem", true, true)}
                 >
                   Gerar mensagem assim mesmo
                 </Button>

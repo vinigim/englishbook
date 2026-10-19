@@ -427,6 +427,12 @@ A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estav
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
 de concordar para a tela não mentir.
 
+**"Gerar mensagem assim mesmo" abre o WhatsApp sozinho** quando a IA termina,
+com o texto pronto (no celular pelo esquema `whatsapp://`, na mesma aba, porque
+o navegador bloqueia aba nova sem toque; no computador tenta o wa.me em aba
+nova). Não abre para quem o WhatsApp confirmou não ter conta. Também não conta
+como envio.
+
 **Cópia do rascunho e clique em "Abrir no WhatsApp" não contam como envio.**
 Abrir o app não é ter enviado, e foi decisão do dono que só o fato conte. O preço
 é o atraso: mensagem mandada pelo WhatsApp só entra no painel quando volta do
