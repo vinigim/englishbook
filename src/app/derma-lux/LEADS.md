@@ -427,7 +427,8 @@ A regra do `devo_responder` é a mesma de sempre, agora num lugar só: ela estav
 copiada na lista, no `priorityScore` e no prompt da IA, e as três cópias tinham
 de concordar para a tela não mentir.
 
-**"Gerar mensagem assim mesmo" abre o WhatsApp sozinho** quando a IA termina,
+**"Analisar" e "Gerar mensagem assim mesmo" abrem o WhatsApp sozinhos** quando
+a IA termina e escreveu mensagem,
 com o texto pronto (no celular pelo esquema `whatsapp://`, na mesma aba, porque
 o navegador bloqueia aba nova sem toque; no computador tenta o wa.me em aba
 nova). Não abre para quem o WhatsApp confirmou não ter conta. Também não conta

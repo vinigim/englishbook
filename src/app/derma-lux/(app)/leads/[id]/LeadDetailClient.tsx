@@ -423,7 +423,8 @@ export function LeadDetailClient({
       // Sem isto, uma recusa da IA é indistinguível de um botão quebrado:
       // o spinner some e nada muda na tela.
       if (r.gerouRascunho) {
-        // "Gerar mensagem assim mesmo": já abre o WhatsApp com o texto. Sem
+        // "Analisar" e "Gerar mensagem assim mesmo": já abre o WhatsApp com o
+        // texto. Se a IA não escreveu (aguardar, descartar), não abre nada. Sem
         // WhatsApp confirmado, abrir só levaria ao aviso "isn't on WhatsApp".
         if (abrirWhatsApp && r.rascunho && whatsapp !== false) {
           const abriu = abrirWhatsAppSozinho(ajustarSaudacao(r.rascunho));
@@ -648,7 +649,7 @@ export function LeadDetailClient({
                 size="sm"
                 variant="ghost"
                 loading={pendente}
-                onClick={() => analisar(true, "analise")}
+                onClick={() => analisar(true, "analise", false, true)}
               >
                 {analysis ? "Reanalisar" : "Analisar"}
               </Button>
