@@ -4,14 +4,11 @@ import type { Modelo, VagaColetada } from "../tipos";
 
 // Portal público de vagas da Gupy (o mesmo que alimenta portal.gupy.io).
 // Não exige chave e não tem documentação: a busca olha só o título da vaga.
-// Há duas rotas conhecidas com a mesma resposta; se uma some (404), usamos a outra.
+// Em out/2026 a Gupy desligou portal.api.gupy.io e employability-portal.gupy.io
+// (404 em tudo); o portal passou a buscar no próprio domínio, com os mesmos
+// parâmetros e a mesma resposta `{ data, pagination }`.
+const BASE = "https://portal.gupy.io/api/job-search/jobs";
 const POR_PAGINA = 100;
-const ROTAS = [
-  (termo: string, offset: number) =>
-    `https://portal.api.gupy.io/api/v1/jobs?jobName=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${offset}`,
-  (termo: string, offset: number) =>
-    `https://portal.api.gupy.io/api/job?name=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${offset}`,
-];
 const MAX_PAGINAS = 3;
 
 // Campos conhecidos; tudo opcional para não quebrar se a Gupy mudar algo.
@@ -41,24 +38,14 @@ function modelo(v: z.infer<typeof VagaGupy>): Modelo {
   return inferirModelo(v.description ?? "");
 }
 
-/** Índice da rota que respondeu por último; começa pela v1. */
-let rotaAtual = 0;
-
 async function pagina(termo: string, offset: number): Promise<z.infer<typeof Resposta>> {
-  let status = 0;
-  for (let t = 0; t < ROTAS.length; t++) {
-    const i = (rotaAtual + t) % ROTAS.length;
-    const url = ROTAS[i](termo, offset);
-    const res = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
-    if (res.ok) {
-      rotaAtual = i;
-      return Resposta.parse(await res.json());
-    }
-    status = res.status;
+  const url = `${BASE}?jobName=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${offset}`;
+  const res = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
+  if (!res.ok) {
     console.error(`[gupy] ${res.status} ${url}`);
-    if (res.status !== 404) break;
+    throw new Error(`gupy_http_${res.status}`);
   }
-  throw new Error(`gupy_http_${status}`);
+  return Resposta.parse(await res.json());
 }
 
 async function buscarTermo(termo: string): Promise<VagaColetada[]> {
