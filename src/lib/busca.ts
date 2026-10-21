@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { extrairVagasDoEmail } from "./ai/extracao-email";
 import { ehRelevante, triarVaga, type PerfilTriagem } from "./ai/triagem";
 import { chaveVaga, citaMainframe, claramenteJunior } from "./filtro";
-import { coletarEmpresa } from "./fontes/ats";
+import { coletarEmpresa, detalharVaga, FONTES_COM_DETALHE } from "./fontes/ats";
 import { gmailConfigurado, lerAlertas } from "./fontes/gmail";
 import { coletarGupy } from "./fontes/gupy";
 import { EmpresaAlvoSchema, type Cv, type VagaColetada } from "./tipos";
@@ -19,11 +19,15 @@ const TRIAGENS_POR_RODADA = 80;
 const CONCORRENCIA = 4;
 /** A função tem 300 s na Vercel; paramos a triagem antes disso. O resto fica pendente para amanhã. */
 const PRAZO_MS = 240_000;
+/** Buscar descrições não pode comer o tempo da triagem. */
+const PRAZO_DETALHE_MS = 120_000;
 
 type ResumoFonte = { trazidas?: number; novas?: number; erro?: string };
 
 export interface ResultadoBusca {
   fontes: Record<string, ResumoFonte>;
+  /** Vagas que vieram sem descrição e ganharam uma nesta rodada. */
+  detalhadas: number;
   triadas: number;
   relevantes: number;
   pendentes: number;
@@ -162,11 +166,28 @@ export async function rodarBusca(
   // 4. Triagem de tudo que está pendente (inclusive o que sobrou de rodadas anteriores)
   const { data: pendentes } = await supabase
     .from("vagas")
-    .select("id, titulo, empresa, local, modelo, pais, descricao, fonte")
+    .select("id, url, titulo, empresa, local, modelo, pais, descricao, fonte")
     .eq("user_id", userId)
     .eq("triagem_status", "pendente")
     .order("encontrada_em", { ascending: false })
     .limit(TRIAGENS_POR_RODADA);
+
+  // Workday e SmartRecruiters vêm sem descrição: busca o detalhe antes de triar.
+  const semDescricao = (pendentes ?? []).filter((v) => !v.descricao && FONTES_COM_DETALHE.includes(v.fonte));
+  let detalhadas = 0;
+  await emLotes(semDescricao, CONCORRENCIA, async (v) => {
+    if (Date.now() - inicio > PRAZO_DETALHE_MS) return;
+    try {
+      const d = await detalharVaga(v.fonte, v.url);
+      if (!d?.descricao) return;
+      v.descricao = d.descricao;
+      if (v.modelo === "desconhecido") v.modelo = d.modelo;
+      await supabase.from("vagas").update({ descricao: v.descricao, modelo: v.modelo }).eq("id", v.id);
+      detalhadas++;
+    } catch (e) {
+      console.error("[busca] detalhe", v.id, e);
+    }
+  });
 
   const { data: cvBase } = await supabase
     .from("cvs")
@@ -210,7 +231,7 @@ export async function rodarBusca(
     .eq("user_id", userId)
     .eq("triagem_status", "pendente");
 
-  const resultado: ResultadoBusca = { fontes, triadas, relevantes, pendentes: count ?? 0 };
+  const resultado: ResultadoBusca = { fontes, detalhadas, triadas, relevantes, pendentes: count ?? 0 };
   if (execucao) {
     await supabase
       .from("execucoes_busca")

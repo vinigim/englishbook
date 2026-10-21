@@ -30,6 +30,11 @@ RLS `user_id = auth.uid()`.
 - The SDK sends zod enums only as a description hint, so enum-like fields are `z.string()`
   and normalized in code (`normalizarTriagem`).
 - Extracted e-mail URLs are kept only if they literally appear in the e-mail text.
+- "+ Vaga manual" fills its fields from the pasted link: `POST /api/vagas/extrair` →
+  `fontes/link.ts` (public http(s) only, private IPs rejected on every redirect; LinkedIn,
+  Indeed, Glassdoor and Catho refused) reads JSON-LD `JobPosting` first, then public Notion
+  pages through Notion's undocumented `loadPageChunk`, then page text; `ai/extracao-link.ts`
+  only calls Haiku when the JSON-LD is missing or thin. Nothing is saved until the user clicks Salvar.
 - The AI must never invent CV facts; the tailored CV is stored as a `cvs` row (`base = false`)
   so `/cv/imprimir/[id]` prints both.
 - No auto-apply, on purpose (ToS / account bans).

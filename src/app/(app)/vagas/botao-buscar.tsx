@@ -13,7 +13,7 @@ export function BotaoBuscar() {
     const res = await fetch("/api/buscar", { method: "POST" });
     if (!res.ok) return setEstado("A busca falhou. Veja os logs.");
     const r = await res.json();
-    setEstado(`${r.triadas} triada(s), ${r.relevantes} relevante(s)${r.pendentes ? `, ${r.pendentes} para a próxima` : ""}`);
+    setEstado(`${r.detalhadas ? `${r.detalhadas} descrição(ões) buscada(s), ` : ""}${r.triadas} triada(s), ${r.relevantes} relevante(s)${r.pendentes ? `, ${r.pendentes} para a próxima` : ""}`);
     router.refresh();
   }
 

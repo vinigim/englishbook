@@ -1,5 +1,5 @@
 import { citaMainframe, htmlParaTexto, inferirModelo } from "../filtro";
-import type { EmpresaAlvo, VagaColetada } from "../tipos";
+import type { EmpresaAlvo, Fonte, Modelo, VagaColetada } from "../tipos";
 
 // ---------------------------------------------------------------------
 // Páginas de carreira com JSON público. Cada empresa-alvo diz qual ATS usa
@@ -157,4 +157,56 @@ export async function coletarEmpresa(e: EmpresaAlvo, termos: string[]): Promise<
     case "workday": return workday(e, termos);
   }
   return vagas.filter((v) => v.url && citaMainframe(`${v.titulo}\n${v.descricao}`));
+}
+
+// ---------------------------------------------------------------------
+// Workday e SmartRecruiters listam vagas sem descrição. Antes da triagem,
+// busca.ts pede o detalhe de cada vaga pendente para a IA não julgar só pelo título.
+// ---------------------------------------------------------------------
+export const FONTES_COM_DETALHE: Fonte[] = ["workday", "smartrecruiters"];
+
+export interface DetalheVaga {
+  descricao: string;
+  modelo: Modelo;
+}
+
+function modeloDoTexto(remoto: string, descricao: string): Modelo {
+  if (/remot|telecommut|anywhere/i.test(remoto)) return "remoto";
+  if (/hybrid|h[ií]brid/i.test(remoto)) return "hibrido";
+  if (/on[- ]?site|office|presencial/i.test(remoto)) return "presencial";
+  return inferirModelo(descricao);
+}
+
+async function detalheWorkday(url: URL): Promise<DetalheVaga> {
+  // https://<tenant>.wdN.myworkdayjobs.com/<site>/job/<local>/<titulo>_<id>
+  const [, site, ...caminho] = url.pathname.split("/");
+  const tenant = url.hostname.split(".")[0];
+  const r = await getJson(`https://${url.hostname}/wday/cxs/${tenant}/${site}/${caminho.join("/")}`);
+  const info: Json = r.jobPostingInfo ?? {};
+  const descricao = htmlParaTexto(info.jobDescription ?? "");
+  return { descricao, modelo: modeloDoTexto(String(info.remoteType ?? ""), `${info.location ?? ""}\n${descricao}`) };
+}
+
+async function detalheSmartRecruiters(url: URL): Promise<DetalheVaga> {
+  // https://jobs.smartrecruiters.com/<empresa>/<id>
+  const [, empresa, id] = url.pathname.split("/");
+  const r = await getJson(`https://api.smartrecruiters.com/v1/companies/${empresa}/postings/${id}`);
+  const secoes: Json = r.jobAd?.sections ?? {};
+  const descricao = ["jobDescription", "qualifications", "additionalInformation"]
+    .map((k) => {
+      const s: Json | undefined = secoes[k];
+      return s?.text ? `${s.title ? `${s.title}\n` : ""}${htmlParaTexto(s.text)}` : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+  const loc: Json = r.location ?? {};
+  return { descricao, modelo: loc.remote ? "remoto" : loc.hybrid ? "hibrido" : inferirModelo(descricao) };
+}
+
+/** Descrição de uma vaga que veio da lista sem ela; null se a fonte não tem detalhe. */
+export async function detalharVaga(fonte: string, url: string): Promise<DetalheVaga | null> {
+  const u = new URL(url);
+  if (fonte === "workday" && u.hostname.endsWith(".myworkdayjobs.com")) return detalheWorkday(u);
+  if (fonte === "smartrecruiters" && u.hostname === "jobs.smartrecruiters.com") return detalheSmartRecruiters(u);
+  return null;
 }
