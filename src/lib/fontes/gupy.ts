@@ -3,9 +3,15 @@ import { htmlParaTexto, inferirModelo } from "../filtro";
 import type { Modelo, VagaColetada } from "../tipos";
 
 // Portal público de vagas da Gupy (o mesmo que alimenta portal.gupy.io).
-// Não exige chave. A busca por `jobName` olha só o título da vaga.
-const BASE = "https://portal.api.gupy.io/api/v1/jobs";
+// Não exige chave e não tem documentação: a busca olha só o título da vaga.
+// Há duas rotas conhecidas com a mesma resposta; se uma some (404), usamos a outra.
 const POR_PAGINA = 100;
+const ROTAS = [
+  (termo: string, offset: number) =>
+    `https://portal.api.gupy.io/api/v1/jobs?jobName=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${offset}`,
+  (termo: string, offset: number) =>
+    `https://portal.api.gupy.io/api/job?name=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${offset}`,
+];
 const MAX_PAGINAS = 3;
 
 // Campos conhecidos; tudo opcional para não quebrar se a Gupy mudar algo.
@@ -35,13 +41,30 @@ function modelo(v: z.infer<typeof VagaGupy>): Modelo {
   return inferirModelo(v.description ?? "");
 }
 
+/** Índice da rota que respondeu por último; começa pela v1. */
+let rotaAtual = 0;
+
+async function pagina(termo: string, offset: number): Promise<z.infer<typeof Resposta>> {
+  let status = 0;
+  for (let t = 0; t < ROTAS.length; t++) {
+    const i = (rotaAtual + t) % ROTAS.length;
+    const url = ROTAS[i](termo, offset);
+    const res = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
+    if (res.ok) {
+      rotaAtual = i;
+      return Resposta.parse(await res.json());
+    }
+    status = res.status;
+    console.error(`[gupy] ${res.status} ${url}`);
+    if (res.status !== 404) break;
+  }
+  throw new Error(`gupy_http_${status}`);
+}
+
 async function buscarTermo(termo: string): Promise<VagaColetada[]> {
   const vagas: VagaColetada[] = [];
-  for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
-    const url = `${BASE}?jobName=${encodeURIComponent(termo)}&limit=${POR_PAGINA}&offset=${pagina * POR_PAGINA}`;
-    const res = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
-    if (!res.ok) throw new Error(`gupy_http_${res.status}`);
-    const corpo = Resposta.parse(await res.json());
+  for (let n = 0; n < MAX_PAGINAS; n++) {
+    const corpo = await pagina(termo, n * POR_PAGINA);
 
     for (const bruto of corpo.data) {
       const p = VagaGupy.safeParse(bruto);
@@ -66,11 +89,23 @@ async function buscarTermo(termo: string): Promise<VagaColetada[]> {
   return vagas;
 }
 
-/** Busca cada termo e junta os resultados (sem repetir o mesmo id). */
+/**
+ * Busca cada termo e junta os resultados (sem repetir o mesmo id). Um termo com
+ * erro não derruba os outros; a fonte só falha se nenhum termo funcionar.
+ */
 export async function coletarGupy(termos: string[]): Promise<VagaColetada[]> {
   const porId = new Map<string, VagaColetada>();
+  const erros: string[] = [];
   for (const termo of termos) {
-    for (const v of await buscarTermo(termo)) porId.set(v.idExterno!, v);
+    try {
+      for (const v of await buscarTermo(termo)) porId.set(v.idExterno!, v);
+    } catch (e) {
+      erros.push(`${termo}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (erros.length) console.error(`[gupy] ${erros.length}/${termos.length} termo(s) falharam`, erros);
+  if (termos.length > 0 && erros.length === termos.length) {
+    throw new Error(`${erros[0].slice(erros[0].indexOf(": ") + 2)} em todos os termos`);
   }
   return [...porId.values()];
 }
