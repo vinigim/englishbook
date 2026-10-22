@@ -11,12 +11,20 @@ import type { Fonte } from "../tipos";
 // A extração das vagas de dentro do e-mail é feita por IA (ai/extracao-email.ts).
 // ---------------------------------------------------------------------
 
-const REMETENTES: { dominio: string; fonte: Fonte }[] = [
-  { dominio: "linkedin.com", fonte: "linkedin" },
-  { dominio: "indeed.com", fonte: "indeed" },
-  { dominio: "glassdoor.com", fonte: "glassdoor" },
-  { dominio: "catho.com.br", fonte: "catho" },
+// `de` é um endereço exato ou um domínio inteiro. Do LinkedIn só os remetentes
+// de vagas: a mesma caixa costuma receber milhares de notificações, convites e
+// mensagens dele, e cada e-mail lido passa pela IA.
+const REMETENTES: { de: string; fonte: Fonte }[] = [
+  { de: "jobalerts-noreply@linkedin.com", fonte: "linkedin" },
+  { de: "jobs-listings@linkedin.com", fonte: "linkedin" },
+  { de: "indeed.com", fonte: "indeed" },
+  { de: "glassdoor.com", fonte: "glassdoor" },
+  { de: "catho.com.br", fonte: "catho" },
 ];
+
+function remetenteBate(endereco: string, de: string): boolean {
+  return de.includes("@") ? endereco === de : endereco === de || endereco.endsWith(`@${de}`) || endereco.endsWith(`.${de}`);
+}
 
 export interface EmailAlerta {
   messageId: string;
@@ -48,7 +56,7 @@ export async function lerAlertas(dias: number, jaProcessados: Set<string>): Prom
     const todos = pastas.find((p) => p.specialUse === "\\All")?.path ?? "INBOX";
     const trava = await cliente.getMailboxLock(todos);
     try {
-      const de = REMETENTES.map((r) => r.dominio).join(" OR ");
+      const de = REMETENTES.map((r) => r.de).join(" OR ");
       const uids = await cliente.search({ gmraw: `from:(${de}) newer_than:${dias}d` }, { uid: true });
       if (!uids || uids.length === 0) return [];
 
@@ -58,7 +66,7 @@ export async function lerAlertas(dias: number, jaProcessados: Set<string>): Prom
         if (jaProcessados.has(messageId) || !msg.source) continue;
 
         const remetente = msg.envelope?.from?.[0]?.address?.toLowerCase() ?? "";
-        const fonte = REMETENTES.find((r) => remetente.endsWith(r.dominio))?.fonte ?? "email";
+        const fonte = REMETENTES.find((r) => remetenteBate(remetente, r.de))?.fonte ?? "email";
         const parsed = await simpleParser(msg.source);
         const texto = parsed.html ? htmlParaTexto(parsed.html, true) : (parsed.text ?? "");
 
