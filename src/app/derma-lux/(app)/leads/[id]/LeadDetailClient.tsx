@@ -580,6 +580,11 @@ export function LeadDetailClient({
             {lead.needs_analysis ? (
               <Badge variant="warning">análise desatualizada</Badge>
             ) : null}
+            {/* Em destaque porque a linha da marca fica no meio dos resultados
+                da busca, e passava batido. Some quando um @ é salvo. */}
+            {!instagram && lead.instagram_nao_encontrado_em ? (
+              <Badge variant="warning">Instagram não encontrado</Badge>
+            ) : null}
           </div>
         </div>
 
