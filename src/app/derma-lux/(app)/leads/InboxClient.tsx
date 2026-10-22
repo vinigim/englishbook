@@ -27,7 +27,7 @@ import {
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
 import { BuscaInstagramLote } from "./BuscaInstagramLote";
-import { guardarFiltrosDoRadar } from "./filtros-radar";
+import { guardarFiltrosDoRadar, marcarLeadAbertoDoRadar } from "./filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -624,6 +624,7 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
     <li>
       <Link
         href={`/derma-lux/leads/${lead.id}`}
+        onClick={() => marcarLeadAbertoDoRadar(lead.id)}
         className="block bg-paper border border-line hover:border-ink transition-colors p-4"
       >
         {/*

@@ -6,6 +6,8 @@ import {
   getAnalysisSpend,
   getLeadsInbox,
 } from "../../leads-data";
+import { colunaExtraDoInstagram, truncate } from "../../leads-shared";
+import type { LeadInboxRow } from "../../leads-types";
 import { InboxActions } from "./InboxActions";
 import { InboxClient } from "./InboxClient";
 
@@ -14,6 +16,47 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Radar de Leads — Lux Derma",
 };
+
+/**
+ * O que a lista do radar realmente usa, e nada mais.
+ *
+ * Tudo o que esta página passa ao InboxClient vai inteiro para o navegador. Com
+ * ~950 leads, isso eram megabytes de rascunhos, resumos e justificativas da IA,
+ * mensagens inteiras e todas as colunas extras da planilha — nenhum deles
+ * mostrado na lista, e todos baixados e lidos pelo celular a cada visita.
+ *
+ * Fica de fora só o que a lista não lê:
+ *   - os textos longos da análise (a ficha os busca por conta própria);
+ *   - a mensagem além do que cabe na prévia de 140 caracteres;
+ *   - as colunas extras, menos a do Instagram — `instagramDoLead` continua
+ *     achando o mesmo @, então busca, chips e selos não mudam.
+ *
+ * A prioridade já foi calculada no servidor com a análise completa.
+ */
+function paraALista(rows: LeadInboxRow[]): LeadInboxRow[] {
+  return rows.map((row) => {
+    const extraIg = colunaExtraDoInstagram(row.lead.extra);
+    return {
+      ...row,
+      lead: { ...row.lead, extra: extraIg ? { [extraIg[0]]: extraIg[1] } : {} },
+      analysis: row.analysis
+        ? {
+            ...row.analysis,
+            summary: null,
+            intent: null,
+            draft_message: null,
+            rationale: null,
+          }
+        : null,
+      lastMessage: row.lastMessage
+        ? {
+            ...row.lastMessage,
+            body: row.lastMessage.body ? truncate(row.lastMessage.body, 200) : null,
+          }
+        : null,
+    };
+  });
+}
 
 export default async function LeadsPage() {
   const [rows, total, pending, spend] = await Promise.all([
@@ -106,7 +149,7 @@ export default async function LeadsPage() {
               outros, me avise que eu acrescento paginação.
             </Alert>
           ) : null}
-          <InboxClient rows={rows} />
+          <InboxClient rows={paraALista(rows)} />
         </>
       )}
     </div>
