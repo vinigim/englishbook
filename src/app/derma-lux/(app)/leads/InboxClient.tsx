@@ -697,6 +697,12 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
               sem WhatsApp
             </Badge>
           ) : null}
+          {/* Mesmo selo da ficha: o @ salvo depois vence a marca. */}
+          {!instagramDoLead(lead) && lead.instagram_nao_encontrado_em ? (
+            <Badge variant="warning" className="whitespace-nowrap">
+              Instagram não encontrado
+            </Badge>
+          ) : null}
         </div>
 
         <p className="text-sm text-muted mt-1.5 truncate">
