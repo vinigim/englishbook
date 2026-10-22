@@ -640,3 +640,14 @@ O teste de RLS que mais importa: entre com uma conta que **não** esteja em
 - ~~Conciliar automaticamente `rentals.wa_lead_id`~~ — feito na 0014: a
   conciliação virou a função `conciliar_rentals()`, chamada ao fim de cada
   backfill.
+
+## Desempenho da caixa de entrada
+
+- **A lista recebe só o que mostra** (`paraALista()` em `leads/page.tsx`): sem os
+  textos longos da análise, com a mensagem cortada em 200 caracteres e com só a
+  coluna extra do Instagram. Com ~950 leads isso tira cerca de 700 kB do que o
+  celular baixa a cada visita. A prioridade é calculada antes, com tudo.
+- **"← Voltar ao radar" vira o Voltar do navegador** quando a ficha foi aberta
+  pela lista (`marcarLeadAbertoDoRadar` / `veioDoRadar`): a lista volta já
+  carregada e na mesma rolagem. Ação na ficha que chama `revalidatePath` faz o
+  Next descartar essa cópia, e a lista volta atualizada.

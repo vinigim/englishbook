@@ -244,12 +244,23 @@ export function instagramDoLead(
   const daColuna = toInstagramHandle(lead.instagram);
   if (daColuna) return daColuna;
 
-  for (const [chave, valor] of extraFields(lead.extra)) {
-    if (!/instagram|insta|^ig$/i.test(semAcento(chave).toLowerCase())) continue;
-    const handle = toInstagramHandle(valor);
-    if (handle) return handle;
-  }
+  const extra = colunaExtraDoInstagram(lead.extra);
+  return extra ? toInstagramHandle(extra[1]) : null;
+}
 
+/**
+ * A coluna extra de onde `instagramDoLead` tira o @, como [chave, valor].
+ *
+ * Separada para a lista do radar poder mandar ao navegador só esta coluna, e
+ * não todas as extras de centenas de leads, com o mesmo resultado.
+ */
+export function colunaExtraDoInstagram(
+  extra: Lead["extra"],
+): [string, string] | null {
+  for (const [chave, valor] of extraFields(extra)) {
+    if (!/instagram|insta|^ig$/i.test(semAcento(chave).toLowerCase())) continue;
+    if (toInstagramHandle(valor)) return [chave, valor];
+  }
   return null;
 }
 
