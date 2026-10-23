@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, NotaBadge, SeloBrasil } from "@/components/ui";
+import type { PreparoBilingue } from "@/lib/ai/entrevista";
 import type { Materiais } from "@/lib/ai/materiais";
 import { createClient } from "@/lib/supabase/server";
 import { FONTE_LABEL, NIVEL_LABEL, type Fonte, type Triagem } from "@/lib/tipos";
 import { dataCurta, dataHora } from "@/lib/utils";
 import { AcoesVaga } from "./acoes-vaga";
 import { PainelCandidatura } from "./painel-candidatura";
+import { PainelEntrevista } from "./painel-entrevista";
 import { PainelMateriais } from "./painel-materiais";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +19,12 @@ export default async function VagaPage({ params }: { params: Promise<{ id: strin
   const { data: vaga } = await supabase.from("vagas").select("*").eq("id", id).maybeSingle();
   if (!vaga) notFound();
 
-  const [{ data: candidatura }, { data: materiais }, { data: cvBase }] = await Promise.all([
+  const [{ data: candidatura }, { data: materiais }, { data: cvBase }, { data: preparo }] = await Promise.all([
     supabase.from("candidaturas").select("*, candidatura_eventos(*)").eq("vaga_id", id).maybeSingle(),
     supabase.from("materiais").select("id, conteudo, created_at").eq("vaga_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("cvs").select("id, conteudo").eq("base", true).maybeSingle(),
+    // Sem a migração 0002 a tabela não existe: o erro vira `data: null` e o painel só não mostra nada salvo.
+    supabase.from("preparos_entrevista").select("conteudo, created_at").eq("vaga_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const t = vaga.triagem as Triagem | null;
   const temCv = Boolean(cvBase?.conteudo?.experiencias?.length);
@@ -82,6 +86,11 @@ export default async function VagaPage({ params }: { params: Promise<{ id: strin
             vagaId={vaga.id}
             temCv={temCv}
             materiais={materiais ? { ...(materiais.conteudo as Materiais & { cv_id: string | null }), criado_em: materiais.created_at } : null}
+          />
+          <PainelEntrevista
+            vagaId={vaga.id}
+            temCv={temCv}
+            preparo={preparo ? { ...(preparo.conteudo as PreparoBilingue), criado_em: preparo.created_at } : null}
           />
           <Card>
             <h2 className="mb-2 font-semibold">Descrição da vaga</h2>
