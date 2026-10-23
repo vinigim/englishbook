@@ -35,6 +35,10 @@ RLS `user_id = auth.uid()`.
   Indeed, Glassdoor and Catho refused) reads JSON-LD `JobPosting` first, then public Notion
   pages through Notion's undocumented `loadPageChunk`, then page text; `ai/extracao-link.ts`
   only calls Haiku when the JSON-LD is missing or thin. Nothing is saved until the user clicks Salvar.
+- Interview prep (`ai/entrevista.ts`, `POST /api/vagas/[id]/entrevista`, table
+  `preparos_entrevista` from `0002`): Opus writes one script in `pt` and `en` in a single call
+  (`conteudo = { pt, en }`, same shape), from the CV, `perfil.resumo_profissional`, the job and the
+  candidatura timeline. The vaga page reads it with `maybeSingle()`, so a missing table just shows nothing.
 - The AI must never invent CV facts; the tailored CV is stored as a `cvs` row (`base = false`)
   so `/cv/imprimir/[id]` prints both.
 - No auto-apply, on purpose (ToS / account bans).
