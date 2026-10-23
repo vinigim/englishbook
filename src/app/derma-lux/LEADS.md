@@ -305,11 +305,11 @@ login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
 
 **Modelo:** a busca da ficha usa o Sonnet (`DRAFT_MODEL`), um lead por vez,
 para julgar melhor os candidatos; a busca em lote manda `lote: true` e usa o
-Haiku 4.5 (`INSTAGRAM_LOTE_MODEL`), mais barato, porque roda em dezenas de
-leads. Ele fica no 4.5 de propósito, separado da triagem (Haiku 5.5): no teste
-de 23/10/2026 o 5.5 achou 1 perfil em 14 leads, contra 8 em 38 do 4.5 na mesma
-fila. A economia ali seria pequena, porque a maior parte do custo são as
-pesquisas na web (US$ 0,01 cada), iguais em qualquer modelo. O
+Haiku 5.5 (`INSTAGRAM_LOTE_MODEL`, separado da triagem para poder trocar
+sozinho), mais barato, porque roda em dezenas de leads. Em 23/10/2026 o Haiku
+4.5 e o 5.5 buscaram os mesmos 14 leads: nenhum dos dois achou perfil, e o 5.5
+saiu ~25% mais barato (US$ 0,043 contra 0,058 por lead). A maior parte do
+custo são as pesquisas na web (US$ 0,01 cada), iguais em qualquer modelo. O
 modelo aparece ao lado do custo na ficha.
 
 **Gasto gravado.** Cada busca (ficha ou lote, com ou sem candidato) grava uma

@@ -40,13 +40,13 @@ export const TRIAGE_MODEL =
   process.env.LEAD_TRIAGE_MODEL ?? "claude-haiku-5-5";
 
 /**
- * Busca de Instagram em lote. Continua no Haiku 4.5, à parte da triagem: no
- * teste com o Haiku 5.5 (23/10/2026) ele achou 1 perfil em 14 leads, contra
- * 8 em 38 do 4.5 na mesma fila, e o dono preferiu a busca completa à economia
- * — que ali é pequena, porque a maior parte do custo são as pesquisas na web.
+ * Busca de Instagram em lote. Separada da triagem para poder trocar sozinha.
+ * Em 23/10/2026 os dois Haiku buscaram os mesmos 14 leads difíceis: nenhum
+ * achou perfil, e o 5.5 saiu ~25% mais barato (US$ 0,043 contra 0,058 por
+ * lead). A maior parte do custo são as pesquisas na web, iguais nos dois.
  */
 export const INSTAGRAM_LOTE_MODEL =
-  process.env.INSTAGRAM_LOTE_MODEL ?? "claude-haiku-4-5";
+  process.env.INSTAGRAM_LOTE_MODEL ?? "claude-haiku-5-5";
 
 /**
  * Padrão da redação. A tela do lead pode escolher outro por clique — ver
