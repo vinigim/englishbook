@@ -105,14 +105,26 @@ Dois níveis, para não gastar à toa:
 
 | | Modelo | Quando roda |
 |---|---|---|
-| **Triagem** | Haiku 4.5 | Em todos os leads pendentes |
-| **Redação** | Sonnet 5 (escolhível) | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
+| **Triagem** | Haiku 5.5, esforço `low` | Em todos os leads pendentes |
+| **Redação** | Sonnet 5.5 (escolhível), esforço `low` | Só em lead quente ou morno, ou no botão "Gerar mensagem" |
+
+Os modelos atuais pensam antes de responder, e esse pensamento conta no
+`max_tokens`: por isso a triagem tem 4000 e a busca de Instagram 8000. Trocar
+de modelo não reanalisa nada sozinho (o modelo não entra no hash). Os IDs
+antigos (Haiku 4.5, Sonnet 5, Opus 5) ficam em `cost.ts` porque há análises
+gravadas com eles.
+
+**Custo gravado.** `input_tokens` é a entrada inteira (sem cache + lida do
+cache + gravada no cache). Até a troca para os modelos 5.5, só a parte sem
+cache era somada, e o custo das análises com cache saía menor que o real.
+O Haiku 5.5 tem duas tabelas de preço: acima de 100 mil tokens de prompt numa
+chamada, tudo custa 5× mais (`longo` em `cost.ts`).
 
 A triagem classifica estágio, temperatura, intenção, objeções e equipamento de
 interesse. A redação escolhe a ação e escreve a mensagem.
 
 **Quem escreve dá para escolher por clique.** Na ficha do lead, um seletor
-oferece Haiku 4.5, Sonnet 5 e Opus 5 (`src/lib/ai/models.ts`), cada um com a
+oferece Haiku 5.5, Sonnet 5.5 e Opus 5.5 (`src/lib/ai/models.ts`), cada um com a
 estimativa em dólares de uma reanálise — calculada sobre o que as últimas 200
 análises de fato gastaram, não sobre preço de tabela.
 
@@ -295,6 +307,12 @@ login para IP de datacenter. Nome com médicos entre parênteses ("Clínica X
 para julgar melhor os candidatos; a busca em lote manda `lote: true` e usa o
 Haiku (`TRIAGE_MODEL`), mais barato, porque roda em dezenas de leads. O
 modelo aparece ao lado do custo na ficha.
+
+**Gasto gravado.** Cada busca (ficha ou lote, com ou sem candidato) grava uma
+linha em `wa_instagram_buscas` (migração 0027): modelo, pesquisas, tokens e
+custo. O cabeçalho do Radar soma esse gasto ao lado do das análises. É o
+maior item da fatura: até 4 pesquisas a US$ 0,01 cada, mais os resultados
+lidos como tokens. Sem a migração, a busca funciona e o gasto só vai para o log.
 
 ### Buscar Instagram em lote
 

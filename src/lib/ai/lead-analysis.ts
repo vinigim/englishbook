@@ -305,15 +305,38 @@ export function contentHash(input: AnalysisInput): string {
 //  Chamadas ao modelo
 // ============================================================================
 
-type Usage = { input: number; output: number; cacheRead: number };
+type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
+/**
+ * `input` é a entrada INTEIRA. A API devolve `input_tokens` só com a parte
+ * fora do cache; antes ela ia sozinha para o custo, que ainda descontava dela
+ * a leitura do cache — e a análise com cache gravava um custo menor que o
+ * real, sem contar a gravação do cache.
+ */
 function readUsage(message: { usage?: Anthropic.Usage }): Usage {
   const u = message.usage;
+  const cacheRead = u?.cache_read_input_tokens ?? 0;
+  const cacheWrite = u?.cache_creation_input_tokens ?? 0;
   return {
-    input: u?.input_tokens ?? 0,
+    input: (u?.input_tokens ?? 0) + cacheRead + cacheWrite,
     output: u?.output_tokens ?? 0,
-    cacheRead: u?.cache_read_input_tokens ?? 0,
+    cacheRead,
+    cacheWrite,
   };
+}
+
+/**
+ * Recusa dos classificadores de segurança: `parsed_output` vem nulo e o erro
+ * genérico de formato esconderia o motivo. O Haiku 5.5 não tem fallback no
+ * servidor, então a falha só fica clara.
+ */
+function exigirResposta(message: { stop_reason: string | null }, etapa: string) {
+  if (message.stop_reason === "refusal") {
+    throw new Error(`${etapa}: o modelo recusou a conversa (filtro de segurança)`);
+  }
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(`${etapa}: a resposta passou do limite de tokens`);
+  }
 }
 
 async function runTriage(
@@ -324,7 +347,8 @@ async function runTriage(
 
   const message = await client.messages.parse({
     model: TRIAGE_MODEL,
-    max_tokens: 1500,
+    // O Haiku 5.5 pensa antes de responder, e o pensamento conta no limite.
+    max_tokens: 4000,
     system,
     messages: [
       {
@@ -332,8 +356,13 @@ async function runTriage(
         content: `${context}\n\nClassifique este lead.`,
       },
     ],
-    output_config: { format: jsonSchemaOutputFormat(TRIAGE_JSON_SCHEMA) },
+    // Classificação: esforço baixo basta, e é o que segura o custo e o tempo.
+    output_config: {
+      effort: "low",
+      format: jsonSchemaOutputFormat(TRIAGE_JSON_SCHEMA),
+    },
   });
+  exigirResposta(message, "triagem");
 
   const parsed = triageSchema.safeParse(message.parsed_output);
   if (!parsed.success) {
@@ -404,6 +433,7 @@ async function runDraft(
       format: jsonSchemaOutputFormat(DRAFT_JSON_SCHEMA),
     },
   });
+  exigirResposta(message, "redação");
 
   const parsed = draftSchema.safeParse(message.parsed_output);
   if (!parsed.success) {
@@ -523,12 +553,14 @@ export async function analyzeLead(
       inputTokens: triagem.usage.input,
       outputTokens: triagem.usage.output,
       cacheReadTokens: triagem.usage.cacheRead,
+      cacheWriteTokens: triagem.usage.cacheWrite,
     }) +
     (redacao
       ? estimateCostUsd(modeloRedacao, {
           inputTokens: redacao.usage.input,
           outputTokens: redacao.usage.output,
           cacheReadTokens: redacao.usage.cacheRead,
+          cacheWriteTokens: redacao.usage.cacheWrite,
         })
       : 0);
 

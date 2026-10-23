@@ -84,6 +84,9 @@ export default async function LeadsPage() {
             {spend.count > 0
               ? ` · US$ ${spend.total.toFixed(2)} gastos em ${spend.count} análises`
               : ""}
+            {spend.instagram.count > 0
+              ? ` · US$ ${spend.instagram.total.toFixed(2)} em ${spend.instagram.count} buscas de Instagram`
+              : ""}
           </p>
         </div>
 

@@ -14,16 +14,36 @@ type Preco = {
   output: number;
   /** Leitura de cache sai por volta de 10% da entrada. */
   cacheRead: number;
+  /**
+   * Tabela de prompt longo: o Haiku 5.5 cobra 5× mais quando o prompt de UMA
+   * chamada passa de 100 mil tokens. Quem soma várias chamadas (a busca de
+   * Instagram com continuação) calcula o custo chamada a chamada.
+   */
+  longo?: { acimaDe: number; input: number; output: number; cacheRead: number };
 };
 
+// Os modelos antigos ficam: a tela da ficha estima o custo com este mapa, e
+// análises gravadas com eles continuam aparecendo.
 const PRECOS: Record<string, Preco> = {
   "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1 },
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    cacheRead: 0.01,
+    longo: { acimaDe: 100_000, input: 0.5, output: 2.5, cacheRead: 0.05 },
+  },
   "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2 },
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5 },
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
 };
 
 export type TokenUsage = {
+  /**
+   * TODA a entrada da chamada: a comum, a lida do cache e a gravada nele. A
+   * API devolve as três separadas (`input_tokens` é só a parte sem cache);
+   * quem chama soma.
+   */
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
@@ -36,10 +56,12 @@ export type TokenUsage = {
 };
 
 export function estimateCostUsd(model: string, usage: TokenUsage): number {
-  const preco = PRECOS[model];
+  const tabela = PRECOS[model];
   // Modelo desconhecido: devolve 0 em vez de chutar. Melhor um custo ausente
   // do que um número inventado num relatório financeiro.
-  if (!preco) return 0;
+  if (!tabela) return 0;
+  const preco =
+    tabela.longo && usage.inputTokens > tabela.longo.acimaDe ? tabela.longo : tabela;
 
   const cacheRead = usage.cacheReadTokens ?? 0;
   const cacheWrite = usage.cacheWriteTokens ?? 0;

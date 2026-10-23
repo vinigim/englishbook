@@ -294,15 +294,42 @@ export async function getDraftTokenProfile(): Promise<{
 }
 
 /** Gasto acumulado com a IA, para o dono não ser surpreendido pela fatura. */
+/**
+ * Soma `cost_usd` de uma tabela inteira. Pagina: o PostgREST corta em 1000
+ * linhas em silêncio, e o painel chegou a mostrar só as primeiras mil
+ * análises. Tabela ausente (migração não rodada) conta zero.
+ */
+async function somarCusto(
+  tabela: "wa_lead_analyses" | "wa_instagram_buscas",
+): Promise<{ total: number; count: number }> {
+  const supabase = await createClient();
+  let total = 0;
+  let count = 0;
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from(tabela)
+      .select("cost_usd")
+      .order("id")
+      .range(de, de + PAGINA - 1);
+    if (error) break;
+    const rows = (data ?? []) as { cost_usd: number | string | null }[];
+    for (const r of rows) total += Number(r.cost_usd ?? 0);
+    count += rows.length;
+    if (rows.length < PAGINA) break;
+  }
+  return { total, count };
+}
+
 export async function getAnalysisSpend(): Promise<{
   total: number;
   count: number;
+  instagram: { total: number; count: number };
 }> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("wa_lead_analyses").select("cost_usd");
-  const rows = (data ?? []) as { cost_usd: number | string | null }[];
-  const total = rows.reduce((acc, r) => acc + Number(r.cost_usd ?? 0), 0);
-  return { total, count: rows.length };
+  const [analises, instagram] = await Promise.all([
+    somarCusto("wa_lead_analyses"),
+    somarCusto("wa_instagram_buscas"),
+  ]);
+  return { ...analises, instagram };
 }
 
 /** Tamanho da página do PostgREST: acima disso ele corta em silêncio. */

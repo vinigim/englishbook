@@ -37,7 +37,7 @@ export function isAiConfigured(): boolean {
 //  Os IDs abaixo são completos como estão; não acrescente sufixo de data.
 // ============================================================================
 export const TRIAGE_MODEL =
-  process.env.LEAD_TRIAGE_MODEL ?? "claude-haiku-4-5";
+  process.env.LEAD_TRIAGE_MODEL ?? "claude-haiku-5-5";
 
 /**
  * Padrão da redação. A tela do lead pode escolher outro por clique — ver
@@ -45,4 +45,4 @@ export const TRIAGE_MODEL =
  * não existir jeito de a fatura crescer sem alguém ter decidido.
  */
 export const DRAFT_MODEL =
-  process.env.LEAD_DRAFT_MODEL ?? "claude-sonnet-5";
+  process.env.LEAD_DRAFT_MODEL ?? "claude-sonnet-5-5";
