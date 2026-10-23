@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { DRAFT_MODEL, TRIAGE_MODEL, isAiConfigured } from "@/lib/ai/anthropic";
+import { DRAFT_MODEL, INSTAGRAM_LOTE_MODEL, isAiConfigured } from "@/lib/ai/anthropic";
 import { buscarInstagram } from "@/lib/ai/buscar-instagram";
 import {
   extraFields,
@@ -156,7 +156,7 @@ export async function POST(
       extras,
       crms,
       excluir,
-    }, parsed.data.lote ? TRIAGE_MODEL : DRAFT_MODEL);
+    }, parsed.data.lote ? INSTAGRAM_LOTE_MODEL : DRAFT_MODEL);
     console.log(
       `[buscar-instagram] lead ${id} (${resultado.modelo}): ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
