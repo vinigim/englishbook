@@ -11,11 +11,17 @@ import { estimateCostUsd } from "./cost";
  * é comum ("Dra. Ana dermatologista"), e um @ errado manda a apresentação
  * para a pessoa errada.
  *
+ * Duas etapas. A primeira pesquisa só no instagram.com. A segunda, só quando
+ * a primeira não acha nada, procura o SITE do médico ou da clínica e abre a
+ * página para ler o link do Instagram: em 23/10/2026, 8 leads que a primeira
+ * etapa não achou (nos dois Haiku) tinham o perfil apontado no próprio site.
+ *
  * Duas travas contra @ inventado:
  *  - o prompt proíbe propor perfil que não apareceu na busca;
  *  - e o código confere: só passa candidato cujo @ aparece na URL ou no
- *    título de algum resultado da pesquisa. O que o modelo "lembrou" sem ter
- *    visto é descartado aqui, não na confiança de que ele obedeceu.
+ *    título de algum resultado da pesquisa, ou no texto de uma página aberta.
+ *    O que o modelo "lembrou" sem ter visto é descartado aqui, não na
+ *    confiança de que ele obedeceu.
  *
  * Modelo barato de propósito (o da triagem): quem julga no fim é o dono, e a
  * verificação acima segura o erro mais caro.
@@ -26,6 +32,15 @@ const PRECO_PESQUISA_USD = 0.01;
 
 /** Pesquisas por busca. Teto de gasto e de tempo. */
 const MAX_PESQUISAS = 4;
+
+/**
+ * Segunda etapa, só quando a primeira não acha nada: pesquisas na web aberta
+ * atrás do site do médico, e páginas abertas para ler o link do Instagram.
+ * Abrir página não tem taxa, só os tokens do texto, limitados abaixo.
+ */
+const MAX_PESQUISAS_SITE = 2;
+const MAX_PAGINAS_SITE = 2;
+const MAX_TOKENS_PAGINA = 6000;
 
 /** Rodadas de continuação quando a API pausa um turno longo. */
 const MAX_CONTINUACOES = 3;
@@ -148,14 +163,45 @@ function descreverLead(d: DadosParaBusca, p: Palpites): string {
   return `Ache o Instagram deste lead:\n${linhas.join("\n")}${blocoPistas}${aviso}`;
 }
 
-/** Texto das URLs e títulos de todos os resultados de pesquisa da conversa. */
+const SISTEMA_SITE = `Você ajuda a Lux Derma, empresa que aluga lasers para médicos e clínicas de estética no Brasil, a achar o perfil do Instagram de um lead. Uma pesquisa direta no instagram.com já foi feita e não achou nada.
+
+Agora o caminho é o SITE: médico e clínica quase sempre põem o link do Instagram no próprio site (no rodapé, no topo ou na página de contato).
+
+1. Se os dados do lead já trazem um site, abra-o direto com a ferramenta de abrir páginas.
+2. Senão, pesquise na web o nome do médico (sem "Dr."/"Dra." e sem a descrição depois de " - ") ou da clínica, com a cidade e a especialidade, e ache o site OFICIAL: domínio com o nome do médico ou da clínica. Diretório (Doctoralia, guias, agregadores) e notícia não servem como fonte; só use um deles se ele mostrar o @ explicitamente.
+3. Abra a página do site oficial (a inicial ou a de contato) e procure o link instagram.com/<perfil> ou o @perfil.
+
+## Regras
+
+- Só proponha um @ que você VIU: no texto de uma página aberta ou num resultado da pesquisa. Nunca invente nem complete um @.
+- Confira se o site é mesmo deste lead: nome e cidade (ou clínica, ou telefone) precisam bater. Site de homônimo em outra cidade não serve.
+- Confiança "alta": site oficial do próprio médico ou da clínica dele, com o link do perfil. "media": o @ aparece em diretório ou página de terceiros com nome e cidade batendo. "baixa" no resto.
+- Perfil da clínica serve quando o lead é médico dela; diga isso no motivo.
+- No máximo 3 candidatos. Lista vazia é uma resposta boa; perfil errado é ruim.
+
+Termine a resposta com um bloco JSON, e nada depois dele:
+\`\`\`json
+{"candidatos":[{"handle":"perfil_sem_arroba","confianca":"alta|media|baixa","motivo":"frase curta em português","fonte":"URL da página onde viu o @"}],"observacao":"frase curta opcional"}
+\`\`\``;
+
+/**
+ * Texto onde um @ pode ter sido visto: URL e título dos resultados de
+ * pesquisa e o texto das páginas abertas. O trecho dos resultados de pesquisa
+ * vem cifrado pela API, por isso só URL e título.
+ */
 function textoDosResultados(conteudo: Anthropic.ContentBlock[]): string {
   const partes: string[] = [];
   for (const bloco of conteudo) {
-    if (bloco.type !== "web_search_tool_result") continue;
-    const resultados = Array.isArray(bloco.content) ? bloco.content : [];
-    for (const r of resultados) {
-      if (r.type === "web_search_result") partes.push(r.url, r.title);
+    if (bloco.type === "web_search_tool_result") {
+      const resultados = Array.isArray(bloco.content) ? bloco.content : [];
+      for (const r of resultados) {
+        if (r.type === "web_search_result") partes.push(r.url, r.title);
+      }
+    } else if (bloco.type === "web_fetch_tool_result") {
+      const c = bloco.content;
+      if (c.type !== "web_fetch_result") continue;
+      partes.push(c.url);
+      if (c.content.source.type === "text") partes.push(c.content.source.data);
     }
   }
   return partes.join("\n").toLowerCase();
@@ -180,20 +226,26 @@ function apareceNosResultados(handle: string, resultados: string): boolean {
   );
 }
 
-/**
- * `modelo`: Haiku na busca em lote (volume, custo) e Sonnet na ficha, onde o
- * dono busca um lead de cada vez e paga mais por um julgamento melhor dos
- * candidatos. Quem escolhe é a rota.
- */
-export async function buscarInstagram(
-  dados: DadosParaBusca,
-  modelo: string = INSTAGRAM_LOTE_MODEL,
-): Promise<ResultadoBusca> {
+type Etapa = {
+  candidatos: CandidatoInstagram[];
+  descartados: number;
+  consultas: string[];
+  observacao: string | null;
+  pesquisas: number;
+  custoUsd: number;
+  tokens: { entrada: number; saida: number; cacheLido: number };
+};
+
+/** Uma conversa com as ferramentas do servidor, até o fim, e os candidatos conferidos. */
+async function rodarEtapa(
+  modelo: string,
+  sistema: string,
+  tools: Anthropic.ToolUnion[],
+  pedido: string,
+  excluir: string[],
+): Promise<Etapa> {
   const client = getAnthropic();
-  const p = montarPalpites(dados);
-  const mensagens: Anthropic.MessageParam[] = [
-    { role: "user", content: descreverLead(dados, p) },
-  ];
+  const mensagens: Anthropic.MessageParam[] = [{ role: "user", content: pedido }];
 
   const conteudo: Anthropic.ContentBlock[] = [];
   let entrada = 0;
@@ -209,20 +261,8 @@ export async function buscarInstagram(
       model: modelo,
       // Os modelos atuais pensam antes de responder, e o pensamento conta aqui.
       max_tokens: 8000,
-      system: SISTEMA,
-      tools: [
-        {
-          type: "web_search_20250305",
-          name: "web_search",
-          max_uses: MAX_PESQUISAS,
-          // Só o instagram.com: na web inteira, o perfil some atrás de site
-          // de clínica, Doctoralia e notícia, e a IA desistia com o perfil
-          // existindo (caso real: @drvictorguidafranca, verificado, 13 mil
-          // seguidores, não encontrado em 4 pesquisas abertas).
-          allowed_domains: ["instagram.com"],
-          user_location: { type: "approximate", country: "BR", timezone: "America/Sao_Paulo" },
-        },
-      ],
+      system: sistema,
+      tools,
       messages: mensagens,
     });
 
@@ -262,13 +302,17 @@ export async function buscarInstagram(
 
   const consultas = conteudo
     .filter((b): b is Anthropic.ServerToolUseBlock => b.type === "server_tool_use")
-    .map((b) => (b.input as { query?: unknown }).query)
+    .map((b) => {
+      const input = b.input as { query?: unknown; url?: unknown };
+      if (typeof input.query === "string") return input.query;
+      return typeof input.url === "string" ? `abriu ${input.url}` : null;
+    })
     .filter((q): q is string => typeof q === "string")
     .slice(0, 8);
 
   for (const c of json?.candidatos ?? []) {
     const handle = toInstagramHandle(typeof c.handle === "string" ? c.handle : null);
-    if (!handle || vistos.has(handle) || dados.excluir?.includes(handle)) continue;
+    if (!handle || vistos.has(handle) || excluir.includes(handle)) continue;
     vistos.add(handle);
     if (!apareceNosResultados(handle, resultados)) {
       descartados += 1;
@@ -285,8 +329,6 @@ export async function buscarInstagram(
     if (candidatos.length >= 3) break;
   }
 
-  const custoUsd = custoTokens + pesquisas * PRECO_PESQUISA_USD;
-
   return {
     candidatos,
     descartados,
@@ -298,8 +340,97 @@ export async function buscarInstagram(
           ? null
           : "A IA não devolveu a resposta no formato esperado.",
     pesquisas,
-    custoUsd: Math.round(custoUsd * 1_000_000) / 1_000_000,
+    custoUsd: custoTokens + pesquisas * PRECO_PESQUISA_USD,
     tokens: { entrada, saida, cacheLido },
+  };
+}
+
+const LOCAL_BR = {
+  type: "approximate",
+  country: "BR",
+  timezone: "America/Sao_Paulo",
+} as const;
+
+/**
+ * `modelo`: Haiku na busca em lote (volume, custo) e Sonnet na ficha, onde o
+ * dono busca um lead de cada vez e paga mais por um julgamento melhor dos
+ * candidatos. Quem escolhe é a rota.
+ */
+export async function buscarInstagram(
+  dados: DadosParaBusca,
+  modelo: string = INSTAGRAM_LOTE_MODEL,
+): Promise<ResultadoBusca> {
+  const excluir = dados.excluir ?? [];
+  const pedido = descreverLead(dados, montarPalpites(dados));
+
+  const instagram = await rodarEtapa(
+    modelo,
+    SISTEMA,
+    [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: MAX_PESQUISAS,
+        // Só o instagram.com: na web inteira, o perfil some atrás de site
+        // de clínica, Doctoralia e notícia, e a IA desistia com o perfil
+        // existindo (caso real: @drvictorguidafranca, verificado, 13 mil
+        // seguidores, não encontrado em 4 pesquisas abertas).
+        allowed_domains: ["instagram.com"],
+        user_location: LOCAL_BR,
+      },
+    ],
+    pedido,
+    excluir,
+  );
+
+  // Segunda etapa: só quando a primeira não achou nada. Falha aqui (modelo
+  // sem a ferramenta de abrir páginas, site fora do ar) não perde a primeira:
+  // o resultado dela volta como está.
+  let site: Etapa | null = null;
+  if (instagram.candidatos.length === 0) {
+    try {
+      site = await rodarEtapa(
+        modelo,
+        SISTEMA_SITE,
+        [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: MAX_PESQUISAS_SITE,
+            user_location: LOCAL_BR,
+          },
+          {
+            type: "web_fetch_20250910",
+            name: "web_fetch",
+            max_uses: MAX_PAGINAS_SITE,
+            max_content_tokens: MAX_TOKENS_PAGINA,
+          },
+        ],
+        pedido,
+        excluir,
+      );
+    } catch (err) {
+      console.error(
+        "[buscar-instagram] etapa do site falhou:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  const etapas = site ? [instagram, site] : [instagram];
+  const custoUsd = etapas.reduce((t, e) => t + e.custoUsd, 0);
+  return {
+    candidatos: site?.candidatos.length ? site.candidatos : instagram.candidatos,
+    descartados: etapas.reduce((t, e) => t + e.descartados, 0),
+    consultas: etapas.flatMap((e) => e.consultas).slice(0, 12),
+    observacao: site ? site.observacao : instagram.observacao,
+    pesquisas: etapas.reduce((t, e) => t + e.pesquisas, 0),
+    custoUsd: Math.round(custoUsd * 1_000_000) / 1_000_000,
+    tokens: {
+      entrada: etapas.reduce((t, e) => t + e.tokens.entrada, 0),
+      saida: etapas.reduce((t, e) => t + e.tokens.saida, 0),
+      cacheLido: etapas.reduce((t, e) => t + e.tokens.cacheLido, 0),
+    },
     modelo,
   };
 }
