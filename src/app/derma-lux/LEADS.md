@@ -242,6 +242,16 @@ cidade e telefone, e devolve até 3 candidatos com confiança e motivo. Na web
 aberta o perfil sumia atrás de site de clínica e Doctoralia. Ao lado há um
 campo para colar o @ ou o link quando o dono já sabe qual é.
 
+**Segunda etapa: o site.** Quando a primeira etapa não acha nada, uma segunda
+conversa pesquisa a web aberta (até 2 pesquisas) atrás do site oficial do
+médico ou da clínica e abre a página (ferramenta de abrir páginas da API, até 2
+páginas, 6 mil tokens cada) para ler o link do Instagram. Motivo: em 23/10/2026,
+8 leads que a primeira etapa não achou, nos dois Haiku, tinham o perfil apontado
+no próprio site. A trava vale igual: o @ precisa aparecer no texto da página
+aberta ou num resultado. Custa uns US$ 0,02 a mais, só nos leads sem resultado.
+Se a segunda etapa falhar (erro da API, site fora do ar), a busca devolve o
+resultado da primeira, e o erro vai só para o log.
+
 O prompt ensina os padrões de @ deste público, tirados de mais de 200 perfis da
 planilha de prospecção: dr/dra + primeiro nome + um sobrenome, sufixo
 `.dermato`/`oftalmo`/`plastica`, apelidos, clínica com o @ do médico. E manda
