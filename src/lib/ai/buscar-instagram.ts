@@ -64,6 +64,8 @@ export type ResultadoBusca = {
   observacao: string | null;
   pesquisas: number;
   custoUsd: number;
+  /** Tokens somados de todas as chamadas, para o registro de gastos. */
+  tokens: { entrada: number; saida: number; cacheLido: number };
   /** Modelo que fez a busca. */
   modelo: string;
 };
@@ -198,11 +200,15 @@ export async function buscarInstagram(
   let saida = 0;
   let cacheLido = 0;
   let pesquisas = 0;
+  // Custo chamada a chamada: a tabela de prompt longo do Haiku 5.5 vale por
+  // chamada, e a continuação reenvia a conversa inteira.
+  let custoTokens = 0;
 
   for (let rodada = 0; rodada <= MAX_CONTINUACOES; rodada += 1) {
     const resposta = await client.messages.create({
       model: modelo,
-      max_tokens: 2000,
+      // Os modelos atuais pensam antes de responder, e o pensamento conta aqui.
+      max_tokens: 8000,
       system: SISTEMA,
       tools: [
         {
@@ -221,10 +227,19 @@ export async function buscarInstagram(
     });
 
     conteudo.push(...resposta.content);
-    entrada += resposta.usage.input_tokens;
+    const lido = resposta.usage.cache_read_input_tokens ?? 0;
+    const gravado = resposta.usage.cache_creation_input_tokens ?? 0;
+    const entradaChamada = resposta.usage.input_tokens + lido + gravado;
+    entrada += entradaChamada;
     saida += resposta.usage.output_tokens;
-    cacheLido += resposta.usage.cache_read_input_tokens ?? 0;
+    cacheLido += lido;
     pesquisas += resposta.usage.server_tool_use?.web_search_requests ?? 0;
+    custoTokens += estimateCostUsd(modelo, {
+      inputTokens: entradaChamada,
+      outputTokens: resposta.usage.output_tokens,
+      cacheReadTokens: lido,
+      cacheWriteTokens: gravado,
+    });
 
     // Turno longo pausado pela API: devolve o que veio e deixa continuar.
     if (resposta.stop_reason !== "pause_turn") break;
@@ -270,13 +285,7 @@ export async function buscarInstagram(
     if (candidatos.length >= 3) break;
   }
 
-  const custoUsd =
-    estimateCostUsd(modelo, {
-      inputTokens: entrada,
-      outputTokens: saida,
-      cacheReadTokens: cacheLido,
-    }) +
-    pesquisas * PRECO_PESQUISA_USD;
+  const custoUsd = custoTokens + pesquisas * PRECO_PESQUISA_USD;
 
   return {
     candidatos,
@@ -289,7 +298,8 @@ export async function buscarInstagram(
           ? null
           : "A IA não devolveu a resposta no formato esperado.",
     pesquisas,
-    custoUsd: Math.round(custoUsd * 10_000) / 10_000,
+    custoUsd: Math.round(custoUsd * 1_000_000) / 1_000_000,
+    tokens: { entrada, saida, cacheLido },
     modelo,
   };
 }

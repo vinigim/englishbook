@@ -161,6 +161,23 @@ export async function POST(
       `[buscar-instagram] lead ${id} (${resultado.modelo}): ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
 
+    // O gasto entra no painel. Falha aqui não derruba a resposta: a busca já
+    // foi paga, e sem a migração 0027 a tabela simplesmente não existe.
+    const { error: erroGasto } = await supabase.from("wa_instagram_buscas").insert({
+      lead_id: id,
+      modelo: resultado.modelo,
+      origem: parsed.data.lote ? "lote" : "ficha",
+      pesquisas: resultado.pesquisas,
+      candidatos: resultado.candidatos.length,
+      input_tokens: resultado.tokens.entrada,
+      output_tokens: resultado.tokens.saida,
+      cache_read_tokens: resultado.tokens.cacheLido,
+      cost_usd: resultado.custoUsd,
+    });
+    if (erroGasto) {
+      console.error("[buscar-instagram] falha ao gravar o gasto:", erroGasto.message);
+    }
+
     // Busca vazia num lead sem @: marca "Instagram não encontrado". Lead que
     // já tem @ (o "perfil errado?") não é marcado — o @ dele continua valendo.
     // Falha aqui não derruba a resposta: os candidatos (nenhum) já são o

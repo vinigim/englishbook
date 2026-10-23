@@ -8,17 +8,17 @@
  * Os IDs são completos como estão; não acrescente sufixo de data.
  */
 export const DRAFT_MODELS = [
-  "claude-haiku-4-5",
-  "claude-sonnet-5",
-  "claude-opus-5",
+  "claude-haiku-5-5",
+  "claude-sonnet-5-5",
+  "claude-opus-5-5",
 ] as const;
 
 export type DraftModel = (typeof DRAFT_MODELS)[number];
 
 export const DRAFT_MODEL_LABEL: Record<DraftModel, string> = {
-  "claude-haiku-4-5": "Haiku 4.5",
-  "claude-sonnet-5": "Sonnet 5",
-  "claude-opus-5": "Opus 5",
+  "claude-haiku-5-5": "Haiku 5.5",
+  "claude-sonnet-5-5": "Sonnet 5.5",
+  "claude-opus-5-5": "Opus 5.5",
 };
 
 /**
@@ -28,9 +28,9 @@ export const DRAFT_MODEL_LABEL: Record<DraftModel, string> = {
  * é de centavos. O que decide é o tipo de mensagem que cada um escreve.
  */
 export const DRAFT_MODEL_NOTE: Record<DraftModel, string> = {
-  "claude-haiku-4-5": "rápido e direto; texto mais simples",
-  "claude-sonnet-5": "o padrão — equilíbrio entre custo e escrita",
-  "claude-opus-5": "o mais capaz; para o lead que vale a mensagem certa",
+  "claude-haiku-5-5": "rápido e direto; texto mais simples",
+  "claude-sonnet-5-5": "o padrão — equilíbrio entre custo e escrita",
+  "claude-opus-5-5": "o mais capaz; para o lead que vale a mensagem certa",
 };
 
 export function isDraftModel(valor: string): valor is DraftModel {
