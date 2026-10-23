@@ -405,6 +405,12 @@ async function runDraft(
     },
   });
 
+  // Sonnet 5.5 pode recusar por política (HTTP 200, stop_reason "refusal");
+  // aí não há JSON para ler, e a mensagem de erro precisa dizer isso.
+  if (message.stop_reason === "refusal") {
+    throw new Error("a IA recusou escrever a mensagem para este lead");
+  }
+
   const parsed = draftSchema.safeParse(message.parsed_output);
   if (!parsed.success) {
     throw new Error(
