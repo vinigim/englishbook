@@ -59,3 +59,11 @@ export function Alerta({ tipo = "info", children }: { tipo?: "info" | "erro" | "
   }[tipo];
   return <div className={cn("rounded-md border px-3 py-2 text-sm", cls)}>{children}</div>;
 }
+
+/** Se alguém que mora no Brasil pode ser contratado para a vaga, segundo a triagem. */
+export function SeloBrasil({ valor }: { valor?: "sim" | "nao" | "incerto" }) {
+  if (valor === "sim") return <Badge cor="verde">🇧🇷 Pode trabalhar do Brasil</Badge>;
+  if (valor === "nao") return <Badge cor="vermelho">Exige morar fora</Badge>;
+  if (valor === "incerto") return <Badge>Local a confirmar</Badge>;
+  return null;
+}

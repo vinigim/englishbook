@@ -182,7 +182,12 @@ export async function rodarBusca(
       if (!d?.descricao) return;
       v.descricao = d.descricao;
       if (v.modelo === "desconhecido") v.modelo = d.modelo;
-      await supabase.from("vagas").update({ descricao: v.descricao, modelo: v.modelo }).eq("id", v.id);
+      if (d.local) v.local = d.local;
+      if (d.pais) v.pais = d.pais;
+      await supabase
+        .from("vagas")
+        .update({ descricao: v.descricao, modelo: v.modelo, local: v.local, pais: v.pais })
+        .eq("id", v.id);
       detalhadas++;
     } catch (e) {
       console.error("[busca] detalhe", v.id, e);

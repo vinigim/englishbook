@@ -168,6 +168,9 @@ export const FONTES_COM_DETALHE: Fonte[] = ["workday", "smartrecruiters"];
 export interface DetalheVaga {
   descricao: string;
   modelo: Modelo;
+  /** Lista completa de locais, quando a lista da busca só dizia "3 Locations". */
+  local?: string;
+  pais?: string;
 }
 
 function modeloDoTexto(remoto: string, descricao: string): Modelo {
@@ -184,7 +187,16 @@ async function detalheWorkday(url: URL): Promise<DetalheVaga> {
   const r = await getJson(`https://${url.hostname}/wday/cxs/${tenant}/${site}/${caminho.join("/")}`);
   const info: Json = r.jobPostingInfo ?? {};
   const descricao = htmlParaTexto(info.jobDescription ?? "");
-  return { descricao, modelo: modeloDoTexto(String(info.remoteType ?? ""), `${info.location ?? ""}\n${descricao}`) };
+  const locais = [info.location, ...(Array.isArray(info.additionalLocations) ? info.additionalLocations : [])]
+    .filter((l): l is string => typeof l === "string" && l.trim() !== "");
+  const local = [...new Set(locais.map((l) => l.trim()))].join(" · ");
+  const pais = /brazil|brasil/i.test(`${local} ${info.country?.descriptor ?? ""}`) ? "BR" : String(info.country?.descriptor ?? "");
+  return {
+    descricao,
+    modelo: modeloDoTexto(String(info.remoteType ?? ""), `${info.location ?? ""}\n${descricao}`),
+    local: local || undefined,
+    pais: pais || undefined,
+  };
 }
 
 async function detalheSmartRecruiters(url: URL): Promise<DetalheVaga> {

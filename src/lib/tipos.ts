@@ -94,15 +94,22 @@ export const TriagemRespostaSchema = z.object({
   nivel: z.string().describe(`Exatamente um de: ${NIVEIS.join(", ")}`),
   modelo: z.string().describe("Exatamente um de: remoto, hibrido, presencial, desconhecido"),
   internacional: z.boolean(),
+  trabalho_do_brasil: z
+    .string()
+    .describe("Exatamente um de: sim, nao, incerto — alguém que mora no Brasil pode ser contratado sem se mudar?"),
   nota: z.number().int().describe("Aderência ao perfil do candidato, de 0 a 100"),
   resumo: z.string().describe("Uma ou duas frases sobre a vaga"),
   motivos: z.array(z.string()).describe("Pontos que explicam a nota, a favor e contra"),
   tecnologias: z.array(z.string()),
   salario: z.string().nullable().describe("Faixa salarial se a vaga informar, senão null"),
 });
-export type Triagem = Omit<z.infer<typeof TriagemRespostaSchema>, "nivel" | "modelo"> & {
+export type TrabalhoDoBrasil = "sim" | "nao" | "incerto";
+
+export type Triagem = Omit<z.infer<typeof TriagemRespostaSchema>, "nivel" | "modelo" | "trabalho_do_brasil"> & {
   nivel: Nivel;
   modelo: Modelo;
+  /** Ausente nas triagens anteriores a este campo. */
+  trabalho_do_brasil?: TrabalhoDoBrasil;
 };
 
 function slug(s: string) {
@@ -123,7 +130,9 @@ export function normalizarTriagem(r: z.infer<typeof TriagemRespostaSchema>): Tri
     : "outro";
   const m = slug(r.modelo);
   const modelo: Modelo = /remot/.test(m) ? "remoto" : /hibrid|hybrid/.test(m) ? "hibrido" : /presencial|onsite|on_site/.test(m) ? "presencial" : "desconhecido";
-  return { ...r, nivel, modelo, nota: Math.max(0, Math.min(100, Math.round(r.nota))) };
+  const b = slug(r.trabalho_do_brasil);
+  const trabalho_do_brasil: TrabalhoDoBrasil = /^s/.test(b) ? "sim" : /^n/.test(b) ? "nao" : "incerto";
+  return { ...r, nivel, modelo, trabalho_do_brasil, nota: Math.max(0, Math.min(100, Math.round(r.nota))) };
 }
 
 export const FONTE_LABEL: Record<Fonte, string> = {
