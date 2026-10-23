@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { toInstagramHandle } from "@/lib/leads/instagram";
 import { montarPalpites, type Palpites } from "@/lib/leads/instagram-palpites";
-import { TRIAGE_MODEL, getAnthropic } from "./anthropic";
+import { INSTAGRAM_LOTE_MODEL, getAnthropic } from "./anthropic";
 import { estimateCostUsd } from "./cost";
 
 /**
@@ -187,7 +187,7 @@ function apareceNosResultados(handle: string, resultados: string): boolean {
  */
 export async function buscarInstagram(
   dados: DadosParaBusca,
-  modelo: string = TRIAGE_MODEL,
+  modelo: string = INSTAGRAM_LOTE_MODEL,
 ): Promise<ResultadoBusca> {
   const client = getAnthropic();
   const p = montarPalpites(dados);
