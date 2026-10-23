@@ -396,6 +396,10 @@ não entra, porque muita clínica tem WhatsApp Business no fixo: rode antes o
 botão de verificação em lote da caixa. É um subconjunto de "Nunca abordado" e
 não entra na soma dos três chips de contato.
 
+**"Sem WhatsApp"** é o recorte para análise: todo lead com WhatsApp confirmado
+como inexistente, fixo ou celular, em qualquer estado e com descartado
+incluído. Combina com a linha de situação (ex.: "Sem WhatsApp" + "Descartado").
+
 Na caixa de entrada, dois chips deixam de fora quem o dono já pôs de lado, sem
 mudar o estado: **frio confirmado** sai de "Devo responder" e **descartado** sai
 de "Nunca abordado". Por isso a soma dos três chips pode ficar abaixo do total.

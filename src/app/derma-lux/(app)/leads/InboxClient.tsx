@@ -47,7 +47,8 @@ type Filtro =
   | "aguardando_resposta"
   | "nunca_abordado"
   | "nunca_abordado_sem_whatsapp"
-  | "aguardando_ele";
+  | "aguardando_ele"
+  | "sem_whatsapp";
 
 // Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
 // leitura natural da barra é do mais quente para o mais frio.
@@ -69,6 +70,7 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "nunca_abordado_sem_whatsapp", label: "Nunca abordado sem WhatsApp" },
   { id: "aguardando_ele", label: "Aguardando ele" },
   { id: "sem_analise", label: "Sem análise" },
+  { id: "sem_whatsapp", label: "Sem WhatsApp" },
 ];
 
 /**
@@ -242,6 +244,18 @@ function nuncaAbordadoSemWhatsApp(row: LeadInboxRow): boolean {
   );
 }
 
+/**
+ * "Sem WhatsApp": todo lead que o WhatsApp confirmou não ter conta, fixo ou
+ * celular, em qualquer estado e situação — descartado incluído.
+ *
+ * É para análise, não uma fila: o recorte de "Nunca abordado sem WhatsApp"
+ * esconde os descartados, e aqui eles entram para que a linha de situação
+ * consiga separá-los. Não verificado fica de fora, como lá.
+ */
+function semWhatsApp(row: LeadInboxRow): boolean {
+  return temWhatsApp(row.lead) === false;
+}
+
 /** Desde quando ele espera resposta, para ordenar a fila. */
 function desdeMs(row: LeadInboxRow): number {
   const desde = estadoContato(row.lead).desde;
@@ -363,6 +377,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "nunca_abordado_sem_whatsapp" && !nuncaAbordadoSemWhatsApp(row)) {
         return false;
       }
+      if (filtro === "sem_whatsapp" && !semWhatsApp(row)) return false;
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
       // que vale — senão o lead sumiria do chip que ele mesmo escolheu.
       if (
@@ -435,6 +450,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       nunca_abordado: 0,
       nunca_abordado_sem_whatsapp: 0,
       aguardando_ele: 0,
+      sem_whatsapp: 0,
     };
     for (const row of rows) {
       const t = temperaturaEfetiva(row.lead, row.analysis);
@@ -452,6 +468,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       }
       else c.aguardando_ele += 1;
       if (nuncaAbordadoSemWhatsApp(row)) c.nunca_abordado_sem_whatsapp += 1;
+      if (semWhatsApp(row)) c.sem_whatsapp += 1;
     }
     return c;
   }, [rows]);
