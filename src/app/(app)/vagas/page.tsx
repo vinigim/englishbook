@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, NotaBadge } from "@/components/ui";
+import { Badge, Card, NotaBadge, SeloBrasil } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import {
   FONTE_LABEL, NIVEL_LABEL, NIVEIS, STATUS_LABEL,
@@ -43,6 +43,7 @@ export default async function VagasPage({ searchParams }: { searchParams: Promis
   if (sp.nivel && (NIVEIS as readonly string[]).includes(sp.nivel)) consulta = consulta.eq("triagem->>nivel", sp.nivel);
   if (sp.internacional === "sim") consulta = consulta.eq("triagem->>internacional", "true");
   if (sp.internacional === "nao") consulta = consulta.eq("triagem->>internacional", "false");
+  if (sp.internacional === "do_brasil") consulta = consulta.eq("triagem->>trabalho_do_brasil", "sim");
   if (sp.q) {
     const q = sp.q.replace(/[%,()]/g, " ").trim();
     if (q) consulta = consulta.or(`titulo.ilike.%${q}%,empresa.ilike.%${q}%,descricao.ilike.%${q}%`);
@@ -118,6 +119,7 @@ export default async function VagasPage({ searchParams }: { searchParams: Promis
           <label className="label">Região</label>
           <select name="internacional" defaultValue={sp.internacional ?? ""} className="input">
             <option value="">Todas</option>
+            <option value="do_brasil">Pode trabalhar do Brasil</option>
             <option value="nao">Brasil</option>
             <option value="sim">Internacional</option>
           </select>
@@ -161,6 +163,7 @@ export default async function VagasPage({ searchParams }: { searchParams: Promis
                   {t?.nivel && <Badge cor="azul">{NIVEL_LABEL[t.nivel as Nivel]}</Badge>}
                   <Badge>{MODELO_LABEL[v.modelo] ?? v.modelo}</Badge>
                   {t?.internacional && <Badge cor="amarelo">Internacional</Badge>}
+                  <SeloBrasil valor={t?.trabalho_do_brasil} />
                   {t?.salario && <Badge cor="verde">{t.salario}</Badge>}
                   <Badge>{FONTE_LABEL[v.fonte as Fonte] ?? v.fonte}</Badge>
                   <span className="text-xs text-slate-400">encontrada em {dataCurta(v.encontrada_em)}</span>

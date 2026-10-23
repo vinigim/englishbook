@@ -28,14 +28,18 @@ export interface VagaParaTriagem {
 
 // Instruções fixas primeiro; o perfil vem depois e é igual em todo o lote,
 // então o bloco inteiro pode ser reaproveitado do cache entre as vagas.
-const INSTRUCOES = `Você faz a triagem de vagas de emprego para um profissional de TI mainframe IBM que procura posições de nível sênior ou de liderança no Brasil ou no exterior.
+const INSTRUCOES = `Você faz a triagem de vagas de emprego para um profissional de TI mainframe IBM que MORA NO BRASIL e procura posições de nível sênior ou de liderança no Brasil ou remotas para empresas de fora, sem se mudar do país.
 
 Para cada vaga, responda:
 - eh_mainframe: true só se o dia a dia da vaga envolve a plataforma mainframe IBM (z/OS, COBOL, CICS, JCL, DB2 for z/OS, IMS, VSAM, Natural/Adabas, PL/I, REXX, HLASM, "alta plataforma", modernização/migração de mainframe). Vagas de AS/400 (IBM i, RPG), DB2 LUW sem mainframe ou que só citam mainframe como "diferencial" distante devem ser false.
 - nivel: o nível da posição. Se o título não diz, deduza pelos requisitos (anos de experiência, responsabilidades, gestão de pessoas). "Especialista" = individual contributor acima de sênior; "tech_lead" = liderança técnica; "coordenador" e "gerente" = gestão. Use "outro" só para vagas que não são de TI.
 - modelo: remoto, hibrido, presencial ou desconhecido.
 - internacional: true se a vaga é fora do Brasil ou para empresa estrangeira contratando do exterior.
-- nota (0 a 100): aderência ao perfil e às preferências do candidato abaixo. Vaga que não é mainframe ou abaixo de sênior fica abaixo de 30.
+- trabalho_do_brasil: alguém que mora no Brasil pode ser contratado para esta vaga sem se mudar?
+  "sim": a vaga é no Brasil (qualquer modelo), ou é remota e aceita quem está no Brasil (remoto Brasil, América Latina, LATAM, "anywhere", qualquer país, contratação internacional como contractor/PJ/EOR).
+  "nao": a vaga é presencial ou híbrida fora do Brasil; é remota só dentro de outro país (ex.: "Remote - USA", "All Cities - Czechia", "remote within India", "must be based in"); exige autorização de trabalho, cidadania, visto, security clearance ou mudança para outro país. Empresa estrangeira com local só fora do Brasil e sem nenhuma menção a contratar de outros países também é "nao".
+  "incerto": só quando o local e a descrição não permitem decidir (ex.: lista de locais desconhecida e descrição muda sobre onde a pessoa precisa estar).
+- nota (0 a 100): aderência ao perfil e às preferências do candidato abaixo. Vaga que não é mainframe, abaixo de sênior ou com trabalho_do_brasil = "nao" fica abaixo de 30.
 - resumo: uma ou duas frases em português.
 - motivos: de 2 a 5 itens curtos, a favor e contra.
 - tecnologias: as tecnologias citadas na vaga.
@@ -55,7 +59,7 @@ ${p.resumo_profissional.trim() || "(o candidato ainda não preencheu o resumo pr
 ## Preferências
 - Modelos de trabalho aceitos: ${modelos.join(", ") || "qualquer"}
 - Cidades para híbrido/presencial: ${p.cidades.join(", ") || "não informadas"}
-- Aceita vagas internacionais: ${p.aceita_internacional ? "sim" : "não"}`;
+- Aceita vagas internacionais: ${p.aceita_internacional ? "sim, remotas para empresas de fora, trabalhando do Brasil" : "não"}`;
 }
 
 export async function triarVaga(
@@ -93,5 +97,6 @@ ${descricao.trim() || "(indisponível)"}`,
 }
 
 export function ehRelevante(t: Triagem): boolean {
-  return t.eh_mainframe && NIVEIS_ALVO.includes(t.nivel);
+  // Vaga que exige morar fora do Brasil não serve, por melhor que seja o resto.
+  return t.eh_mainframe && NIVEIS_ALVO.includes(t.nivel) && t.trabalho_do_brasil !== "nao";
 }

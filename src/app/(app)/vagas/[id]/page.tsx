@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Card, NotaBadge } from "@/components/ui";
+import { Badge, Card, NotaBadge, SeloBrasil } from "@/components/ui";
 import type { Materiais } from "@/lib/ai/materiais";
 import { createClient } from "@/lib/supabase/server";
 import { FONTE_LABEL, NIVEL_LABEL, type Fonte, type Triagem } from "@/lib/tipos";
@@ -49,6 +49,7 @@ export default async function VagaPage({ params }: { params: Promise<{ id: strin
           {t?.nivel && <Badge cor="azul">{NIVEL_LABEL[t.nivel]}</Badge>}
           <Badge>{vaga.modelo}</Badge>
           {t?.internacional && <Badge cor="amarelo">Internacional</Badge>}
+          <SeloBrasil valor={t?.trabalho_do_brasil} />
           {t?.salario && <Badge cor="verde">{t.salario}</Badge>}
           {t && !t.eh_mainframe && <Badge cor="vermelho">IA: não parece mainframe</Badge>}
           <Badge>{FONTE_LABEL[vaga.fonte as Fonte] ?? vaga.fonte}</Badge>
