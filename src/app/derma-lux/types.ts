@@ -30,6 +30,8 @@ export type Rental = {
    * frete. Nula quando o endereço não traz uma cidade reconhecível.
    */
   city: string | null;
+  /** Distância em linha reta da cidade até Penápolis, em km. Nula sem cidade. */
+  distance_km: number | null;
   /** O lead do Radar que fez esta locação (0014). Nulo = não conciliado. */
   wa_lead_id: string | null;
 };

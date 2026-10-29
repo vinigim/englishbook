@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { cidadeDoEndereco } from "@/lib/geo/cidades";
+import { cidadeDoEndereco, distanciaKm, resolverCidade } from "@/lib/geo/cidades";
 import { cidadeConhecida } from "./shared";
 import type {
   Block,
@@ -53,6 +53,7 @@ function toRental(r: RawRental): Rental {
     freddo: r.freddo ?? null,
     freddo_price: r.freddo_price != null ? Number(r.freddo_price) : null,
     city: cidade ? `${cidade.nome}/${cidade.uf}` : null,
+    distance_km: null,
     wa_lead_id: r.wa_lead_id ?? null,
   };
 }
@@ -99,6 +100,13 @@ export async function getDermaLuxData(): Promise<{
   const conhecidas = [...new Set(rentals.map((r) => r.city).filter(Boolean))] as string[];
   for (const r of rentals) {
     if (!r.city) r.city = cidadeConhecida(r.address, conhecidas);
+  }
+  // Distância da base, para o roteiro do motorista. Linha reta: a estrada
+  // costuma ser uns 20–30% maior.
+  const base = resolverCidade("Penápolis", "SP");
+  for (const r of rentals) {
+    const m = r.city ? resolverCidade(r.city, null) : null;
+    if (base && m) r.distance_km = Math.round(distanciaKm(base, m));
   }
   // Se a tabela blocks ainda não existir (migração não rodada), blRes.data vem
   // null e caímos em [] sem quebrar a página.

@@ -7,6 +7,7 @@ import { fmtBRL, fmtDayHeading, minutes, todayStr, whatsAppUrl } from "../shared
 import { deleteRental, deleteBlock } from "../actions";
 import { RentalModal } from "./RentalModal";
 import { BlockModal } from "./BlockModal";
+import { RoteiroModal } from "./RoteiroModal";
 
 const PERIOD_LABEL: Record<BlockPeriod, string> = {
   full: "Dia todo",
@@ -37,6 +38,7 @@ export function AgendaClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Rental | null>(null);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [roteiroOpen, setRoteiroOpen] = useState(false);
 
   const equipMap = useMemo(
     () => new Map(equipment.map((e) => [e.id, e])),
@@ -151,7 +153,13 @@ export function AgendaClient({
             Aluguéis e fechamentos de agenda, organizados por data.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setRoteiroOpen(true)}
+            className="h-11 px-5 bg-paper text-ink border border-ink font-medium hover:bg-ink hover:text-paper transition-colors"
+          >
+            🚐 Roteiro do motorista
+          </button>
           <button
             onClick={openBlock}
             className="h-11 px-5 bg-paper text-ink border border-ink font-medium hover:bg-ink hover:text-paper transition-colors"
@@ -417,6 +425,12 @@ export function AgendaClient({
         equipment={equipment}
         rentals={rentals}
         initial={editing}
+      />
+      <RoteiroModal
+        open={roteiroOpen}
+        onClose={() => setRoteiroOpen(false)}
+        rentals={rentals}
+        equipment={equipment}
       />
       <BlockModal
         open={blockModalOpen}
