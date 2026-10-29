@@ -22,6 +22,9 @@ export type Rental = {
   tips_used: string | null;
   sterilized: boolean | null;
   specialized_technique: boolean | null;
+  /** Resfriador Freddo junto com o laser (0028). */
+  freddo: boolean | null;
+  freddo_price: number | null;
   /** O lead do Radar que fez esta locação (0014). Nulo = não conciliado. */
   wa_lead_id: string | null;
 };

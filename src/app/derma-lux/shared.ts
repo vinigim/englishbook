@@ -127,6 +127,7 @@ export function buildConfirmationMessage(
   if (r.tips_used) lines.push(`🔧 Ponteiras: ${r.tips_used}`);
   if (r.sterilized != null)
     lines.push(`🧼 Esterilização: ${r.sterilized ? "Sim" : "Não"}`);
+  if (r.freddo === true) lines.push("❄️ Acompanha resfriador Freddo");
   if (r.specialized_technique != null)
     lines.push(
       `🎯 Acompanha técnica especializada? ${
@@ -137,7 +138,9 @@ export function buildConfirmationMessage(
   // Bloco de valores + total
   const showTech = r.specialized_technique === true && r.technique_price != null;
   const techValue = showTech ? (r.technique_price as number) : 0;
-  if (r.price != null || r.freight_price != null || showTech) {
+  const showFreddo = r.freddo === true && r.freddo_price != null;
+  const freddoValue = showFreddo ? (r.freddo_price as number) : 0;
+  if (r.price != null || r.freight_price != null || showTech || showFreddo) {
     lines.push("");
     if (r.price != null) lines.push(`💰 Valor do aluguel: ${fmtBRL(r.price)}`);
     if (r.freight_price != null)
@@ -150,7 +153,10 @@ export function buildConfirmationMessage(
       lines.push(
         `💠 Técnica especializada: ${fmtBRL(r.technique_price as number)}`
       );
-    const total = (r.price ?? 0) + (r.freight_price ?? 0) + techValue;
+    if (showFreddo)
+      lines.push(`❄️ Resfriador Freddo: ${fmtBRL(r.freddo_price as number)}`);
+    const total =
+      (r.price ?? 0) + (r.freight_price ?? 0) + techValue + freddoValue;
     lines.push(`🧾 *Valor total: ${fmtBRL(total)}*`);
   }
 
