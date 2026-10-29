@@ -24,6 +24,8 @@ type RawRental = {
   tips_used: string | null;
   sterilized: boolean | null;
   specialized_technique: boolean | null;
+  freddo?: boolean | null;
+  freddo_price?: number | string | null;
   wa_lead_id?: string | null;
 };
 
@@ -45,6 +47,8 @@ function toRental(r: RawRental): Rental {
     tips_used: r.tips_used ?? null,
     sterilized: r.sterilized ?? null,
     specialized_technique: r.specialized_technique ?? null,
+    freddo: r.freddo ?? null,
+    freddo_price: r.freddo_price != null ? Number(r.freddo_price) : null,
     wa_lead_id: r.wa_lead_id ?? null,
   };
 }

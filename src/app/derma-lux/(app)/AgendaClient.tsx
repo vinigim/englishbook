@@ -290,6 +290,14 @@ export function AgendaClient({
                               {r.specialized_technique ? "Sim" : "Não"}
                             </span>
                           ) : null}
+                          {r.freddo ? (
+                            <span>
+                              ❄️ Freddo
+                              {r.freddo_price != null
+                                ? `: ${fmtBRL(r.freddo_price)}`
+                                : ""}
+                            </span>
+                          ) : null}
                           {r.notes ? <span>📝 {r.notes}</span> : null}
                         </div>
                       </div>

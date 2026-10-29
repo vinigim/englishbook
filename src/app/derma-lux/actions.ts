@@ -89,6 +89,8 @@ const rentalSchema = z
     tips_used: z.string().trim().nullish(),
     sterilized: z.boolean().nullish(),
     specialized_technique: z.boolean().nullish(),
+    freddo: z.boolean().nullish(),
+    freddo_price: z.number().nullish(),
   })
   .refine((d) => d.end_time > d.start_time, {
     message: "O término deve ser depois do início",
@@ -121,6 +123,8 @@ export async function saveRental(input: unknown): Promise<ActionResult> {
     tips_used: rest.tips_used || null,
     sterilized: rest.sterilized ?? null,
     specialized_technique: rest.specialized_technique ?? null,
+    freddo: rest.freddo ?? null,
+    freddo_price: rest.freddo ? rest.freddo_price ?? null : null,
   };
 
   const { error } = id

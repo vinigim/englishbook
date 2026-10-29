@@ -38,7 +38,12 @@ type FormState = {
   tips_used: string;
   sterilized: "" | "sim" | "nao";
   specialized_technique: "" | "sim" | "nao";
+  freddo: "" | "sim" | "nao";
+  freddo_price: string;
 };
+
+/** Valor sugerido ao marcar o Freddo; dá para mudar em cada aluguel. */
+const FREDDO_PRECO_PADRAO = "250,00";
 
 function todayStr() {
   const d = new Date();
@@ -85,6 +90,12 @@ function buildInitial(
           : initial.specialized_technique === false
           ? "nao"
           : "",
+      freddo:
+        initial.freddo === true ? "sim" : initial.freddo === false ? "nao" : "",
+      freddo_price:
+        initial.freddo_price != null
+          ? initial.freddo_price.toFixed(2).replace(".", ",")
+          : "",
     };
   }
   return {
@@ -103,6 +114,8 @@ function buildInitial(
     tips_used: "",
     sterilized: "",
     specialized_technique: "",
+    freddo: "",
+    freddo_price: "",
   };
 }
 
@@ -275,6 +288,10 @@ export function RentalModal({
           : form.specialized_technique === "nao"
           ? false
           : null,
+      freddo:
+        form.freddo === "sim" ? true : form.freddo === "nao" ? false : null,
+      freddo_price:
+        form.freddo === "sim" ? parseBRL(form.freddo_price) : null,
     });
     setSaving(false);
 
@@ -487,6 +504,41 @@ export function RentalModal({
               />
             </Field>
           ) : null}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Resfriador Freddo">
+              <select
+                className={inputCls}
+                value={form.freddo}
+                onChange={(e) => {
+                  const v = e.target.value as FormState["freddo"];
+                  setForm((f) => ({
+                    ...f,
+                    freddo: v,
+                    freddo_price:
+                      v === "sim" && !f.freddo_price
+                        ? FREDDO_PRECO_PADRAO
+                        : f.freddo_price,
+                  }));
+                }}
+              >
+                <option value="">— selecione —</option>
+                <option value="sim">Sim</option>
+                <option value="nao">Não</option>
+              </select>
+            </Field>
+            {form.freddo === "sim" ? (
+              <Field label="Valor do Freddo (R$)">
+                <input
+                  className={inputCls}
+                  inputMode="decimal"
+                  value={form.freddo_price}
+                  onChange={(e) => set("freddo_price", e.target.value)}
+                  placeholder="Ex.: 250,00"
+                />
+              </Field>
+            ) : null}
+          </div>
 
           <Field label="Observações">
             <input
