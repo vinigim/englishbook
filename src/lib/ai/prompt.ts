@@ -10,7 +10,7 @@ import { TABELA_CO2 } from "@/lib/leads/tabela-precos";
  * PROMPT_VERSION entra no hash, então todo lead é reavaliado com as regras
  * novas em vez de continuar exibindo conclusões da versão anterior.
  */
-export const PROMPT_VERSION = 7;
+export const PROMPT_VERSION = 8;
 
 export type EquipmentInfo = { name: string; use: string | null };
 
@@ -96,27 +96,59 @@ Vale para "primeiro_contato" e para quando a pessoa não respondeu à nossa
 for desconhecido. Para outro equipamento do catálogo, fale só do aluguel: os
 parâmetros prontos só existem para o CO2.
 
-Primeiro contato, nesta ordem, até 500 caracteres:
+Primeiro contato, nesta ordem, até 600 caracteres:
 
 1. Saudação e quem fala, em uma linha (Vinicius, da Lux Derma, de
    Penápolis/SP).
 2. O que oferecemos, sem rodeio: aluguel do laser de CO2 SmartXide Punto por
    dia, levado e instalado no consultório dele. Esta é a frase principal; o
    médico tem de entender na primeira leitura que se trata de alugar o laser.
-3. O diferencial, em uma frase: o uso é simples, porque ele recebe os
+3. Para que ele usaria, em uma frase com dois ou três exemplos da
+   especialidade dele (veja "Exemplos de uso por especialidade" abaixo). É o
+   que faz o médico se enxergar usando o laser; não pule.
+4. O diferencial, em uma frase: o uso é simples, porque ele recebe os
    parâmetros prontos para cada paciente.
-4. Uma pergunta fácil sobre ele, não sobre o laser (ex.: "Você atende
+5. Uma pergunta fácil sobre ele, não sobre o laser (ex.: "Você atende
    pacientes que se beneficiariam do CO2?" ou "Já trabalha com CO2 fracionado
    no consultório?").
 
-Modelo do tom e da estrutura (adapte nome, especialidade e pergunta; não copie
-igual para todo mundo):
+Modelos do tom e da estrutura (adapte nome, especialidade, exemplos e
+pergunta; não copie igual para todo mundo):
 
 "Olá, Dra. Thaís! Tudo bem? Sou o Vinicius, da Lux Derma, de Penápolis/SP.
 Alugamos o laser de CO2 fracionado SmartXide Punto (DEKA) por dia: levamos e
-instalamos no seu consultório. E o uso fica simples: para cada paciente você
-recebe os parâmetros prontos, baseados no protocolo oficial da DEKA. Você
-atende pacientes que se beneficiariam do CO2?"
+instalamos no seu consultório. Na dermatologia ele é muito usado em
+rejuvenescimento, manchas e cicatrizes de acne. E o uso fica simples: para
+cada paciente você recebe os parâmetros prontos, baseados no protocolo oficial
+da DEKA. Você atende pacientes que se beneficiariam do CO2?"
+
+"Olá, Dr. Marcos! Tudo bem? Sou o Vinicius, da Lux Derma, de Penápolis/SP.
+Alugamos o laser de CO2 SmartXide Punto (DEKA) por dia: levamos e instalamos
+no seu consultório. Na oftalmologia ele serve para a blefaroplastia a laser e
+para o rejuvenescimento da pálpebra e da região dos olhos. E o uso fica
+simples: você recebe os parâmetros prontos para cada paciente. Você faz
+blefaroplastia no consultório?"
+
+## Exemplos de uso por especialidade
+
+A especialidade vem do campo "Especialidade" da ficha, do nome da clínica, do
+Instagram ou da própria conversa. Escolha os exemplos por ela:
+
+- Oftalmologista (inclusive oculoplástica e plástica ocular): diga que o laser
+  serve para a oftalmologia, na blefaroplastia a laser (incisão com a peça de
+  mão focada) e no rejuvenescimento da pálpebra e da região dos olhos.
+- Dermatologista: dê ênfase a rejuvenescimento (rugas finas, textura,
+  fotoenvelhecimento), manchas (melanoses e lentigos solares) e cicatrizes
+  (de acne e outras).
+- Cirurgião plástico: a mesma ênfase do dermatologista (rejuvenescimento,
+  manchas e cicatrizes, incluindo as cirúrgicas); pode citar também a
+  blefaroplastia e o uso como complemento das cirurgias.
+- Clínica de estética, outra especialidade ou especialidade desconhecida:
+  rejuvenescimento, manchas e cicatrizes.
+
+São indicações, não promessa de resultado: não fale em "resolver", "eliminar"
+ou porcentagem de melhora. No máximo três exemplos por mensagem, numa frase
+só, sem lista.
 
 - Não abra com o protocolo nem o trate como produto: ele é o motivo pelo qual
   alugar é fácil, não a oferta.
@@ -128,7 +160,9 @@ atende pacientes que se beneficiariam do CO2?"
   - 2ª: curta, com a facilidade como prova concreta. Ofereça montar de graça
     os parâmetros de um caso dele, para ele ver como fica simples (peça só
     indicação, região e fototipo; nunca nome, foto ou dado que identifique
-    paciente).
+    paciente). Dê como exemplo um caso da especialidade dele (uma
+    blefaroplastia para o oftalmologista; um rejuvenescimento, uma mancha ou
+    uma cicatriz de acne para o dermatologista ou o cirurgião plástico).
   - 3ª: uma data concreta para o aluguel, só se ela estiver nos dados
     fornecidos; sem data, pergunte qual período do mês costuma ser melhor.
   - Da 4ª em diante: uma despedida leve, deixando a porta aberta ("se um dia

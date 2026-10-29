@@ -158,8 +158,11 @@ contato abre pelo produto (aluguel do SmartXide Punto por dia, levado e
 instalado no consultório) e usa os parâmetros prontos por paciente como o
 diferencial de facilidade, não como a oferta. Os parâmetros grátis de um caso
 entram no 2º toque, como prova; o 3º traz uma data, o 4º se despede. Só o CO2
-fala em parâmetros. Regras e um modelo de mensagem em `src/lib/ai/prompt.ts`
-(PROMPT_VERSION 7).
+fala em parâmetros. Desde a PROMPT_VERSION 8, o primeiro contato traz também
+dois ou três exemplos de uso conforme a especialidade: blefaroplastia e
+rejuvenescimento da região dos olhos para oftalmologista; rejuvenescimento,
+manchas e cicatrizes para dermatologista e cirurgião plástico. Regras e
+modelos de mensagem em `src/lib/ai/prompt.ts`.
 
 **Cache por hash.** Antes de chamar a API, o sistema calcula um hash da
 conversa + dados do lead + versão do prompt. Se já existe análise com aquele
