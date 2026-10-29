@@ -256,7 +256,7 @@ export function AgendaClient({
                   return (
                     <div
                       key={r.id}
-                      className={`flex items-center gap-4 p-4 border border-line bg-paper ${
+                      className={`flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-3 p-4 border border-line bg-paper ${
                         isPast ? "opacity-60" : ""
                       }`}
                     >
@@ -302,42 +302,50 @@ export function AgendaClient({
                         </div>
                       </div>
 
-                      {eq ? (
-                        <span
-                          className="px-2.5 py-1 text-xs font-semibold text-paper whitespace-nowrap"
-                          style={{ backgroundColor: eq.color }}
-                        >
-                          {eq.name}
-                        </span>
-                      ) : null}
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {wa ? (
-                          <a
-                            href={wa}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-[#25D366] hover:bg-line transition-colors"
-                            title="Enviar confirmação no WhatsApp"
-                            aria-label="Enviar confirmação no WhatsApp"
+                      {/* No celular, equipamento e botões descem para uma linha
+                          própria: lado a lado, empurravam os botões para fora da tela. */}
+                      <div className="flex items-center justify-between gap-2 w-full sm:w-auto sm:shrink-0">
+                        {eq ? (
+                          <span
+                            className="px-2.5 py-1 text-xs font-semibold text-paper truncate min-w-0"
+                            style={{ backgroundColor: eq.color }}
                           >
-                            💬
-                          </a>
-                        ) : null}
-                        <button
-                          onClick={() => openEdit(r)}
-                          className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDelete(r)}
-                          className="p-2 text-muted hover:text-accent hover:bg-line transition-colors"
-                          title="Remover"
-                        >
-                          🗑️
-                        </button>
+                            {eq.name}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {wa ? (
+                            <a
+                              href={wa}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-[#25D366] hover:bg-line transition-colors"
+                              title="Enviar confirmação no WhatsApp"
+                              aria-label="Enviar confirmação no WhatsApp"
+                            >
+                              💬
+                            </a>
+                          ) : null}
+                          <button
+                            onClick={() => openEdit(r)}
+                            className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
+                            title="Editar"
+                            aria-label="Editar aluguel"
+                          >
+                            ✏️<span className="sm:hidden ml-1 text-sm">Editar</span>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(r)}
+                            className="p-2 text-muted hover:text-accent hover:bg-line transition-colors"
+                            title="Remover"
+                            aria-label="Remover aluguel"
+                          >
+                            🗑️<span className="sm:hidden ml-1 text-sm">Remover</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -348,7 +356,7 @@ export function AgendaClient({
                   return (
                     <div
                       key={b.id}
-                      className={`flex items-center gap-4 p-4 border border-dashed border-line bg-line/25 ${
+                      className={`flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-3 p-4 border border-dashed border-line bg-line/25 ${
                         isPast ? "opacity-60" : ""
                       }`}
                     >
@@ -369,24 +377,30 @@ export function AgendaClient({
                         </div>
                       </div>
 
-                      {eq ? (
-                        <span
-                          className="px-2.5 py-1 text-xs font-semibold text-paper whitespace-nowrap"
-                          style={{ backgroundColor: eq.color }}
-                        >
-                          {eq.name}
-                        </span>
-                      ) : null}
+                      {/* No celular, equipamento e botões descem para uma linha
+                          própria: lado a lado, empurravam os botões para fora da tela. */}
+                      <div className="flex items-center justify-between gap-2 w-full sm:w-auto sm:shrink-0">
+                        {eq ? (
+                          <span
+                            className="px-2.5 py-1 text-xs font-semibold text-paper truncate min-w-0"
+                            style={{ backgroundColor: eq.color }}
+                          >
+                            {eq.name}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => handleDeleteBlock(b)}
-                          className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
-                          title="Reabrir (remover fechamento)"
-                          aria-label="Reabrir agenda"
-                        >
-                          ↩️
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleDeleteBlock(b)}
+                            className="p-2 text-muted hover:text-ink hover:bg-line transition-colors"
+                            title="Reabrir (remover fechamento)"
+                            aria-label="Reabrir agenda"
+                          >
+                            ↩️
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
