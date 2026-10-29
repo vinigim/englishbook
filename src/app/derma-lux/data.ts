@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { cidadeDoEndereco } from "@/lib/geo/cidades";
+import { cidadeConhecida } from "./shared";
 import type {
   Block,
   BlockPeriod,
@@ -30,6 +32,7 @@ type RawRental = {
 };
 
 function toRental(r: RawRental): Rental {
+  const cidade = cidadeDoEndereco(r.address, r.phone);
   return {
     id: r.id,
     client: r.client,
@@ -49,6 +52,7 @@ function toRental(r: RawRental): Rental {
     specialized_technique: r.specialized_technique ?? null,
     freddo: r.freddo ?? null,
     freddo_price: r.freddo_price != null ? Number(r.freddo_price) : null,
+    city: cidade ? `${cidade.nome}/${cidade.uf}` : null,
     wa_lead_id: r.wa_lead_id ?? null,
   };
 }
@@ -90,6 +94,12 @@ export async function getDermaLuxData(): Promise<{
 
   const equipment = (eqRes.data ?? []) as Equipment[];
   const rentals = ((rtRes.data ?? []) as RawRental[]).map(toRental);
+  // "Hospital Pirajuí" não passa em `cidadeDoEndereco` (começa por
+  // logradouro), mas a mesma cidade escrita em outro aluguel resolve.
+  const conhecidas = [...new Set(rentals.map((r) => r.city).filter(Boolean))] as string[];
+  for (const r of rentals) {
+    if (!r.city) r.city = cidadeConhecida(r.address, conhecidas);
+  }
   // Se a tabela blocks ainda não existir (migração não rodada), blRes.data vem
   // null e caímos em [] sem quebrar a página.
   const blocks = ((blRes.data ?? []) as RawBlock[]).map(toBlock);

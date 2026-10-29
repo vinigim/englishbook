@@ -190,3 +190,91 @@ export function groupByDate(rentals: Rental[]): Record<string, Rental[]> {
   }
   return groups;
 }
+
+// ============================================================================
+// Histórico de frete — quanto já se cobrou para o mesmo cliente ou cidade
+// ============================================================================
+
+/** "São José do Rio Preto" -> "sao jose do rio preto". */
+function semAcento(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export type FreteAnterior = {
+  id: string;
+  date: string;
+  client: string;
+  freight_price: number;
+};
+
+export type HistoricoFrete = {
+  cliente: FreteAnterior[];
+  cidade: string | null;
+  naCidade: FreteAnterior[];
+};
+
+/**
+ * A cidade de um endereço digitado agora, procurada só entre as cidades que
+ * já aparecem nos aluguéis: o cálculo completo (`cidadeDoEndereco`) usa a
+ * tabela do IBGE, que é só do servidor, e cidade sem aluguel anterior não
+ * teria histórico de qualquer jeito.
+ */
+export function cidadeConhecida(
+  endereco: string,
+  cidades: string[]
+): string | null {
+  const alvo = ` ${semAcento(endereco)} `;
+  let melhor: string | null = null;
+  for (const c of cidades) {
+    const nome = semAcento(c.split("/")[0]);
+    if (!nome || !alvo.includes(` ${nome} `)) continue;
+    if (!melhor || nome.length > semAcento(melhor.split("/")[0]).length) melhor = c;
+  }
+  return melhor;
+}
+
+/**
+ * Fretes já cobrados para o mesmo cliente (nome igual, sem diferenciar
+ * maiúsculas) e para outros clientes da mesma cidade, do mais recente para
+ * o mais antigo. O próprio aluguel em edição fica de fora.
+ */
+export function historicoFrete(
+  rentals: Rental[],
+  atual: { id?: string | null; client: string; address: string; city?: string | null }
+): HistoricoFrete {
+  const comFrete = rentals
+    .filter((r) => r.id !== atual.id && r.freight_price != null)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const item = (r: Rental): FreteAnterior => ({
+    id: r.id,
+    date: r.date,
+    client: r.client,
+    freight_price: r.freight_price as number,
+  });
+
+  const nome = atual.client.trim().toLowerCase();
+  const cliente = nome
+    ? comFrete.filter((r) => r.client.trim().toLowerCase() === nome).map(item)
+    : [];
+
+  const cidades = [...new Set(comFrete.map((r) => r.city).filter(Boolean))] as string[];
+  const cidade =
+    atual.city ?? (atual.address.trim() ? cidadeConhecida(atual.address, cidades) : null);
+  const naCidade = cidade
+    ? comFrete
+        .filter((r) => r.city === cidade && r.client.trim().toLowerCase() !== nome)
+        .map(item)
+    : [];
+
+  return { cliente, cidade, naCidade };
+}
+
+export function fmtDataCurta(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}

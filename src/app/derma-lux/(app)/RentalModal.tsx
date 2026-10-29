@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Equipment, Rental } from "../types";
-import { checkConflict, minutes, parseBRL, fmtBRL } from "../shared";
+import {
+  checkConflict,
+  minutes,
+  parseBRL,
+  fmtBRL,
+  fmtDataCurta,
+  historicoFrete,
+  type FreteAnterior,
+} from "../shared";
 import { saveRental } from "../actions";
 
 export type RentalPrefill = {
@@ -220,6 +228,17 @@ export function RentalModal({
       // usuário cancelou ou navegador não suporta — ignora
     }
   }
+
+  const fretes = useMemo(
+    () =>
+      historicoFrete(rentals, {
+        id: initial?.id,
+        client: form.client,
+        address: form.address,
+        city: initial && form.address === initial.address ? initial.city : null,
+      }),
+    [rentals, initial, form.client, form.address]
+  );
 
   if (!open) return null;
 
@@ -459,6 +478,30 @@ export function RentalModal({
             </Field>
           </div>
 
+          {fretes.cliente.length > 0 || fretes.naCidade.length > 0 ? (
+            <div className="border border-dashed border-line bg-line/25 px-3 py-2.5 text-sm space-y-2">
+              <p className="font-medium">🚚 Fretes anteriores</p>
+              {fretes.cliente.length > 0 ? (
+                <ListaFretes
+                  titulo={form.client.trim()}
+                  itens={fretes.cliente}
+                  mostrarCliente={false}
+                  onUsar={(v) => set("freight_price", v)}
+                />
+              ) : null}
+              {fretes.naCidade.length > 0 ? (
+                <ListaFretes
+                  titulo={`${fretes.cliente.length > 0 ? "Outros clientes em " : ""}${
+                    fretes.cidade ?? ""
+                  }`}
+                  itens={fretes.naCidade}
+                  mostrarCliente
+                  onUsar={(v) => set("freight_price", v)}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
           <Field label="Ponteiras utilizadas">
             <input
               className={inputCls}
@@ -580,6 +623,48 @@ export function RentalModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/** Os 3 fretes mais recentes de um cliente ou cidade, com botão para reaproveitar. */
+function ListaFretes({
+  titulo,
+  itens,
+  mostrarCliente,
+  onUsar,
+}: {
+  titulo: string;
+  itens: FreteAnterior[];
+  mostrarCliente: boolean;
+  onUsar: (valor: string) => void;
+}) {
+  const ultimo = itens[0];
+  const valorForm = ultimo.freight_price.toFixed(2).replace(".", ",");
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted">
+          {titulo}
+          {itens.length > 1 ? ` · ${itens.length} aluguéis` : ""}
+        </span>
+        <button
+          type="button"
+          onClick={() => onUsar(valorForm)}
+          className="text-accent underline whitespace-nowrap"
+        >
+          Usar {ultimo.freight_price === 0 ? "isento" : fmtBRL(ultimo.freight_price)}
+        </button>
+      </div>
+      <ul className="mt-0.5 text-xs text-muted space-y-0.5">
+        {itens.slice(0, 3).map((f) => (
+          <li key={f.id}>
+            {fmtDataCurta(f.date)} ·{" "}
+            {f.freight_price === 0 ? "Isento" : fmtBRL(f.freight_price)}
+            {mostrarCliente ? ` · ${f.client}` : ""}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
