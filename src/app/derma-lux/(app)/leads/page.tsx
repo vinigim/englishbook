@@ -5,6 +5,7 @@ import {
   countPendingAnalysis,
   getAnalysisSpend,
   getLeadsInbox,
+  INBOX_LIMIT,
 } from "../../leads-data";
 import { colunaExtraDoInstagram, truncate } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
@@ -147,9 +148,10 @@ export default async function LeadsPage() {
         <>
           {truncado ? (
             <Alert variant="warning" className="mb-4">
-              Mostrando os {rows.length} leads mais recentes, de {total}. Os
-              filtros e a busca só alcançam esses — se precisar chegar nos
-              outros, me avise que eu acrescento paginação.
+              Mostrando {rows.length} de {total} leads: a tela carrega no
+              máximo {INBOX_LIMIT}, para não ficar pesada. Os filtros e a busca
+              só alcançam esses. Chegou a hora de levar a busca e os filtros
+              para o banco — me avise.
             </Alert>
           ) : null}
           <InboxClient rows={paraALista(rows)} />
