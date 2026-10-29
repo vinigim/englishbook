@@ -319,14 +319,20 @@ export function LeadDetailClient({
   const tratamento = tratamentoDoMedico(lead.sheet_name, lead.display_name);
 
   /**
-   * Copia a apresentação fixa, e não o rascunho da IA.
+   * Copia a mensagem da caixa (o rascunho da IA, com as edições do dono) e,
+   * com a caixa vazia, a apresentação fixa. Escolha do dono: a mensagem da
+   * IA, quando existe, serve também para o direct.
    *
-   * Escolha do dono: pelo Instagram ele sempre se apresenta, em qualquer lead.
-   * Não chama registerDraftCopied — o que saiu não foi o rascunho, e registrar
-   * como se fosse estragaria a medida de quanto as mensagens da IA são usadas.
+   * Só registra a cópia do rascunho quando foi ele que saiu: contar a
+   * apresentação fixa estragaria a medida de quanto as mensagens da IA são
+   * usadas.
    */
   function aoAbrirInstagram() {
-    const texto = apresentacaoInstagram(tratamento);
+    const usaRascunho = Boolean(rascunho.trim());
+    const texto = usaRascunho ? rascunho : apresentacaoInstagram(tratamento);
+    if (usaRascunho && analysis) {
+      void registerDraftCopied(lead.id, analysis.id, rascunho);
+    }
     // Primeiro a cópia síncrona. No iPhone, o link leva direto para o app do
     // Instagram e a página vai para o fundo antes de a Clipboard API (que é
     // assíncrona) terminar — a cópia falhava calada e o direct abria sem nada
@@ -338,7 +344,7 @@ export function LeadDetailClient({
         onde: "mensagem",
         tipo: "erro",
         texto:
-          "O navegador bloqueou a cópia da apresentação. Volte e toque de novo em \"Abrir no Instagram\".",
+          "O navegador bloqueou a cópia da mensagem. Volte e toque de novo em \"Abrir no Instagram\".",
       });
     });
   }
@@ -1086,10 +1092,13 @@ export function LeadDetailClient({
 
             {instagram ? (
               <p className="text-xs text-muted mt-1">
-                &ldquo;Abrir no Instagram&rdquo; copia a sua apresentação (não a
-                mensagem acima), começando com &ldquo;
-                {tratamento ? `Olá, ${tratamento}!` : "Olá!"}&rdquo;, no mesmo
-                toque — é só colar no direct de{" "}
+                &ldquo;Abrir no Instagram&rdquo; copia, no mesmo toque,{" "}
+                {rascunho.trim()
+                  ? "a mensagem acima"
+                  : `a sua apresentação, começando com “${
+                      tratamento ? `Olá, ${tratamento}!` : "Olá!"
+                    }”`}
+                . É só colar no direct de{" "}
                 <a
                   href={instagramProfileUrl(instagram)}
                   target="_blank"

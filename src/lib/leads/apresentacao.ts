@@ -1,9 +1,8 @@
 /**
- * Apresentação de primeiro contato, copiada pelo botão "Abrir no Instagram".
+ * Apresentação de primeiro contato, copiada pelo botão "Abrir no Instagram"
+ * quando o lead ainda não tem mensagem da IA (com mensagem, o botão copia ela).
  *
- * Texto fixo, escrito e aprovado pelo dono — não passa pela IA. O botão copia
- * este texto em TODO lead, por escolha dele, inclusive nos que já conversaram
- * pelo WhatsApp: para esses, a mensagem da IA continua no "Copiar mensagem".
+ * Texto fixo, escrito e aprovado pelo dono — não passa pela IA.
  */
 const CORPO = `Sou Vinicius, da Lux Derma, empresa de Penápolis-SP.
 Estamos oferecendo para locação o Laser de CO2 Fracionado da DEKA (Itália — última geração), indicado para rejuvenescimento, cicatrizes, resurfacing e como complemento à cirurgia plástica, inclusive blefaroplastia.
