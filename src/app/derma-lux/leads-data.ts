@@ -24,10 +24,15 @@ const MESSAGE_COLS =
  *
  * Os filtros e a busca da tela rodam sobre o que foi carregado, então um teto
  * baixo não "esconde" leads: ele os torna inalcançáveis, inclusive pela busca.
- * Por isso o número é alto o bastante para caber a carteira inteira, e a tela
- * avisa quando esbarra nele em vez de omitir em silêncio.
+ * A carga pagina de `PAGINA` em `PAGINA` (o PostgREST corta cada resposta em
+ * 1000 linhas), e este teto é só a proteção contra uma página pesada demais:
+ * perto dele, a hora é de levar busca e filtros para o banco. A tela avisa
+ * quando esbarra nele em vez de omitir em silêncio.
  */
-export const INBOX_LIMIT = 1000;
+export const INBOX_LIMIT = 5000;
+
+/** Tamanho da página do PostgREST: acima disso ele corta em silêncio. */
+const PAGINA = 1000;
 
 /**
  * Quantos ids cabem num filtro `.in(...)` por requisição.
@@ -79,20 +84,29 @@ export async function getLeadsInbox(
 ): Promise<LeadInboxRow[]> {
   const supabase = await createClient();
 
-  const { data: leadsData, error: leadsErr } = await supabase
-    .from("wa_leads")
-    .select("*")
-    .eq("archived", false)
-    // Lead vindo de planilha não tem mensagem, então `last_message_at` é nulo
-    // para todos eles. Sem o desempate por `created_at` o banco devolveria um
-    // subconjunto arbitrário quando o teto fosse atingido.
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const leads: Lead[] = [];
+  for (let de = 0; de < limit; de += PAGINA) {
+    const ate = Math.min(de + PAGINA, limit) - 1;
+    const { data, error } = await supabase
+      .from("wa_leads")
+      .select("*")
+      .eq("archived", false)
+      // Lead vindo de planilha não tem mensagem, então `last_message_at` é nulo
+      // para todos eles. O desempate por `created_at` e `id` deixa a ordem
+      // estável, senão uma página repetiria ou pularia leads da anterior.
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(de, ate);
+    // Página que falha no meio derruba a carga inteira, como antes: uma lista
+    // pela metade pareceria completa.
+    if (error) return [];
+    leads.push(...((data ?? []) as Lead[]));
+    if (!data || data.length < ate - de + 1) break;
+  }
 
-  if (leadsErr || !leadsData || leadsData.length === 0) return [];
+  if (leads.length === 0) return [];
 
-  const leads = leadsData as Lead[];
   const ids = leads.map((l) => l.id);
 
   const [analyses, messages, rentals] = await Promise.all([
@@ -331,9 +345,6 @@ export async function getAnalysisSpend(): Promise<{
   ]);
   return { ...analises, instagram };
 }
-
-/** Tamanho da página do PostgREST: acima disso ele corta em silêncio. */
-const PAGINA = 1000;
 
 /**
  * Todos os leads (inclusive arquivados, sem grupos) com a análise mais recente
