@@ -317,9 +317,7 @@ export function roteiroMotorista(
     .filter((r) => r.date >= hoje && r.date <= ate)
     .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.start_time) - minutes(b.start_time));
 
-  const linhas: string[] = [
-    `🚐 Roteiro das locações: ${diaCurto(hoje)} a ${diaCurto(ate)}`,
-  ];
+  const linhas: string[] = ["🚐 Roteiro das próximas locações"];
   if (lista.length === 0) {
     linhas.push("", "Nenhuma locação marcada nesse período.");
     return { texto: linhas.join("\n"), total: 0 };
