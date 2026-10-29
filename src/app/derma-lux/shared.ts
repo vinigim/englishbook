@@ -278,3 +278,78 @@ export function fmtDataCurta(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+// ============================================================================
+// Roteiro do motorista — as locações dos próximos dias, em texto para WhatsApp
+// ============================================================================
+
+const DOW_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+function somarDias(iso: string, dias: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + dias);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(
+    dt.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function diaCurto(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = DOW_CURTO[new Date(y, m - 1, d).getDay()];
+  return `${dow.charAt(0).toUpperCase()}${dow.slice(1)}, ${String(d).padStart(2, "0")}/${String(
+    m
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Texto do roteiro: de `hoje` até `hoje + dias - 1`, por data e horário.
+ * Sem valores nem telefone do cliente — é para o motorista se organizar.
+ * A chegada é 30 min antes do início, a mesma regra da confirmação.
+ */
+export function roteiroMotorista(
+  rentals: Rental[],
+  equipmentNames: Map<string, string>,
+  hoje: string,
+  dias = 15
+): { texto: string; total: number } {
+  const ate = somarDias(hoje, dias - 1);
+  const lista = rentals
+    .filter((r) => r.date >= hoje && r.date <= ate)
+    .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.start_time) - minutes(b.start_time));
+
+  const linhas: string[] = [
+    `🚐 Roteiro das locações: ${diaCurto(hoje)} a ${diaCurto(ate)}`,
+  ];
+  if (lista.length === 0) {
+    linhas.push("", "Nenhuma locação marcada nesse período.");
+    return { texto: linhas.join("\n"), total: 0 };
+  }
+
+  const variosEquipamentos = new Set(lista.map((r) => r.equip_id)).size > 1;
+  for (const r of lista) {
+    const chegada = fmtMin(Math.max(0, minutes(r.start_time) - 30));
+    linhas.push("");
+    linhas.push(`📅 ${diaCurto(r.date)}`);
+    linhas.push(
+      r.city
+        ? `📍 ${r.city}${
+            r.distance_km != null
+              ? r.distance_km === 0
+                ? " (Penápolis)"
+                : ` · ${r.distance_km} km de Penápolis (linha reta)`
+              : ""
+          }`
+        : "📍 Cidade não identificada no endereço"
+    );
+    linhas.push(`🕑 Uso do laser: ${r.start_time} às ${r.end_time} · chegar até ${chegada}`);
+    if (r.address) linhas.push(`🏥 ${r.address}`);
+    linhas.push(`👤 ${r.client}`);
+    if (variosEquipamentos && r.equip_id) {
+      const nome = equipmentNames.get(r.equip_id);
+      if (nome) linhas.push(`🔬 ${nome}`);
+    }
+    if (r.freddo) linhas.push("❄️ Levar o resfriador Freddo");
+  }
+  linhas.push("", `Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}.`);
+  return { texto: linhas.join("\n"), total: lista.length };
+}
