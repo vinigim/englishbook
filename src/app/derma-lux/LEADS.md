@@ -230,7 +230,9 @@ ficha continua mostrando o valor como a planilha escreveu.
 
 O botão "Abrir no Instagram" usa `ig.me/m/<handle>`, o equivalente do `wa.me`.
 A diferença é que ele **não aceita o texto da mensagem na URL** — por isso o
-clique copia o rascunho para a área de transferência no mesmo gesto.
+clique copia a mensagem para a área de transferência no mesmo gesto: o texto
+da caixa (o rascunho da IA, com as edições) quando há um, e a apresentação
+fixa de `src/lib/leads/apresentacao.ts` quando a caixa está vazia.
 
 Leads importados antes da 0015 não precisam de reimportação: quando a coluna
 está vazia, a tela procura o Instagram entre as colunas extras.
