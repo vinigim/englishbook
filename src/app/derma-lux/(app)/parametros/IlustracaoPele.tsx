@@ -25,7 +25,7 @@ export type PerfilBase = {
 };
 
 // Paleta fixa: os desenhos precisam ler igual em qualquer tela.
-const COR = {
+export const COR = {
   epiderme: "#e8c7a3",
   dermePapilar: "#f2d9d0",
   dermeReticular: "#ebcfc3",
@@ -194,7 +194,7 @@ function Anotacoes({ c, x, fundo }: { c: Coluna; x: number; fundo: number }) {
   );
 }
 
-function CorteColuna({
+export function CorteColuna({
   perfil,
   rotulo,
   comRotulos = false,
@@ -382,7 +382,7 @@ const LADO_MM = 2;
 const LADO_UM = LADO_MM * 1000;
 const VISTA = 120;
 
-function VistaDeCima({ spacing, rotulo }: { spacing: number; rotulo: string }) {
+export function VistaDeCima({ spacing, rotulo }: { spacing: number; rotulo: string }) {
   const escala = VISTA / LADO_UM;
   const raio = Math.max(150 * escala * 0.5, 3); // DOT desenhado em tamanho relativo
   const pontos: { x: number; y: number }[] = [];
@@ -414,7 +414,7 @@ function VistaDeCima({ spacing, rotulo }: { spacing: number; rotulo: string }) {
  * mesma escala horizontal da vista de cima (2 mm), com a cota entre duas.
  */
 const CORTE_SPACING_H = 62;
-function CorteSpacing({ spacing }: { spacing: number }) {
+export function CorteSpacing({ spacing }: { spacing: number }) {
   const escala = VISTA / LADO_UM;
   const sup = 12;
   const fimEpi = 17;

@@ -4,6 +4,7 @@ import {
   ORIGEM_LABEL,
 } from "@/lib/laser/base-conhecimento";
 import { listarConsultas, listarLocacoes } from "@/lib/laser/consultas";
+import { AulaParametros } from "./AulaParametros";
 import { OculosPessoal } from "./OculosPessoal";
 import { ParametrosClient, type FonteInfo } from "./ParametrosClient";
 
@@ -56,6 +57,9 @@ export default async function ParametrosPage() {
             ? ` · US$ ${gastoTotal.toFixed(2)} gastos nas últimas ${historico.length} consultas`
             : ""}
         </p>
+        <div className="mt-3">
+          <AulaParametros />
+        </div>
         <OculosPessoal />
       </div>
 
