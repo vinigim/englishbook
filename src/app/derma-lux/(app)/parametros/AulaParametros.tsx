@@ -621,8 +621,11 @@ function Player({ onClose }: { onClose: () => void }) {
     if (!tocando) return;
     let anterior = performance.now();
     let quadro = 0;
-    const passo = (agora: number) => {
-      const dt = agora - anterior;
+    const passo = () => {
+      // Limita o salto: com a aba em segundo plano o rAF para e, na volta,
+      // um dt de minutos pularia a cena inteira.
+      const agora = performance.now();
+      const dt = Math.min(Math.max(agora - anterior, 0), 100);
       anterior = agora;
       setT((v) => Math.min(1, v + dt / CENAS[indice].duracao));
       quadro = requestAnimationFrame(passo);
