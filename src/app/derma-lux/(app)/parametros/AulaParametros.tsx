@@ -402,12 +402,12 @@ const CENAS: Cena[] = [
     },
   },
   {
-    titulo: "5. SmartStack (1 a 5) = aprofundar",
+    titulo: "5. SmartStack (1 a 3) = aprofundar",
     duracao: 15000,
     fala:
-      "O SmartStack dispara de um a cinco pulsos seguidos no mesmo ponto. A coluna desce mais e fica um pouco mais estreita, então é o jeito de ganhar profundidade sem espalhar calor para os lados. Stack um é superficial; dois a três é o mais usado em cicatrizes e estrias; quatro e cinco, só em cicatriz profunda e pele espessa. Para aprofundar, subir o stack é mais seguro do que subir o time.",
+      "O SmartStack dispara de um a três pulsos seguidos no mesmo ponto; no nosso aparelho, o máximo é três. A coluna desce mais e fica um pouco mais estreita, então é o jeito de ganhar profundidade sem espalhar calor para os lados. Stack um é superficial; dois é o mais usado em rejuvenescimento, cicatrizes e estrias; três, o máximo, fica para cicatriz profunda e pele espessa. Para aprofundar, subir o stack é mais seguro do que subir o time.",
     desenho: (t) => {
-      const stack = 1 + Math.min(4, Math.floor(fase(t, 0.05, 0.8) * 5));
+      const stack = 1 + Math.min(2, Math.floor(fase(t, 0.05, 0.8) * 3));
       return (
         <div>
           <div className="max-w-[240px] mx-auto border border-line p-1.5">

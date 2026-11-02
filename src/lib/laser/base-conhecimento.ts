@@ -41,7 +41,7 @@ import {
  * antes de tratá-lo como definitivo.
  */
 
-export const KB_VERSAO = 4;
+export const KB_VERSAO = 5;
 
 export const ORIGENS = [
   "protocolo_treinamento",
@@ -97,7 +97,7 @@ Sem scanner, com peça de mão focada, o Punto corta e vaporiza lesões (uso cir
     texto: `Faixas descritas para o sistema SmartXide DOT (confirmar no manual da versão do aparelho):
 - Dwell time (tempo por DOT): 200 a 2.000 µs (0,2 a 2 ms). No HP o time não se ajusta.
 - Spacing / DOT pitch (distância entre DOTs): 200 a 1.000 µm.
-- SmartStack: 1 a 5 pulsos sobre o mesmo DOT.
+- SmartStack: 1 a 3 pulsos sobre o mesmo DOT no Punto da Lux Derma (o seletor do aparelho vai só até 3; materiais de outros modelos citam até 5).
 - Potência: até 50 W no Punto; nas tabelas de pele do protocolo Premium o máximo é 25 W (manchas, SP, fototipo 1–2).
 Nunca recomende valores fora dessas faixas.`,
   },
@@ -193,16 +193,17 @@ No protocolo Premium o spacing aumenta à medida que o fototipo sobe (ex.: rejuv
   },
   {
     id: "param-smartstack",
-    titulo: "SmartStack (1 a 5)",
+    titulo: "SmartStack (1 a 3)",
     origem: "fabricante",
     fonte: {
       label: "Folheto SmartXide Punto (DEKA)",
       url: "https://app.aico.swiss/19871/storage/files/Smartxide%20Punto%20Brochure%20ING%20Rev%203.0.pdf",
     },
-    texto: `Número de pulsos consecutivos sobre o mesmo DOT (1 a 5). Aprofunda a coluna sem alargá-la tanto: segundo a DEKA, ao subir o nível o canal de ablação fica mais estreito por efeito de retração.
+    texto: `Número de pulsos consecutivos sobre o mesmo DOT. No Punto da Lux Derma o nível vai de 1 a 3: nunca recomende 4 ou 5. Aprofunda a coluna sem alargá-la tanto: segundo a DEKA, ao subir o nível o canal de ablação fica mais estreito por efeito de retração.
 - Stack 1: superficial (manchas, textura, pele fina).
-- Stack 2–3: o mais usado em cicatrizes e estrias.
-- Stack 4–5: cicatrizes profundas em pele espessa; acumula muito calor no mesmo ponto.
+- Stack 2: o mais usado em rejuvenescimento, cicatrizes e estrias.
+- Stack 3 (o máximo do aparelho): cicatrizes profundas e pele espessa; acumula muito calor no mesmo ponto.
+Se o caso pedir mais profundidade do que o stack 3 dá, suba a potência aos poucos ou ganhe resultado com mais sessões; não passe de 3.
 Para ganhar profundidade, subir o stack é mais seguro do que subir o dwell, porque concentra o efeito em profundidade e não lateralmente.`,
   },
   {

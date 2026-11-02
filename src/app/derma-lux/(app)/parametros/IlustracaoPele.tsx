@@ -322,8 +322,8 @@ export function ComparaModo({ base }: { base: PerfilBase }) {
 }
 
 export function ComparaStack({ base }: { base: PerfilBase }) {
-  const inicio = Math.min(Math.max(base.stack - 1, 1), 3);
-  const niveis = [inicio, inicio + 1, inicio + 2];
+  // O Punto da Lux Derma vai de 1 a 3: os três níveis cabem lado a lado.
+  const niveis = [1, 2, 3];
   return (
     <Painel
       opcoes={niveis.map((n) => ({
