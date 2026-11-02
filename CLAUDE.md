@@ -133,6 +133,11 @@ for every SmartXide Punto setting with its reason and the knowledge-base ids it 
   model's text (`analise_foto`) is saved. A consultation with photos is never reused
   from or offered to the content-hash cache.
 
+- **Training lesson** — `AulaParametros.tsx`: a "▶ Aula" button opens an animated,
+  video-like walkthrough (11 scenes, play/pause, optional browser `speechSynthesis`
+  narration in pt-BR). Drawings reuse `IlustracaoPele.tsx`; texts follow the `param-*`
+  KB chunks, so review them when those chunks change. No AI call.
+
 - **Even G2 glasses** (`0024`, `oculos-g2/`) — a staff-generated 8-char code per rental
   (`laser_oculos_acessos`) opens `GET /api/oculos/<codigo>`: public, service role, CORS
   open, valid from the day before the rental to two days after. It returns display-ready
