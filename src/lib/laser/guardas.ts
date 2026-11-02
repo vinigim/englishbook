@@ -37,7 +37,7 @@ export const LIMITES = {
   potencia_w: { min: 1, max: 50 },
   dwell_time_us: { min: 200, max: 2000 },
   spacing_um: { min: 200, max: 1000 },
-  smartstack: { min: 1, max: 5 },
+  smartstack: { min: 1, max: 3 },
 } as const;
 
 // ============================================================================

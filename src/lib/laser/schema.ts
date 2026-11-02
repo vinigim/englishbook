@@ -76,7 +76,7 @@ const PARAMETROS_JSON_SCHEMA = {
       "Time (dwell) em microssegundos (µs). No pulso HP o time não se ajusta: use 0 em valor, faixa_min e faixa_max.",
     ),
     spacing_um: numerico("Spacing / DOT pitch em micrômetros (µm)."),
-    smartstack: numerico("Nível do SmartStack, inteiro de 1 a 5."),
+    smartstack: numerico("Nível do SmartStack, inteiro de 1 a 3 (o máximo deste aparelho é 3)."),
     modo_varredura: {
       type: "object",
       properties: {
@@ -383,7 +383,7 @@ export const sessaoAnteriorSchema = z.object({
   potencia: numeroOpcional(1, 50),
   dwell: numeroOpcional(100, 3000),
   spacing: numeroOpcional(100, 1500),
-  stack: numeroOpcional(1, 5),
+  stack: numeroOpcional(1, 3),
   diasEritema: numeroOpcional(0, 90),
   teveHpi: z.boolean().default(false),
   resultado: z.enum(RESULTADOS_ANTERIORES).nullable().default(null),
@@ -464,7 +464,7 @@ export const realizadoSchema = z.object({
   potencia: z.number().min(0).max(50).nullable().default(null),
   dwell: z.number().min(0).max(3000).nullable().default(null),
   spacing: z.number().min(0).max(1500).nullable().default(null),
-  stack: z.number().int().min(1).max(5).nullable().default(null),
+  stack: z.number().int().min(1).max(3).nullable().default(null),
   varredura: z.enum(MODOS_VARREDURA).nullable().default(null),
   passadas: z.number().int().min(1).max(5).nullable().default(null),
   notas: z.string().trim().max(1000, "As notas passam de 1000 caracteres.").default(""),
