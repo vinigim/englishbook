@@ -388,12 +388,9 @@ export function LeadDetailClient({
    *
    * Chamada depois da IA escrever, então não há mais o toque do usuário: o
    * navegador bloqueia aba nova (window.open) nessa hora. No celular vai pelo
-   * wa.me na própria aba: abre o app direto ou, se o sistema não deixar, a
-   * página do wa.me com o botão "Continuar para o chat". Não usar o esquema
-   * `whatsapp://`: num iPhone sem o app que responde a ele (ex.: só com o
-   * WhatsApp Business) o Safari mostra "address is invalid" e não abre nada.
-   * No computador tenta o wa.me em aba nova; bloqueado, sobra o botão
-   * "Abrir no WhatsApp", que continua ali.
+   * esquema `whatsapp://` na própria aba — o sistema abre o app (o iPhone
+   * pergunta antes) e o painel fica onde está. No computador tenta o wa.me em
+   * aba nova; bloqueado, sobra o botão "Abrir no WhatsApp", que continua ali.
    *
    * Abrir não é enviar: nada é marcado aqui (ver estadoContato).
    */
@@ -401,7 +398,7 @@ export function LeadDetailClient({
     if (!numero) return false;
     const msg = encodeURIComponent(texto);
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-      window.location.href = `https://wa.me/${numero}?text=${msg}`;
+      window.location.href = `whatsapp://send?phone=${numero}&text=${msg}`;
       return true;
     }
     return window.open(`https://wa.me/${numero}?text=${msg}`, "_blank") !== null;
