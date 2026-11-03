@@ -470,9 +470,10 @@ de concordar para a tela não mentir.
 
 **"Analisar" e "Gerar mensagem assim mesmo" abrem o WhatsApp sozinhos** quando
 a IA termina e escreveu mensagem,
-com o texto pronto (no celular pelo esquema `whatsapp://`, na mesma aba, porque
-o navegador bloqueia aba nova sem toque; no computador tenta o wa.me em aba
-nova). Não abre para quem o WhatsApp confirmou não ter conta. Também não conta
+com o texto pronto (no celular pelo wa.me na mesma aba, porque o navegador
+bloqueia aba nova sem toque; no computador tenta o wa.me em aba nova). O esquema
+`whatsapp://` foi abandonado: num iPhone sem o app que responde a ele o Safari
+mostra "address is invalid". Não abre para quem o WhatsApp confirmou não ter conta. Também não conta
 como envio.
 
 **Cópia do rascunho e clique em "Abrir no WhatsApp" não contam como envio.**
