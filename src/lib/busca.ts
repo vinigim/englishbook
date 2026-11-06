@@ -14,11 +14,17 @@ import { EmpresaAlvoSchema, type Cv, type VagaColetada } from "./tipos";
 // a Gupy fora do ar não impede a leitura do Gmail.
 // ---------------------------------------------------------------------
 
-const DIAS_GMAIL = 3;
+/**
+ * Janela de leitura dos alertas. E-mails já lidos são pulados antes da IA, então uma janela
+ * larga não custa nada por dia e recupera sozinha os alertas de dias em que o Gmail falhou.
+ */
+const DIAS_GMAIL = 10;
 const TRIAGENS_POR_RODADA = 80;
 const CONCORRENCIA = 4;
 /** A função tem 300 s na Vercel; paramos a triagem antes disso. O resto fica pendente para amanhã. */
 const PRAZO_MS = 240_000;
+/** Ler os alertas do Gmail também não: o que passar disso fica para a próxima rodada. */
+const PRAZO_EMAIL_MS = 90_000;
 /** Buscar descrições não pode comer o tempo da triagem. */
 const PRAZO_DETALHE_MS = 120_000;
 
@@ -147,16 +153,26 @@ export async function rodarBusca(
         .gte("processado_em", new Date(Date.now() - (DIAS_GMAIL + 2) * 86_400_000).toISOString());
       const emails = await lerAlertas(DIAS_GMAIL, new Set((lidos ?? []).map((l) => l.message_id)));
       const vagas: VagaColetada[] = [];
-      for (const email of emails) {
-        const extraidas = await extrairVagasDoEmail(supabase, userId, email);
-        vagas.push(...extraidas);
-        await supabase.from("emails_processados").upsert({
-          user_id: userId,
-          message_id: email.messageId,
-          remetente: email.remetente,
-          vagas_extraidas: extraidas.length,
-        });
-      }
+      const erros: string[] = [];
+      // Um e-mail com erro não derruba os outros e fica sem marcar, para a próxima rodada tentar
+      // de novo. O que não couber no prazo também fica para a próxima.
+      await emLotes(emails, CONCORRENCIA, async (email) => {
+        if (Date.now() - inicio > PRAZO_EMAIL_MS) return;
+        try {
+          const extraidas = await extrairVagasDoEmail(supabase, userId, email);
+          vagas.push(...extraidas);
+          await supabase.from("emails_processados").upsert({
+            user_id: userId,
+            message_id: email.messageId,
+            remetente: email.remetente,
+            vagas_extraidas: extraidas.length,
+          });
+        } catch (e) {
+          erros.push(e instanceof Error ? e.message : String(e));
+          console.error("[busca] e-mail", email.messageId, e);
+        }
+      });
+      if (emails.length > 0 && erros.length === emails.length) throw new Error(erros[0]);
       return vagas;
     });
   } else {

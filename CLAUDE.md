@@ -29,7 +29,12 @@ RLS `user_id = auth.uid()`.
   `registrarUso()` (prices in `cliente.ts`).
 - The SDK sends zod enums only as a description hint, so enum-like fields are `z.string()`
   and normalized in code (`normalizarTriagem`).
-- Extracted e-mail URLs are kept only if they literally appear in the e-mail text.
+- Alert e-mails: every URL is swapped for a short code (`L12`) before Haiku sees the text, and the
+  code is mapped back in `extracao-email.ts`; a code not in the e-mail is dropped, so the AI can't
+  invent links. (Copying LinkedIn's tracking URLs blew past `max_tokens` and truncated the JSON.)
+  Each e-mail fails alone and stays unmarked for the next round; reading stops at `PRAZO_EMAIL_MS`.
+  The window is `DIAS_GMAIL = 10`: processed ids are skipped from the IMAP envelope alone, so a wide
+  window costs nothing daily and catches up on days the source failed.
 - "+ Vaga manual" fills its fields from the pasted link: `POST /api/vagas/extrair` →
   `fontes/link.ts` (public http(s) only, private IPs rejected on every redirect; LinkedIn,
   Indeed, Glassdoor and Catho refused) reads JSON-LD `JobPosting` first, then public Notion
