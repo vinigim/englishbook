@@ -14,7 +14,11 @@ import { EmpresaAlvoSchema, type Cv, type VagaColetada } from "./tipos";
 // a Gupy fora do ar não impede a leitura do Gmail.
 // ---------------------------------------------------------------------
 
-const DIAS_GMAIL = 3;
+/**
+ * Janela de leitura dos alertas. E-mails já lidos são pulados antes da IA, então uma janela
+ * larga não custa nada por dia e recupera sozinha os alertas de dias em que o Gmail falhou.
+ */
+const DIAS_GMAIL = 10;
 const TRIAGENS_POR_RODADA = 80;
 const CONCORRENCIA = 4;
 /** A função tem 300 s na Vercel; paramos a triagem antes disso. O resto fica pendente para amanhã. */

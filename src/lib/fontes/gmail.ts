@@ -60,8 +60,15 @@ export async function lerAlertas(dias: number, jaProcessados: Set<string>): Prom
       const uids = await cliente.search({ gmraw: `from:(${de}) newer_than:${dias}d` }, { uid: true });
       if (!uids || uids.length === 0) return [];
 
+      // Primeiro só o cabeçalho: o conteúdo inteiro é baixado apenas dos e-mails ainda não lidos.
+      const novos: number[] = [];
+      for await (const msg of cliente.fetch(uids, { envelope: true }, { uid: true })) {
+        if (!jaProcessados.has(msg.envelope?.messageId ?? `uid-${msg.uid}`)) novos.push(msg.uid);
+      }
+      if (novos.length === 0) return [];
+
       const emails: EmailAlerta[] = [];
-      for await (const msg of cliente.fetch(uids, { source: true, envelope: true }, { uid: true })) {
+      for await (const msg of cliente.fetch(novos, { source: true, envelope: true }, { uid: true })) {
         const messageId = msg.envelope?.messageId ?? `uid-${msg.uid}`;
         if (jaProcessados.has(messageId) || !msg.source) continue;
 
