@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/derma-lux", label: "Agenda" },
   { href: "/derma-lux/leads", label: "Leads" },
   { href: "/derma-lux/parametros", label: "Parâmetros CO2" },
+  { href: "/derma-lux/manuseio", label: "Manuseio do laser" },
   { href: "/derma-lux/disponibilidade", label: "Disponibilidade Locação" },
   {
     href: "/derma-lux/disponibilidade-clinica",

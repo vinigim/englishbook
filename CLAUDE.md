@@ -24,6 +24,7 @@ lasers to doctors and aesthetic clinics. It has two areas, both behind the same 
 | `/derma-lux` | Rental agenda: equipment, rentals, availability, schedule blocks |
 | `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI |
 | `/derma-lux/parametros` | AI recommender for SmartXide Punto (CO2 laser) settings |
+| `/derma-lux/manuseio` | Field checklists (install / uninstall the laser). Static steps in `procedimentos.ts`, progress in `localStorage` only |
 | `oculos-g2/` | Even G2 glasses app showing a rental's saved settings (own `package.json`) |
 
 `/` redirects to `/derma-lux` (`next.config.mjs`). UI language is pt-BR throughout.
