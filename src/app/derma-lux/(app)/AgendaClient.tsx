@@ -8,6 +8,7 @@ import { deleteRental, deleteBlock } from "../actions";
 import { RentalModal } from "./RentalModal";
 import { BlockModal } from "./BlockModal";
 import { RoteiroModal } from "./RoteiroModal";
+import { LocacoesFuturasModal } from "./LocacoesFuturasModal";
 
 const PERIOD_LABEL: Record<BlockPeriod, string> = {
   full: "Dia todo",
@@ -39,6 +40,7 @@ export function AgendaClient({
   const [editing, setEditing] = useState<Rental | null>(null);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [roteiroOpen, setRoteiroOpen] = useState(false);
+  const [futurasOpen, setFuturasOpen] = useState(false);
 
   const equipMap = useMemo(
     () => new Map(equipment.map((e) => [e.id, e])),
@@ -159,6 +161,12 @@ export function AgendaClient({
             className="h-11 px-5 bg-paper text-ink border border-ink font-medium hover:bg-ink hover:text-paper transition-colors"
           >
             🚐 Roteiro do motorista
+          </button>
+          <button
+            onClick={() => setFuturasOpen(true)}
+            className="h-11 px-5 bg-paper text-ink border border-ink font-medium hover:bg-ink hover:text-paper transition-colors"
+          >
+            📋 Locações futuras
           </button>
           <button
             onClick={openBlock}
@@ -429,6 +437,12 @@ export function AgendaClient({
       <RoteiroModal
         open={roteiroOpen}
         onClose={() => setRoteiroOpen(false)}
+        rentals={rentals}
+        equipment={equipment}
+      />
+      <LocacoesFuturasModal
+        open={futurasOpen}
+        onClose={() => setFuturasOpen(false)}
         rentals={rentals}
         equipment={equipment}
       />
