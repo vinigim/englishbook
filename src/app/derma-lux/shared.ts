@@ -351,3 +351,71 @@ export function roteiroMotorista(
   linhas.push("", `Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}.`);
   return { texto: linhas.join("\n"), total: lista.length };
 }
+
+// ============================================================================
+// Resumo das locações futuras — tudo o que está marcado de hoje em diante
+// ============================================================================
+
+function simNao(v: boolean | null): string | null {
+  return v === true ? "sim" : v === false ? "não" : null;
+}
+
+/**
+ * Texto com todas as locações de `hoje` em diante, com todos os dados do
+ * aluguel (cliente, telefone, endereço, equipamento, opcionais e
+ * observações). Com `valores`, inclui os preços de cada uma e o total
+ * previsto; sem, serve para mandar a quem não deve ver valores.
+ */
+export function resumoLocacoesFuturas(
+  rentals: Rental[],
+  equipmentNames: Map<string, string>,
+  hoje: string,
+  { valores = true }: { valores?: boolean } = {}
+): { texto: string; total: number } {
+  const lista = rentals
+    .filter((r) => r.date >= hoje)
+    .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.start_time) - minutes(b.start_time));
+
+  const linhas: string[] = ["📋 *Locações futuras do laser*", `Atualizado em ${fmtDataCurta(hoje)}`];
+  if (lista.length === 0) {
+    linhas.push("", "Nenhuma locação marcada.");
+    return { texto: linhas.join("\n"), total: 0 };
+  }
+
+  let somaGeral = 0;
+  for (const r of lista) {
+    linhas.push("", `📅 *${diaCurto(r.date)}/${r.date.slice(0, 4)}* · ${r.start_time} às ${r.end_time}`);
+    linhas.push(`👤 ${r.client}${r.specialty ? ` (${r.specialty})` : ""}`);
+    if (r.phone) linhas.push(`📞 ${r.phone}`);
+    if (r.address) linhas.push(`🏥 ${r.address}${r.city && !r.address.includes(r.city.split("/")[0]) ? ` — ${r.city}` : ""}`);
+    else if (r.city) linhas.push(`📍 ${r.city}`);
+    const equip = r.equip_id ? equipmentNames.get(r.equip_id) : null;
+    if (equip) linhas.push(`🔬 ${equip}`);
+    if (r.tips_used) linhas.push(`🔧 Ponteiras: ${r.tips_used}`);
+    const est = simNao(r.sterilized);
+    if (est) linhas.push(`🧼 Esterilização: ${est}`);
+    const tec = simNao(r.specialized_technique);
+    if (tec) linhas.push(`🎓 Técnica especializada: ${tec}`);
+    if (r.freddo) linhas.push("❄️ Com resfriador Freddo");
+    if (valores) {
+      const partes: string[] = [];
+      if (r.price != null) partes.push(`aluguel ${fmtBRL(r.price)}`);
+      if (r.freight_price != null) partes.push(`frete ${fmtBRL(r.freight_price)}`);
+      if (r.technique_price != null) partes.push(`técnica ${fmtBRL(r.technique_price)}`);
+      if (r.freddo && r.freddo_price != null) partes.push(`Freddo ${fmtBRL(r.freddo_price)}`);
+      const soma =
+        (r.price ?? 0) +
+        (r.freight_price ?? 0) +
+        (r.technique_price ?? 0) +
+        (r.freddo ? r.freddo_price ?? 0 : 0);
+      somaGeral += soma;
+      if (partes.length > 1) linhas.push(`💰 ${partes.join(" + ")} = *${fmtBRL(soma)}*`);
+      else if (partes.length === 1) linhas.push(`💰 ${partes[0]}`);
+    }
+    if (r.notes?.trim()) linhas.push(`📝 ${r.notes.trim()}`);
+  }
+
+  linhas.push("", `*Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}*`);
+  if (valores) linhas.push(`*Total previsto (com frete e opcionais): ${fmtBRL(somaGeral)}*`);
+  return { texto: linhas.join("\n"), total: lista.length };
+}
