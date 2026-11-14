@@ -5,9 +5,8 @@ import type { Equipment, Rental } from "../types";
 import { resumoLocacoesFuturas, todayStr } from "../shared";
 
 /**
- * Todas as locações de hoje em diante, com todos os dados, em texto pronto
- * para o WhatsApp (o app pede o contato). Os valores podem sair do texto
- * quando a mensagem vai para quem não deve vê-los.
+ * Todas as locações de hoje em diante, em texto enxuto pronto para o
+ * WhatsApp (o app pede o contato). Sem cliente, telefone, endereço e valores.
  */
 export function LocacoesFuturasModal({
   open,
@@ -20,16 +19,14 @@ export function LocacoesFuturasModal({
   rentals: Rental[];
   equipment: Equipment[];
 }) {
-  const [valores, setValores] = useState(true);
   const gerado = useMemo(
     () =>
       resumoLocacoesFuturas(
         rentals,
         new Map(equipment.map((e) => [e.id, e.name])),
-        todayStr(),
-        { valores }
+        todayStr()
       ),
-    [rentals, equipment, valores]
+    [rentals, equipment]
   );
   const [texto, setTexto] = useState(gerado.texto);
   const [copiado, setCopiado] = useState(false);
@@ -73,16 +70,6 @@ export function LocacoesFuturasModal({
                 gerado.total === 1 ? "locação" : "locações"
               } de hoje em diante. Dá para ajustar o texto antes de mandar.`}
         </p>
-
-        <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={valores}
-            onChange={(e) => setValores(e.target.checked)}
-            className="w-4 h-4 accent-[#1c3d31]"
-          />
-          Incluir valor da técnica especializada
-        </label>
 
         {/* text-base no celular: abaixo de 16px o Safari dá zoom no foco. */}
         <textarea
