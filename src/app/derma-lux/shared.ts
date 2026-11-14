@@ -361,10 +361,10 @@ function simNao(v: boolean | null): string | null {
 }
 
 /**
- * Texto com todas as locações de `hoje` em diante, com todos os dados do
- * aluguel (cliente, telefone, endereço, equipamento, opcionais e
- * observações). Com `valores`, inclui os preços de cada uma e o total
- * previsto; sem, serve para mandar a quem não deve ver valores.
+ * Texto enxuto com todas as locações de `hoje` em diante: data, horário,
+ * especialidade, telefone, cidade, equipamento, opcionais e observações.
+ * Nome do cliente, endereço e valor do aluguel ficam de fora a pedido do
+ * dono. Com `valores`, inclui frete, técnica e Freddo de cada uma.
  */
 export function resumoLocacoesFuturas(
   rentals: Rental[],
@@ -385,10 +385,10 @@ export function resumoLocacoesFuturas(
   let somaGeral = 0;
   for (const r of lista) {
     linhas.push("", `📅 *${diaCurto(r.date)}/${r.date.slice(0, 4)}* · ${r.start_time} às ${r.end_time}`);
-    linhas.push(`👤 ${r.client}${r.specialty ? ` (${r.specialty})` : ""}`);
+    // Sem nome do cliente nem endereço: a mensagem é um resumo enxuto.
+    if (r.specialty) linhas.push(`🩺 ${r.specialty}`);
     if (r.phone) linhas.push(`📞 ${r.phone}`);
-    if (r.address) linhas.push(`🏥 ${r.address}${r.city && !r.address.includes(r.city.split("/")[0]) ? ` — ${r.city}` : ""}`);
-    else if (r.city) linhas.push(`📍 ${r.city}`);
+    if (r.city) linhas.push(`📍 ${r.city}`);
     const equip = r.equip_id ? equipmentNames.get(r.equip_id) : null;
     if (equip) linhas.push(`🔬 ${equip}`);
     if (r.tips_used) linhas.push(`🔧 Ponteiras: ${r.tips_used}`);
@@ -399,12 +399,11 @@ export function resumoLocacoesFuturas(
     if (r.freddo) linhas.push("❄️ Com resfriador Freddo");
     if (valores) {
       const partes: string[] = [];
-      if (r.price != null) partes.push(`aluguel ${fmtBRL(r.price)}`);
       if (r.freight_price != null) partes.push(`frete ${fmtBRL(r.freight_price)}`);
       if (r.technique_price != null) partes.push(`técnica ${fmtBRL(r.technique_price)}`);
       if (r.freddo && r.freddo_price != null) partes.push(`Freddo ${fmtBRL(r.freddo_price)}`);
+      // O valor do aluguel fica de fora de propósito.
       const soma =
-        (r.price ?? 0) +
         (r.freight_price ?? 0) +
         (r.technique_price ?? 0) +
         (r.freddo ? r.freddo_price ?? 0 : 0);
@@ -416,6 +415,6 @@ export function resumoLocacoesFuturas(
   }
 
   linhas.push("", `*Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}*`);
-  if (valores) linhas.push(`*Total previsto (com frete e opcionais): ${fmtBRL(somaGeral)}*`);
+  if (valores) linhas.push(`*Total de frete e opcionais: ${fmtBRL(somaGeral)}*`);
   return { texto: linhas.join("\n"), total: lista.length };
 }
