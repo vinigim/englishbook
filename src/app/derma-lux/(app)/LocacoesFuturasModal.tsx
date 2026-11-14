@@ -81,7 +81,7 @@ export function LocacoesFuturasModal({
             onChange={(e) => setValores(e.target.checked)}
             className="w-4 h-4 accent-[#1c3d31]"
           />
-          Incluir valores (frete, técnica e Freddo)
+          Incluir valor da técnica especializada
         </label>
 
         {/* text-base no celular: abaixo de 16px o Safari dá zoom no foco. */}
