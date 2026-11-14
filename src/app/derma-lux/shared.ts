@@ -364,7 +364,8 @@ function simNao(v: boolean | null): string | null {
  * Texto enxuto com todas as locações de `hoje` em diante: data, horário,
  * especialidade, telefone, cidade, equipamento, opcionais e observações.
  * Nome do cliente, endereço e valor do aluguel ficam de fora a pedido do
- * dono. Com `valores`, inclui frete, técnica e Freddo de cada uma.
+ * dono, assim como frete e Freddo (o Freddo aparece, sem valor). Com
+ * `valores`, inclui só o valor da técnica especializada.
  */
 export function resumoLocacoesFuturas(
   rentals: Rental[],
@@ -397,24 +398,16 @@ export function resumoLocacoesFuturas(
     const tec = simNao(r.specialized_technique);
     if (tec) linhas.push(`🎓 Técnica especializada: ${tec}`);
     if (r.freddo) linhas.push("❄️ Com resfriador Freddo");
-    if (valores) {
-      const partes: string[] = [];
-      if (r.freight_price != null) partes.push(`frete ${fmtBRL(r.freight_price)}`);
-      if (r.technique_price != null) partes.push(`técnica ${fmtBRL(r.technique_price)}`);
-      if (r.freddo && r.freddo_price != null) partes.push(`Freddo ${fmtBRL(r.freddo_price)}`);
-      // O valor do aluguel fica de fora de propósito.
-      const soma =
-        (r.freight_price ?? 0) +
-        (r.technique_price ?? 0) +
-        (r.freddo ? r.freddo_price ?? 0 : 0);
-      somaGeral += soma;
-      if (partes.length > 1) linhas.push(`💰 ${partes.join(" + ")} = *${fmtBRL(soma)}*`);
-      else if (partes.length === 1) linhas.push(`💰 ${partes[0]}`);
+    // Aluguel, frete e Freddo ficam de fora a pedido do dono; só a técnica
+    // especializada mostra valor, quando `valores` está ligado.
+    if (valores && r.technique_price != null) {
+      linhas.push(`💰 Técnica: ${fmtBRL(r.technique_price)}`);
+      somaGeral += r.technique_price;
     }
     if (r.notes?.trim()) linhas.push(`📝 ${r.notes.trim()}`);
   }
 
   linhas.push("", `*Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}*`);
-  if (valores) linhas.push(`*Total de frete e opcionais: ${fmtBRL(somaGeral)}*`);
+  if (valores && somaGeral > 0) linhas.push(`*Total de técnica especializada: ${fmtBRL(somaGeral)}*`);
   return { texto: linhas.join("\n"), total: lista.length };
 }
