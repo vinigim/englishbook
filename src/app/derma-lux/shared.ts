@@ -362,16 +362,13 @@ function simNao(v: boolean | null): string | null {
 
 /**
  * Texto enxuto com todas as locações de `hoje` em diante: data, horário,
- * especialidade, telefone, cidade, equipamento, opcionais e observações.
- * Nome do cliente, endereço e valor do aluguel ficam de fora a pedido do
- * dono, assim como frete e Freddo (o Freddo aparece, sem valor). Com
- * `valores`, inclui só o valor da técnica especializada.
+ * especialidade, cidade, equipamento, opcionais e observações. A pedido do
+ * dono, não leva nome do cliente, telefone, endereço nem nenhum valor.
  */
 export function resumoLocacoesFuturas(
   rentals: Rental[],
   equipmentNames: Map<string, string>,
-  hoje: string,
-  { valores = true }: { valores?: boolean } = {}
+  hoje: string
 ): { texto: string; total: number } {
   const lista = rentals
     .filter((r) => r.date >= hoje)
@@ -383,12 +380,10 @@ export function resumoLocacoesFuturas(
     return { texto: linhas.join("\n"), total: 0 };
   }
 
-  let somaGeral = 0;
   for (const r of lista) {
     linhas.push("", `📅 *${diaCurto(r.date)}/${r.date.slice(0, 4)}* · ${r.start_time} às ${r.end_time}`);
-    // Sem nome do cliente nem endereço: a mensagem é um resumo enxuto.
+    // Sem nome do cliente, telefone nem endereço: a mensagem é um resumo enxuto.
     if (r.specialty) linhas.push(`🩺 ${r.specialty}`);
-    if (r.phone) linhas.push(`📞 ${r.phone}`);
     if (r.city) linhas.push(`📍 ${r.city}`);
     const equip = r.equip_id ? equipmentNames.get(r.equip_id) : null;
     if (equip) linhas.push(`🔬 ${equip}`);
@@ -398,16 +393,9 @@ export function resumoLocacoesFuturas(
     const tec = simNao(r.specialized_technique);
     if (tec) linhas.push(`🎓 Técnica especializada: ${tec}`);
     if (r.freddo) linhas.push("❄️ Com resfriador Freddo");
-    // Aluguel, frete e Freddo ficam de fora a pedido do dono; só a técnica
-    // especializada mostra valor, quando `valores` está ligado.
-    if (valores && r.technique_price != null) {
-      linhas.push(`💰 Técnica: ${fmtBRL(r.technique_price)}`);
-      somaGeral += r.technique_price;
-    }
     if (r.notes?.trim()) linhas.push(`📝 ${r.notes.trim()}`);
   }
 
   linhas.push("", `*Total: ${lista.length} ${lista.length === 1 ? "locação" : "locações"}*`);
-  if (valores && somaGeral > 0) linhas.push(`*Total de técnica especializada: ${fmtBRL(somaGeral)}*`);
   return { texto: linhas.join("\n"), total: lista.length };
 }
