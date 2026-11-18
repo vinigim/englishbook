@@ -243,7 +243,6 @@ async function rodarEtapa(
   tools: Anthropic.ToolUnion[],
   pedido: string,
   excluir: string[],
-  aoResponder?: (resposta: Anthropic.Message) => void,
 ): Promise<Etapa> {
   const client = getAnthropic();
   const mensagens: Anthropic.MessageParam[] = [{ role: "user", content: pedido }];
@@ -267,7 +266,6 @@ async function rodarEtapa(
       messages: mensagens,
     });
 
-    aoResponder?.(resposta);
     conteudo.push(...resposta.content);
     const lido = resposta.usage.cache_read_input_tokens ?? 0;
     const gravado = resposta.usage.cache_creation_input_tokens ?? 0;
@@ -358,26 +356,11 @@ const LOCAL_BR = {
  * dono busca um lead de cada vez e paga mais por um julgamento melhor dos
  * candidatos. Quem escolhe é a rota.
  */
-export type OpcoesBusca = {
-  /**
-   * "basicas": web_search_20250305 / web_fetch_20250910, as que todo modelo
-   * aceita. "filtragem": as _20260209, com filtragem dinâmica (só Sonnet 5.5,
-   * Opus e Fable) — o resultado é filtrado antes de entrar no modelo.
-   */
-  ferramentas?: "basicas" | "filtragem";
-  /** Para testes: recebe cada resposta crua da API. */
-  aoResponder?: (resposta: Anthropic.Message) => void;
-};
-
 export async function buscarInstagram(
   dados: DadosParaBusca,
   modelo: string = INSTAGRAM_LOTE_MODEL,
-  opcoes: OpcoesBusca = {},
 ): Promise<ResultadoBusca> {
   const excluir = dados.excluir ?? [];
-  const novas = opcoes.ferramentas === "filtragem";
-  const tipoBusca = novas ? "web_search_20260209" : "web_search_20250305";
-  const tipoPagina = novas ? "web_fetch_20260209" : "web_fetch_20250910";
   const pedido = descreverLead(dados, montarPalpites(dados));
 
   const instagram = await rodarEtapa(
@@ -385,7 +368,7 @@ export async function buscarInstagram(
     SISTEMA,
     [
       {
-        type: tipoBusca,
+        type: "web_search_20250305",
         name: "web_search",
         max_uses: MAX_PESQUISAS,
         // Só o instagram.com: na web inteira, o perfil some atrás de site
@@ -398,7 +381,6 @@ export async function buscarInstagram(
     ],
     pedido,
     excluir,
-    opcoes.aoResponder,
   );
 
   // Segunda etapa: só quando a primeira não achou nada. Falha aqui (modelo
@@ -412,13 +394,13 @@ export async function buscarInstagram(
         SISTEMA_SITE,
         [
           {
-            type: tipoBusca,
+            type: "web_search_20250305",
             name: "web_search",
             max_uses: MAX_PESQUISAS_SITE,
             user_location: LOCAL_BR,
           },
           {
-            type: tipoPagina,
+            type: "web_fetch_20250910",
             name: "web_fetch",
             max_uses: MAX_PAGINAS_SITE,
             max_content_tokens: MAX_TOKENS_PAGINA,
@@ -426,7 +408,6 @@ export async function buscarInstagram(
         ],
         pedido,
         excluir,
-        opcoes.aoResponder,
       );
     } catch (err) {
       console.error(
