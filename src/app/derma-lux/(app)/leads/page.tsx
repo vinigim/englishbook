@@ -7,6 +7,7 @@ import {
   getLeadsInbox,
   INBOX_LIMIT,
 } from "../../leads-data";
+import { pareceRespostaAutomatica } from "@/lib/leads/resposta-automatica";
 import { colunaExtraDoInstagram, truncate } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
 import { InboxActions } from "./InboxActions";
@@ -39,6 +40,10 @@ function paraALista(rows: LeadInboxRow[]): LeadInboxRow[] {
     const extraIg = colunaExtraDoInstagram(row.lead.extra);
     return {
       ...row,
+      // Antes do corte da prévia: menu e aviso de horário costumam vir no fim.
+      respostaAutomatica:
+        row.lastMessage?.direction === "in" &&
+        pareceRespostaAutomatica(row.lastMessage.body),
       lead: { ...row.lead, extra: extraIg ? { [extraIg[0]]: extraIg[1] } : {} },
       analysis: row.analysis
         ? {

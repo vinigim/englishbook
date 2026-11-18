@@ -447,6 +447,21 @@ mudar o estado: **frio confirmado** sai de "Devo responder" e **descartado** sai
 de "Nunca abordado". Por isso a soma dos três chips pode ficar abaixo do total.
 A ficha do lead continua mostrando o estado real.
 
+**"Resposta automática"** é o recorte de "Devo responder" (frio confirmado
+fora) em que a última mensagem dele parece robô da clínica: saudação e ausência
+do WhatsApp Business (que começam com um U+200E invisível), "seja bem-vindo",
+horário de atendimento, menu "1 - … 2 - …", encerramento por falta de
+interação. Regra de texto, sem IA, em `src/lib/leads/resposta-automatica.ts`,
+calculada no servidor com o texto inteiro antes de a prévia ser cortada. O
+"agradecemos o contato" solto não conta, porque é como se recusa à mão. É para
+conferir, não uma certeza; o card troca "responder ele" por "resposta
+automática", e "Devo responder" continua igual.
+
+**"Nunca respondeu"**: saiu mensagem nossa (WhatsApp ou Instagram) e nunca
+chegou nada dele (`last_inbound_at` nulo), sem situação marcada pelo dono e sem
+locação. Resposta pelo direct não sincroniza: quem respondeu só lá fica aqui
+até ser marcado "Em conversa".
+
 **Terceira linha: canais**, calculada (o dono não marca nada) e combinável com
 as outras duas por interseção. São dois grupos independentes, e clicar de novo
 no chip ligado o desliga:
