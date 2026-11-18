@@ -49,6 +49,8 @@ type Filtro =
   | "nunca_abordado_com_whatsapp"
   | "nunca_abordado_sem_whatsapp"
   | "aguardando_ele"
+  | "resposta_automatica"
+  | "nunca_respondeu"
   | "sem_whatsapp";
 
 // Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
@@ -67,10 +69,12 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "frio", label: "Frios" },
   { id: "frio_confirmado", label: "Frio confirmado" },
   { id: "aguardando_resposta", label: "Devo responder" },
+  { id: "resposta_automatica", label: "Resposta automática" },
   { id: "nunca_abordado", label: "Nunca abordado" },
   { id: "nunca_abordado_com_whatsapp", label: "Nunca abordado com WhatsApp" },
   { id: "nunca_abordado_sem_whatsapp", label: "Nunca abordado sem WhatsApp" },
   { id: "aguardando_ele", label: "Aguardando ele" },
+  { id: "nunca_respondeu", label: "Nunca respondeu" },
   { id: "sem_analise", label: "Sem análise" },
   { id: "sem_whatsapp", label: "Sem WhatsApp" },
 ];
@@ -274,6 +278,39 @@ function semWhatsApp(row: LeadInboxRow): boolean {
   return temWhatsApp(row.lead) === false;
 }
 
+/**
+ * "Resposta automática": a bola está conosco, mas quem falou por último foi o
+ * robô da clínica (saudação do WhatsApp Business, ausência, menu), não uma
+ * pessoa. Regra de texto, sem IA (`src/lib/leads/resposta-automatica.ts`):
+ * é um recorte para conferir, não uma certeza. Subconjunto de "Devo
+ * responder" (frio confirmado fora, como lá), que continua igual.
+ */
+function respostaAutomatica(row: LeadInboxRow): boolean {
+  return (
+    row.respostaAutomatica === true &&
+    estadoContato(row.lead).estado === "devo_responder" &&
+    !foraDoDevoResponder(row)
+  );
+}
+
+/**
+ * "Nunca respondeu": mandamos (WhatsApp ou Instagram) e nunca chegou nada
+ * dele, nem resposta automática. Fica de fora quem o dono marcou com alguma
+ * situação (em conversa, cliente, inativo, descartado) e quem já alugou: são
+ * sinais de que houve conversa por outro caminho, ou de que ele já foi posto
+ * de lado. Resposta pelo direct não sincroniza, então quem respondeu só lá
+ * aparece aqui até o dono marcar "Em conversa".
+ */
+function nuncaRespondeu(row: LeadInboxRow): boolean {
+  const { lead } = row;
+  return (
+    estadoContato(lead).canal !== null &&
+    lead.last_inbound_at == null &&
+    (lead.status == null || lead.status === "novo") &&
+    !row.rentals?.ultima
+  );
+}
+
 /** Desde quando ele espera resposta, para ordenar a fila. */
 function desdeMs(row: LeadInboxRow): number {
   const desde = estadoContato(row.lead).desde;
@@ -399,6 +436,8 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         return false;
       }
       if (filtro === "sem_whatsapp" && !semWhatsApp(row)) return false;
+      if (filtro === "resposta_automatica" && !respostaAutomatica(row)) return false;
+      if (filtro === "nunca_respondeu" && !nuncaRespondeu(row)) return false;
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
       // que vale — senão o lead sumiria do chip que ele mesmo escolheu.
       if (
@@ -472,6 +511,8 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       nunca_abordado_com_whatsapp: 0,
       nunca_abordado_sem_whatsapp: 0,
       aguardando_ele: 0,
+      resposta_automatica: 0,
+      nunca_respondeu: 0,
       sem_whatsapp: 0,
     };
     for (const row of rows) {
@@ -492,6 +533,8 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (nuncaAbordadoComWhatsApp(row)) c.nunca_abordado_com_whatsapp += 1;
       if (nuncaAbordadoSemWhatsApp(row)) c.nunca_abordado_sem_whatsapp += 1;
       if (semWhatsApp(row)) c.sem_whatsapp += 1;
+      if (respostaAutomatica(row)) c.resposta_automatica += 1;
+      if (nuncaRespondeu(row)) c.nunca_respondeu += 1;
     }
     return c;
   }, [rows]);
@@ -722,7 +765,7 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
           */}
           {contato.estado === "devo_responder" ? (
             <Badge variant="warning" className="whitespace-nowrap">
-              responder ele
+              {row.respostaAutomatica ? "resposta automática" : "responder ele"}
             </Badge>
           ) : contato.estado === "aguardando_ele" && contato.canal ? (
             <Badge variant="success" className="whitespace-nowrap">

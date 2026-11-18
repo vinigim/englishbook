@@ -136,6 +136,12 @@ export type LeadInboxRow = {
   /** Agregado da agenda. Nulo quando o lead nunca alugou. */
   rentals: LeadRentals | null;
   priority: number;
+  /**
+   * A última mensagem é dele e parece robô da clínica (saudação, ausência,
+   * menu). Calculado no servidor com o texto inteiro, antes de a lista cortar
+   * a prévia — ver `pareceRespostaAutomatica()`.
+   */
+  respostaAutomatica?: boolean;
 };
 
 /** Uma locação já registrada na agenda, ligada a este lead. */
