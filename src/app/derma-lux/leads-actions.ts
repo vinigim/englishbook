@@ -15,6 +15,7 @@ import {
   LEAD_STATUSES,
   type RecommendedAction,
 } from "@/lib/leads/taxonomy";
+import { TIPOS_RESPOSTA } from "./leads-types";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -307,6 +308,45 @@ export async function marcarInstagramNaoEncontrado(
       ok: false,
       error: /instagram_nao_encontrado_em/.test(error.message)
         ? "Falta rodar a migração 0026_instagram_nao_encontrado.sql no Supabase."
+        : error.message,
+    };
+  }
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
+/**
+ * Marca à mão o tipo de resposta do lead (0029), por cima da regra dos chips
+ * "Resposta automática" e "Nunca respondeu". `null` volta a seguir a regra.
+ * Não mexe em `needs_analysis`: a IA não lê esta marca.
+ */
+const tipoRespostaSchema = z.enum(TIPOS_RESPOSTA).nullable();
+
+export async function marcarTipoResposta(
+  id: string,
+  valor: string | null,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const parsed = tipoRespostaSchema.safeParse(valor);
+  if (!parsed.success) return { ok: false, error: "Tipo de resposta inválido." };
+
+  const { error } = await supabase
+    .from("wa_leads")
+    .update({ resposta_manual: parsed.data })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      ok: false,
+      error: /resposta_manual/.test(error.message)
+        ? "Falta rodar a migração 0029_resposta_manual.sql no Supabase."
         : error.message,
     };
   }

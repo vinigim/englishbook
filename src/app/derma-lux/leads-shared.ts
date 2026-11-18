@@ -9,6 +9,7 @@ import type {
   LeadAnalysis,
   LeadRentals,
   MessageType,
+  TipoResposta,
   WaMessage,
 } from "./leads-types";
 
@@ -163,6 +164,54 @@ export function estadoContato(
   }
 
   return { estado: "nunca_abordado", desde: null, canal: null };
+}
+
+export const TIPO_RESPOSTA_LABEL: Record<TipoResposta, string> = {
+  automatica: "Resposta automática",
+  humana: "Resposta humana",
+  nunca_respondeu: "Nunca respondeu",
+};
+
+/**
+ * O tipo de resposta que os chips "Resposta automática" e "Nunca respondeu"
+ * usam. A marcação do dono (`resposta_manual`, 0029) prevalece; sem ela, vale
+ * a regra:
+ *
+ *  - "automatica": a bola está conosco e a última mensagem dele parece robô
+ *    da clínica (`pareceRespostaAutomatica`, regra de texto sem IA). Quem
+ *    chama passa esse booleano porque a lista e a ficha têm o texto em
+ *    lugares diferentes.
+ *  - "nunca_respondeu": saiu mensagem nossa (WhatsApp ou Instagram), nunca
+ *    chegou nada dele, e não há situação marcada nem locação — sinais de que
+ *    houve conversa por outro caminho ou de que ele já foi posto de lado.
+ *  - `null`: nenhuma das duas. A regra nunca devolve "humana"; só o dono.
+ */
+export function respostaEfetiva(
+  lead: Pick<
+    Lead,
+    | "resposta_manual"
+    | "last_inbound_at"
+    | "last_outbound_at"
+    | "instagram_sent_at"
+    | "status"
+  >,
+  ultimaPareceAutomatica: boolean,
+  temLocacao: boolean,
+): TipoResposta | null {
+  if (lead.resposta_manual) return lead.resposta_manual;
+  const contato = estadoContato(lead);
+  if (contato.estado === "devo_responder" && ultimaPareceAutomatica) {
+    return "automatica";
+  }
+  if (
+    contato.canal !== null &&
+    lead.last_inbound_at == null &&
+    (lead.status == null || lead.status === "novo") &&
+    !temLocacao
+  ) {
+    return "nunca_respondeu";
+  }
+  return null;
 }
 
 const STAGE_WEIGHT: Record<FunnelStage, number> = {

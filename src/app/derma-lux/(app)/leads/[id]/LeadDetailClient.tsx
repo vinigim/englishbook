@@ -46,12 +46,15 @@ import {
   instagramDoLead,
   leadDisplayName,
   relativeDays,
+  respostaEfetiva,
   situacaoEfetiva,
+  TIPO_RESPOSTA_LABEL,
   temWhatsApp,
   temperaturaEfetiva,
 } from "../../../leads-shared";
 import {
   marcarInstagramEnviado,
+  marcarTipoResposta,
   registerDraftCopied,
   reanalyzeLead,
   updateLeadNotes,
@@ -59,7 +62,13 @@ import {
   updateLeadTemperature,
   verificarWhatsApp,
 } from "../../../leads-actions";
-import type { LeadDetail, WaMessage } from "../../../leads-types";
+import {
+  TIPOS_RESPOSTA,
+  type LeadDetail,
+  type TipoResposta,
+  type WaMessage,
+} from "../../../leads-types";
+import { pareceRespostaAutomatica } from "@/lib/leads/resposta-automatica";
 import { BuscarInstagram } from "./BuscarInstagram";
 import { InstagramNaoEncontrado } from "./InstagramNaoEncontrado";
 import { urlDoRadar } from "../filtros-radar";
@@ -135,6 +144,15 @@ export function LeadDetailClient({
   // primeira é a última que aconteceu — é só disso que a derivação precisa.
   const agenda = rentals.length > 0 ? { ultima: rentals[0].date } : null;
   const situacao = situacaoEfetiva(lead, agenda);
+  // A mesma regra dos chips do radar, sobre a última mensagem da conversa
+  // (as mensagens vêm em ordem cronológica).
+  const ultimaMensagem = messages.length > 0 ? messages[messages.length - 1] : null;
+  const tipoResposta = respostaEfetiva(
+    lead,
+    ultimaMensagem?.direction === "in" &&
+      pareceRespostaAutomatica(ultimaMensagem.body),
+    rentals.length > 0,
+  );
   // A saudação é ajustada à hora de agora: o rascunho pode ter sido escrito de
   // tarde e ser enviado de manhã.
   const [rascunho, setRascunho] = useState(() =>
@@ -227,6 +245,28 @@ export function LeadDetailClient({
           valor === null
             ? "Voltou a seguir a agenda."
             : `Marcado como ${LEAD_STATUS_LABEL[valor]}.`,
+      };
+    });
+  }
+
+  function marcarResposta(valor: TipoResposta | null) {
+    executar("analise", async () => {
+      const r = await marcarTipoResposta(lead.id, valor);
+      if (!r.ok) {
+        return {
+          onde: "analise",
+          tipo: "erro",
+          texto: r.error ?? "Não consegui salvar o tipo de resposta.",
+        };
+      }
+      router.refresh();
+      return {
+        onde: "analise",
+        tipo: "info",
+        texto:
+          valor === null
+            ? "Voltou a seguir a regra automática."
+            : `Marcado como ${TIPO_RESPOSTA_LABEL[valor]}.`,
       };
     });
   }
@@ -784,6 +824,57 @@ export function LeadDetailClient({
                   Voltar a seguir a agenda
                 </button>
               ) : null}
+            </div>
+
+            {/* ------------------------------- tipo de resposta à mão */}
+            <div className="mb-4 pb-4 border-b border-line">
+              <p className="text-xs uppercase tracking-wide text-muted mb-2">
+                Resposta do lead
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {TIPOS_RESPOSTA.map((v) => {
+                  const ativo = tipoResposta === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={pendente}
+                      onClick={() =>
+                        marcarResposta(lead.resposta_manual === v ? null : v)
+                      }
+                      className={cn(
+                        "px-2.5 py-1 text-xs border transition-colors disabled:opacity-50",
+                        ativo
+                          ? "bg-ink text-paper border-ink"
+                          : "bg-paper text-ink border-line hover:border-ink",
+                      )}
+                    >
+                      {lead.resposta_manual === v ? "✓ " : ""}
+                      {TIPO_RESPOSTA_LABEL[v]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {lead.resposta_manual ? (
+                <button
+                  type="button"
+                  disabled={pendente}
+                  onClick={() => marcarResposta(null)}
+                  className="text-xs text-muted underline mt-2 disabled:opacity-50"
+                >
+                  Voltar a seguir a regra automática
+                </button>
+              ) : (
+                <p className="text-xs text-muted mt-2">
+                  {tipoResposta
+                    ? "Detectado pela regra automática. Toque para corrigir à mão."
+                    : "A regra não marcou nada. Toque para marcar à mão."}{" "}
+                  Vale para os filtros &ldquo;Resposta automática&rdquo; e
+                  &ldquo;Nunca respondeu&rdquo; do radar.
+                </p>
+              )}
             </div>
 
             {/* ------------------------------------ temperatura à mão */}
