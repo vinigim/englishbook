@@ -433,6 +433,11 @@ não entra, porque muita clínica tem WhatsApp Business no fixo: rode antes o
 botão de verificação em lote da caixa. É um subconjunto de "Nunca abordado" e
 não entra na soma dos três chips de contato.
 
+**"Nunca abordado com WhatsApp"** é o espelho: a fila do primeiro contato pelo
+WhatsApp, com os leads de "Nunca abordado" (descartado fora) cuja conta foi
+**confirmada** (`temWhatsApp() === true`). Não verificado fica fora dos dois
+chips até o botão de verificação em lote passar por ele.
+
 **"Sem WhatsApp"** é o recorte para análise: todo lead com WhatsApp confirmado
 como inexistente, fixo ou celular, em qualquer estado e com descartado
 incluído. Combina com a linha de situação (ex.: "Sem WhatsApp" + "Descartado").
