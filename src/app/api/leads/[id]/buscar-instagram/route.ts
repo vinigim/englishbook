@@ -15,7 +15,7 @@ import type { Lead } from "@/app/derma-lux/leads-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * "Buscar Instagram com IA", na ficha do lead.
@@ -44,6 +44,13 @@ const bodySchema = z.object({
    * julgamento melhor ali.
    */
   lote: z.boolean().optional(),
+  /**
+   * Teste A/B (página /derma-lux/leads/teste-busca): escolhe as ferramentas e
+   * não marca "Instagram não encontrado" — é medição, não decisão do dono. O
+   * gasto é gravado com o modelo marcado ("+teste-<ferramentas>").
+   */
+  teste: z.boolean().optional(),
+  ferramentas: z.enum(["basicas", "filtragem"]).optional(),
 });
 
 export async function POST(
@@ -156,7 +163,10 @@ export async function POST(
       extras,
       crms,
       excluir,
-    }, parsed.data.lote ? INSTAGRAM_LOTE_MODEL : DRAFT_MODEL);
+    }, parsed.data.lote ? INSTAGRAM_LOTE_MODEL : DRAFT_MODEL, {
+      // A filtragem dinâmica não existe no Haiku: no lote, sempre as básicas.
+      ferramentas: parsed.data.lote ? "basicas" : parsed.data.ferramentas,
+    });
     console.log(
       `[buscar-instagram] lead ${id} (${resultado.modelo}): ${resultado.candidatos.length} candidato(s), ${resultado.pesquisas} pesquisa(s), US$ ${resultado.custoUsd}`,
     );
@@ -165,7 +175,9 @@ export async function POST(
     // foi paga, e sem a migração 0027 a tabela simplesmente não existe.
     const { error: erroGasto } = await supabase.from("wa_instagram_buscas").insert({
       lead_id: id,
-      modelo: resultado.modelo,
+      modelo: parsed.data.teste
+        ? `${resultado.modelo}+teste-${parsed.data.ferramentas ?? "basicas"}`
+        : resultado.modelo,
       origem: parsed.data.lote ? "lote" : "ficha",
       pesquisas: resultado.pesquisas,
       candidatos: resultado.candidatos.length,
@@ -183,7 +195,7 @@ export async function POST(
     // Falha aqui não derruba a resposta: os candidatos (nenhum) já são o
     // resultado, e sem a migração 0026 a coluna simplesmente não existe.
     let naoEncontrado = false;
-    if (resultado.candidatos.length === 0 && !instagramDoLead(lead)) {
+    if (resultado.candidatos.length === 0 && !instagramDoLead(lead) && !parsed.data.teste) {
       const { error: erroMarca } = await supabase
         .from("wa_leads")
         .update({ instagram_nao_encontrado_em: new Date().toISOString() })
