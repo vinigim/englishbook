@@ -22,6 +22,10 @@ export type MessageType =
   | "contact"
   | "other";
 
+/** Ver `respostaEfetiva()` em leads-shared.ts e a migração 0029. */
+export const TIPOS_RESPOSTA = ["automatica", "humana", "nunca_respondeu"] as const;
+export type TipoResposta = (typeof TIPOS_RESPOSTA)[number];
+
 export type Lead = {
   id: string;
   phone_key: string;
@@ -42,6 +46,12 @@ export type Lead = {
    * Opcional para não quebrar antes da migração rodar.
    */
   instagram_nao_encontrado_em?: string | null;
+  /**
+   * Tipo de resposta marcado pelo dono (0029), por cima da regra dos chips
+   * "Resposta automática" e "Nunca respondeu". Nulo = segue a regra.
+   * Opcional para não quebrar antes da migração rodar.
+   */
+  resposta_manual?: TipoResposta | null;
   /**
    * Quando o dono marcou que mandou mensagem pelo direct (0016).
    *

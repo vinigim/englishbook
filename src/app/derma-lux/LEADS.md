@@ -462,6 +462,14 @@ chegou nada dele (`last_inbound_at` nulo), sem situação marcada pelo dono e se
 locação. Resposta pelo direct não sincroniza: quem respondeu só lá fica aqui
 até ser marcado "Em conversa".
 
+**Marcar à mão.** A ficha do lead tem o bloco "Resposta do lead" com
+"Resposta automática", "Resposta humana" e "Nunca respondeu". A marcação
+(`wa_leads.resposta_manual`, migração `0029`) vale por cima da regra nos dois
+chips: "Resposta humana" tira o lead dos dois. Tocar de novo, ou em "Voltar a
+seguir a regra automática", limpa a marcação. A lógica dos dois chips mora em
+`respostaEfetiva()` (`leads-shared.ts`), a mesma na lista e na ficha. A IA não
+lê esta marca.
+
 **Terceira linha: canais**, calculada (o dono não marca nada) e combinável com
 as outras duas por interseção. São dois grupos independentes, e clicar de novo
 no chip ligado o desliga:

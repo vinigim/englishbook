@@ -21,6 +21,7 @@ import {
   leadDisplayName,
   messagePreview,
   relativeDays,
+  respostaEfetiva,
   situacaoEfetiva,
   temWhatsApp,
   temperaturaEfetiva,
@@ -279,36 +280,25 @@ function semWhatsApp(row: LeadInboxRow): boolean {
 }
 
 /**
- * "Resposta automática": a bola está conosco, mas quem falou por último foi o
- * robô da clínica (saudação do WhatsApp Business, ausência, menu), não uma
- * pessoa. Regra de texto, sem IA (`src/lib/leads/resposta-automatica.ts`):
- * é um recorte para conferir, não uma certeza. Subconjunto de "Devo
- * responder" (frio confirmado fora, como lá), que continua igual.
+ * Os chips "Resposta automática" e "Nunca respondeu" seguem
+ * `respostaEfetiva()`: a marcação do dono na ficha (0029) e, sem ela, a regra.
+ * A regra de texto roda no servidor com a mensagem inteira
+ * (`row.respostaAutomatica`); "Devo responder" continua igual.
  */
-function respostaAutomatica(row: LeadInboxRow): boolean {
-  return (
-    row.respostaAutomatica === true &&
-    estadoContato(row.lead).estado === "devo_responder" &&
-    !foraDoDevoResponder(row)
+function tipoResposta(row: LeadInboxRow) {
+  return respostaEfetiva(
+    row.lead,
+    row.respostaAutomatica === true,
+    Boolean(row.rentals?.ultima),
   );
 }
 
-/**
- * "Nunca respondeu": mandamos (WhatsApp ou Instagram) e nunca chegou nada
- * dele, nem resposta automática. Fica de fora quem o dono marcou com alguma
- * situação (em conversa, cliente, inativo, descartado) e quem já alugou: são
- * sinais de que houve conversa por outro caminho, ou de que ele já foi posto
- * de lado. Resposta pelo direct não sincroniza, então quem respondeu só lá
- * aparece aqui até o dono marcar "Em conversa".
- */
+function respostaAutomatica(row: LeadInboxRow): boolean {
+  return tipoResposta(row) === "automatica";
+}
+
 function nuncaRespondeu(row: LeadInboxRow): boolean {
-  const { lead } = row;
-  return (
-    estadoContato(lead).canal !== null &&
-    lead.last_inbound_at == null &&
-    (lead.status == null || lead.status === "novo") &&
-    !row.rentals?.ultima
-  );
+  return tipoResposta(row) === "nunca_respondeu";
 }
 
 /** Desde quando ele espera resposta, para ordenar a fila. */
@@ -765,7 +755,7 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
           */}
           {contato.estado === "devo_responder" ? (
             <Badge variant="warning" className="whitespace-nowrap">
-              {row.respostaAutomatica ? "resposta automática" : "responder ele"}
+              {respostaAutomatica(row) ? "resposta automática" : "responder ele"}
             </Badge>
           ) : contato.estado === "aguardando_ele" && contato.canal ? (
             <Badge variant="success" className="whitespace-nowrap">
