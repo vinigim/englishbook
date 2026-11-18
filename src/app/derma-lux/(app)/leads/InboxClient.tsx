@@ -46,6 +46,7 @@ type Filtro =
   | "sem_analise"
   | "aguardando_resposta"
   | "nunca_abordado"
+  | "nunca_abordado_com_whatsapp"
   | "nunca_abordado_sem_whatsapp"
   | "aguardando_ele"
   | "sem_whatsapp";
@@ -67,6 +68,7 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "frio_confirmado", label: "Frio confirmado" },
   { id: "aguardando_resposta", label: "Devo responder" },
   { id: "nunca_abordado", label: "Nunca abordado" },
+  { id: "nunca_abordado_com_whatsapp", label: "Nunca abordado com WhatsApp" },
   { id: "nunca_abordado_sem_whatsapp", label: "Nunca abordado sem WhatsApp" },
   { id: "aguardando_ele", label: "Aguardando ele" },
   { id: "sem_analise", label: "Sem análise" },
@@ -245,6 +247,22 @@ function nuncaAbordadoSemWhatsApp(row: LeadInboxRow): boolean {
 }
 
 /**
+ * "Nunca abordado com WhatsApp": a fila do primeiro contato pelo WhatsApp.
+ *
+ * O espelho do chip acima: mesmo recorte de "Nunca abordado" (descartado fora),
+ * só que para quem o WhatsApp CONFIRMOU ter conta. Não verificado fica de fora
+ * dos dois — o botão de verificação em lote da caixa (fixo e celular) o põe em
+ * um deles. Também não entra na conta dos três chips de contato.
+ */
+function nuncaAbordadoComWhatsApp(row: LeadInboxRow): boolean {
+  return (
+    estadoContato(row.lead).estado === "nunca_abordado" &&
+    !foraDoNuncaAbordado(row) &&
+    temWhatsApp(row.lead) === true
+  );
+}
+
+/**
  * "Sem WhatsApp": todo lead que o WhatsApp confirmou não ter conta, fixo ou
  * celular, em qualquer estado e situação — descartado incluído.
  *
@@ -374,6 +392,9 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "nunca_abordado" && foraDoNuncaAbordado(row)) {
         return false;
       }
+      if (filtro === "nunca_abordado_com_whatsapp" && !nuncaAbordadoComWhatsApp(row)) {
+        return false;
+      }
       if (filtro === "nunca_abordado_sem_whatsapp" && !nuncaAbordadoSemWhatsApp(row)) {
         return false;
       }
@@ -448,6 +469,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       sem_analise: 0,
       aguardando_resposta: 0,
       nunca_abordado: 0,
+      nunca_abordado_com_whatsapp: 0,
       nunca_abordado_sem_whatsapp: 0,
       aguardando_ele: 0,
       sem_whatsapp: 0,
@@ -467,6 +489,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         if (!foraDoNuncaAbordado(row)) c.nunca_abordado += 1;
       }
       else c.aguardando_ele += 1;
+      if (nuncaAbordadoComWhatsApp(row)) c.nunca_abordado_com_whatsapp += 1;
       if (nuncaAbordadoSemWhatsApp(row)) c.nunca_abordado_sem_whatsapp += 1;
       if (semWhatsApp(row)) c.sem_whatsapp += 1;
     }
