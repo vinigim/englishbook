@@ -93,7 +93,9 @@ export const DIAS_ESPERA_REATIVACAO = 30;
  *  - Locação na agenda, a última há mais de DIAS_SEM_ALUGAR_REATIVACAO dias
  *    (locação futura marcada tira da fila). É o fato da agenda, não o rótulo:
  *    rótulo "inativo" sem nenhuma locação não entra.
- *  - Rótulo "cliente" ou "descartado" do dono tira da fila, como em toda a tela.
+ *  - Só o rótulo "descartado" do dono tira da fila. "Cliente" NÃO tira: o dono
+ *    marca assim quem já alugou, que é exatamente quem a fila procura — com
+ *    ele saindo, todo cliente marcado à mão ficava fora para sempre.
  *  - Sem mensagem nossa (WhatsApp ou Instagram) nos últimos
  *    DIAS_ESPERA_REATIVACAO dias. Mensagem dele não tira da fila: um
  *    ex-cliente que escreveu e esperou continua sendo alguém a reativar.
@@ -106,7 +108,7 @@ export function paraReativar(
   agora: Date = new Date(),
 ): boolean {
   if (!rentals?.ultima) return false;
-  if (lead.status === "cliente" || lead.status === "descartado") return false;
+  if (lead.status === "descartado") return false;
 
   const dia = 86_400_000;
   const ultima = new Date(rentals.ultima).getTime();

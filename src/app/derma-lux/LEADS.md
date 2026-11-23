@@ -566,8 +566,10 @@ dias sem locação, sem nenhuma futura marcada, e não recebeu
 mensagem nossa, por WhatsApp ou Instagram, nos últimos
 `DIAS_ESPERA_REATIVACAO` (30) dias. São 30 dias, e não os 3 meses de
 `MESES_CLIENTE_ATIVO`, por escolha do dono: a reabordagem começa antes de o
-cliente virar "inativo", então a fila inclui clientes ainda ativos. Rótulo "cliente" ou "descartado" do dono
-tira da fila, e frio confirmado também. Regra em `paraReativar()`
+cliente virar "inativo", então a fila inclui clientes ainda ativos. Só o
+rótulo "descartado" do dono tira da fila, e frio confirmado também. O rótulo
+"cliente" não tira: o dono marca assim quem já alugou, que é quem a fila
+procura. Regra em `paraReativar()`
 (`leads-shared.ts`).
 
 A ordem é por valor: quem mais somou na agenda (R$, depois número de
