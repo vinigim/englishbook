@@ -728,6 +728,9 @@ O teste de RLS que mais importa: entre com uma conta que **não** esteja em
 - ~~Conciliar automaticamente `rentals.wa_lead_id`~~ — feito na 0014: a
   conciliação virou a função `conciliar_rentals()`, chamada ao fim de cada
   backfill.
+- ~~Locação cadastrada depois do último backfill ficava sem lead~~ — feito
+  na 0030: um gatilho liga a locação ao lead ao criar ou trocar o telefone, e
+  outro liga as locações soltas quando o lead é criado depois.
 
 ## Desempenho da caixa de entrada
 
