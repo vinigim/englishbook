@@ -12,7 +12,7 @@ import { toInstagramHandle } from "@/lib/leads/instagram";
 import { toLeadPhone } from "@/lib/leads/phone";
 import { trocarTelefone } from "@/lib/leads/troca-telefone";
 import { gerarFilaDoDia } from "@/lib/leads/fila-servidor";
-import { hojeSP } from "./fila-do-dia";
+import { fimDeSemanaSP, hojeSP } from "./fila-do-dia";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import {
   EFFECTIVE_TEMPERATURES,
@@ -756,6 +756,7 @@ export async function montarFilaDoDiaAgora(): Promise<ActionResult> {
     .eq("user_id", user?.id ?? "")
     .maybeSingle();
   if (!staff) return { ok: false, error: "Sem permissão." };
+  if (fimDeSemanaSP()) return { ok: false, error: "Fim de semana não tem fila." };
 
   const { data: existe, error: erroLer } = await supabase
     .from("fila_do_dia")

@@ -1,5 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/fila-do-dia", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/fila-do-dia", "schedule": "0 9 * * 1-5" }
   ]
 }

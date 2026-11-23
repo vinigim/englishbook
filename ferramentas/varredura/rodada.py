@@ -34,7 +34,7 @@ import comum as c  # noqa: E402
 
 BASE_URL = "https://lux-derma.vercel.app/api/varredura/base"
 POR_RODADA = 8
-INICIO_RODIZIO = datetime.date(2026, 12, 1)  # 1ª rodada agendada (dias 1 e 15 de cada mês)
+INICIO_RODIZIO = datetime.date(2026, 12, 1)  # 1ª quinzena do rodízio
 RAIO_KM = 200
 DSPEC = {"dermatologista": "Dermatologista", "oftalmologista": "Oftalmologista", "cirurgiao-plastico": "Cirurgião Plástico"}
 CSPEC = {"dermatologistas": "Dermatologista", "oftalmologistas": "Oftalmologista", "cirurgioes-plastica": "Cirurgião Plástico"}
@@ -157,9 +157,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cidades", help="lista separada por vírgula; padrão: as da vez em cidades.txt")
     ap.add_argument("--base-json", help="base já baixada (JSON da rota /api/varredura/base)")
+    ap.add_argument("--agendada", action="store_true",
+                    help="só roda na 1ª segunda-feira de cada quinzena (dias 1–7 ou 15–21); nos outros dias sai sem fazer nada")
     args = ap.parse_args()
 
     hoje = datetime.date.today()
+    # O agendamento dispara toda segunda (só dias úteis, por escolha do dono);
+    # a rodada é uma por quinzena, na primeira segunda dela.
+    if args.agendada and not (hoje.weekday() == 0 and (1 <= hoje.day <= 7 or 15 <= hoje.day <= 21)):
+        print("SEM RODADA HOJE: a varredura roda na primeira segunda-feira de cada quinzena.")
+        return
     cidades = [x.strip() for x in args.cidades.split(",")] if args.cidades else cidades_da_vez(hoje)
     print("Cidades:", ", ".join(cidades), flush=True)
 

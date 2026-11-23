@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { gerarFilaDoDia } from "@/lib/leads/fila-servidor";
-import { resumoTexto } from "@/app/derma-lux/fila-do-dia";
+import { fimDeSemanaSP, resumoTexto } from "@/app/derma-lux/fila-do-dia";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Cron das 6h (São Paulo) — `vercel.json`, "0 9 * * *" em UTC. No plano Hobby
+ * Cron das 6h (São Paulo) — `vercel.json`, "0 9 * * 1-5" em UTC: só dias
+ * úteis, por escolha do dono. No plano Hobby
  * a Vercel dispara em algum momento dentro dessa hora, não no minuto exato.
  *
  * A Vercel manda `Authorization: Bearer <CRON_SECRET>` quando a variável
@@ -24,6 +25,11 @@ export async function GET(request: NextRequest) {
   const segredo = process.env.CRON_SECRET;
   if (!segredo || request.headers.get("authorization") !== `Bearer ${segredo}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // O agendamento já é só de segunda a sexta; isto cobre uma chamada manual.
+  if (fimDeSemanaSP()) {
+    return NextResponse.json({ ok: true, pulado: "fim_de_semana" });
   }
 
   const adminResult = tryCreateAdminClient();

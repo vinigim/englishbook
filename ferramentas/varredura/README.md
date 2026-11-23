@@ -2,8 +2,11 @@
 
 Procura dermatologistas, oftalmologistas e cirurgiões plásticos em
 catalogo.med.br e doctoralia.com.br, cruza com o Radar e gera a planilha que a
-tela **Importar planilha** do Radar lê. Roda nos dias 1 e 15 de cada mês, numa
-sessão agendada do Claude Code; também dá para rodar à mão.
+tela **Importar planilha** do Radar lê. Roda na **primeira segunda-feira de cada
+quinzena** (a do dia 1 ao 7 e a do dia 15 ao 21), numa sessão agendada do
+Claude Code que dispara toda segunda: com `--agendada`, nas outras segundas o
+script sai sem fazer nada. Só dias úteis, por escolha do dono. Também dá para
+rodar à mão.
 
 ## Rodar
 
@@ -54,7 +57,9 @@ bloqueio passa em algumas horas.
 
 ## Para a sessão agendada
 
-1. `pip install openpyxl` se faltar; rode `python3 ferramentas/varredura/rodada.py`.
+1. `pip install openpyxl` se faltar; rode
+   `python3 ferramentas/varredura/rodada.py --agendada`. Se ele disser
+   "SEM RODADA HOJE", encerre sem relatório e sem enviar nada.
 2. Se a base der 401, pare e avise que falta a credencial de
    `lux-derma.vercel.app` (o token `VARREDURA_TOKEN` da Vercel).
 3. Envie ao dono, com SendUserFile, a planilha e o .vcf da pasta `saida`.

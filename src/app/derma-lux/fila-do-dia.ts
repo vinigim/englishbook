@@ -79,6 +79,12 @@ export type LinhaFila = {
   rentals: LeadRentals | null;
 };
 
+/** Sábado ou domingo em São Paulo: sem fila (o dono trabalha leads só em dias úteis). */
+export function fimDeSemanaSP(agora: Date = new Date()): boolean {
+  const dia = agora.toLocaleDateString("en-US", { timeZone: "America/Sao_Paulo", weekday: "short" });
+  return dia === "Sat" || dia === "Sun";
+}
+
 /** Data de hoje em São Paulo, aaaa-mm-dd. */
 export function hojeSP(agora: Date = new Date()): string {
   return agora.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });

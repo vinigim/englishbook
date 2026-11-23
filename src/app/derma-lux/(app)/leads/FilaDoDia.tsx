@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import {
+  fimDeSemanaSP,
   itemFeito,
   SECAO_DICA,
   SECAO_LABEL,
@@ -46,6 +47,18 @@ export function FilaDoDia({
       return { secao, itens, feitos: itens.filter((i) => i.feito).length };
     }).filter((s) => s.itens.length > 0);
   }, [fila, porId]);
+
+  if (!fila && fimDeSemanaSP()) {
+    return (
+      <div className="mb-6 border border-line bg-paper p-4">
+        <p className="font-display text-lg text-ink tracking-tight">Fila do dia</p>
+        <p className="text-sm text-muted mt-1">
+          Fim de semana: sem fila. A de segunda é montada às 6h e já inclui o que
+          chegar até lá.
+        </p>
+      </div>
+    );
+  }
 
   if (!fila) {
     return (

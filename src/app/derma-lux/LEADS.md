@@ -582,7 +582,7 @@ Todo card de quem já alugou mostra `alugou N× · última há X` (ou
 ## Fila do dia
 
 Bloco no topo do Radar com o trabalho de hoje, na ordem combinada com o dono.
-Montado às **6h** (São Paulo) por um cron da Vercel e guardado em
+Montado às **6h** (São Paulo), **de segunda a sexta**, por um cron da Vercel e guardado em
 `fila_do_dia` (`0032`), para a lista ficar parada o dia inteiro e mostrar o
 progresso ("12 de 70 feitos"). Regras puras em `src/app/derma-lux/fila-do-dia.ts`.
 
@@ -600,7 +600,7 @@ entra numa seção só. "Feito" é fato, como em "De quem é a bola": mensagem n
 (WhatsApp sincronizado ou "Já enviei pelo Instagram") depois da montagem, o
 lead tirado do jogo, ou — em "Responder" — a bola ter deixado de ser nossa.
 
-**O cron** (`/api/cron/fila-do-dia`, `vercel.json` `0 9 * * *` UTC) também
+**O cron** (`/api/cron/fila-do-dia`, `vercel.json` `0 9 * * 1-5` UTC) também
 analisa os leads da fila que estão pendentes, até ~35 s, para os rascunhos
 estarem prontos. Mesma regra do botão "Analisar pendentes" (triagem sempre,
 redação só para quente/morno), então o custo é o de sempre e fica gravado em
@@ -611,6 +611,9 @@ redação só para quente/morno), então o custo é o de sempre e fica gravado e
   montada. A Vercel manda o segredo sozinha no cabeçalho do cron.
 - `FILA_AVISO_WHATSAPP` (opcional): um número; o resumo das 6h vai por
   WhatsApp pelo provedor. Uma mensagem por dia para um número seu.
+
+Sábado e domingo não têm fila, por escolha do dono: o bloco só diz isso. A
+fila de segunda já pega o que chegou no fim de semana.
 
 Sem a fila de hoje (cron não rodou), o bloco mostra **"Montar agora"**, que só
 monta se ainda não existir — remontar no meio do dia zeraria o progresso.
