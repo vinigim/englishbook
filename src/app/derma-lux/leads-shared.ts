@@ -71,6 +71,45 @@ export function situacaoEfetiva(
 }
 
 /**
+ * Quantos dias depois da nossa última mensagem um ex-cliente volta para a fila
+ * "Reativar ex-cliente". Menos que isso, a bola está com ele: já foi
+ * procurado e ainda está no prazo de responder.
+ */
+export const DIAS_ESPERA_REATIVACAO = 30;
+
+/**
+ * "Reativar ex-cliente": quem já alugou, parou, e não recebeu nada nosso faz
+ * tempo. É a fila de recompra — quem já alugou converte muito mais que lead frio.
+ *
+ *  - Situação EFETIVA "inativo" com locação na agenda: o fato (alugou e faz
+ *    mais de MESES_CLIENTE_ATIVO), não só o rótulo. Rótulo "inativo" sem
+ *    nenhuma locação não entra; rótulo "cliente" ou "descartado" do dono vence
+ *    a agenda, como em toda a tela.
+ *  - Sem mensagem nossa (WhatsApp ou Instagram) nos últimos
+ *    DIAS_ESPERA_REATIVACAO dias. Mensagem dele não tira da fila: um
+ *    ex-cliente que escreveu e esperou continua sendo alguém a reativar.
+ *
+ * Frio confirmado fica de fora por quem chama, que tem a análise.
+ */
+export function paraReativar(
+  lead: Pick<
+    Lead,
+    "status" | "last_message_at" | "instagram_sent_at" | "last_outbound_at"
+  >,
+  rentals: Pick<LeadRentals, "ultima"> | null,
+  agora: Date = new Date(),
+): boolean {
+  if (!rentals?.ultima) return false;
+  if (situacaoEfetiva(lead, rentals) !== "inativo") return false;
+
+  const corte = agora.getTime() - DIAS_ESPERA_REATIVACAO * 86_400_000;
+  return [lead.last_outbound_at, lead.instagram_sent_at].every((iso) => {
+    const t = iso ? new Date(iso).getTime() : NaN;
+    return Number.isNaN(t) || t < corte;
+  });
+}
+
+/**
  * A temperatura que a tela usa.
  *
  * A marcação do dono prevalece; sem ela, vale a leitura da IA. Devolve `null`

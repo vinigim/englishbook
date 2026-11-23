@@ -519,6 +519,23 @@ original, usado como chave de `Record` em vários pontos. O rótulo na tela viro
 **"Devo responder"** porque "Esperando resposta" dizia o contrário do que o
 filtro faz.
 
+### Reativar ex-cliente
+
+Chip **"Reativar ex-cliente"**, na linha de cima: a fila de recompra. Entra
+quem já alugou (agenda), está com situação efetiva "inativo" (última locação
+há mais de `MESES_CLIENTE_ATIVO`, ou o dono marcou inativo) e não recebeu
+mensagem nossa, por WhatsApp ou Instagram, nos últimos
+`DIAS_ESPERA_REATIVACAO` (30) dias. Rótulo "cliente" ou "descartado" do dono
+tira da fila, e frio confirmado também. Regra em `paraReativar()`
+(`leads-shared.ts`).
+
+A ordem é por valor: quem mais somou na agenda (R$, depois número de
+locações) primeiro; empate, quem está parado há mais tempo. O rascunho é o
+de sempre — a IA já escolhe `reativacao_inativo` para quem foi cliente.
+
+Todo card de quem já alugou mostra `alugou N× · última há X` (ou
+`tem locação marcada`), da view `wa_lead_rentals`.
+
 ## Janelas da rota
 
 `/derma-lux/leads/janelas` (link "Janelas da rota" no topo do Radar). O laser
