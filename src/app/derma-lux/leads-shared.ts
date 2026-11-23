@@ -71,6 +71,56 @@ export function situacaoEfetiva(
 }
 
 /**
+ * Quantos dias sem alugar antes de um cliente entrar em "Reativar ex-cliente".
+ *
+ * Escolhido pelo dono, e de propósito mais curto que MESES_CLIENTE_ATIVO: a
+ * situação "cliente ativo" continua valendo por 3 meses, mas a reabordagem
+ * começa depois de um mês sem locação.
+ */
+export const DIAS_SEM_ALUGAR_REATIVACAO = 30;
+
+/**
+ * Quantos dias depois da nossa última mensagem um ex-cliente volta para a fila
+ * "Reativar ex-cliente". Menos que isso, a bola está com ele: já foi
+ * procurado e ainda está no prazo de responder.
+ */
+export const DIAS_ESPERA_REATIVACAO = 30;
+
+/**
+ * "Reativar ex-cliente": quem já alugou, parou, e não recebeu nada nosso faz
+ * tempo. É a fila de recompra — quem já alugou converte muito mais que lead frio.
+ *
+ *  - Locação na agenda, a última há mais de DIAS_SEM_ALUGAR_REATIVACAO dias
+ *    (locação futura marcada tira da fila). É o fato da agenda, não o rótulo:
+ *    rótulo "inativo" sem nenhuma locação não entra.
+ *  - Rótulo "cliente" ou "descartado" do dono tira da fila, como em toda a tela.
+ *  - Sem mensagem nossa (WhatsApp ou Instagram) nos últimos
+ *    DIAS_ESPERA_REATIVACAO dias. Mensagem dele não tira da fila: um
+ *    ex-cliente que escreveu e esperou continua sendo alguém a reativar.
+ *
+ * Frio confirmado fica de fora por quem chama, que tem a análise.
+ */
+export function paraReativar(
+  lead: Pick<Lead, "status" | "instagram_sent_at" | "last_outbound_at">,
+  rentals: Pick<LeadRentals, "ultima"> | null,
+  agora: Date = new Date(),
+): boolean {
+  if (!rentals?.ultima) return false;
+  if (lead.status === "cliente" || lead.status === "descartado") return false;
+
+  const dia = 86_400_000;
+  const ultima = new Date(rentals.ultima).getTime();
+  if (Number.isNaN(ultima)) return false;
+  if (ultima > agora.getTime() - DIAS_SEM_ALUGAR_REATIVACAO * dia) return false;
+
+  const corte = agora.getTime() - DIAS_ESPERA_REATIVACAO * dia;
+  return [lead.last_outbound_at, lead.instagram_sent_at].every((iso) => {
+    const t = iso ? new Date(iso).getTime() : NaN;
+    return Number.isNaN(t) || t < corte;
+  });
+}
+
+/**
  * A temperatura que a tela usa.
  *
  * A marcação do dono prevalece; sem ela, vale a leitura da IA. Devolve `null`

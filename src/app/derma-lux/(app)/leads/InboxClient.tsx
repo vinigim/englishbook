@@ -16,10 +16,12 @@ import {
   type LeadStatus,
 } from "@/lib/leads/taxonomy";
 import {
+  daysSince,
   estadoContato,
   instagramDoLead,
   leadDisplayName,
   messagePreview,
+  paraReativar,
   relativeDays,
   respostaEfetiva,
   situacaoEfetiva,
@@ -52,6 +54,7 @@ type Filtro =
   | "aguardando_ele"
   | "resposta_automatica"
   | "nunca_respondeu"
+  | "reativar"
   | "sem_whatsapp";
 
 // Os confirmados ficam ao lado da temperatura correspondente, não no fim: a
@@ -71,6 +74,7 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: "frio_confirmado", label: "Frio confirmado" },
   { id: "aguardando_resposta", label: "Devo responder" },
   { id: "resposta_automatica", label: "Resposta automática" },
+  { id: "reativar", label: "Reativar ex-cliente" },
   { id: "nunca_abordado", label: "Nunca abordado" },
   { id: "nunca_abordado_com_whatsapp", label: "Nunca abordado com WhatsApp" },
   { id: "nunca_abordado_sem_whatsapp", label: "Nunca abordado sem WhatsApp" },
@@ -301,6 +305,29 @@ function nuncaRespondeu(row: LeadInboxRow): boolean {
   return tipoResposta(row) === "nunca_respondeu";
 }
 
+/**
+ * "Reativar ex-cliente": a regra está em `paraReativar()`. Frio confirmado sai
+ * pelo mesmo motivo de "Devo responder": o dono já decidiu não investir.
+ */
+function reativar(row: LeadInboxRow): boolean {
+  return (
+    paraReativar(row.lead, row.rentals) &&
+    temperaturaEfetiva(row.lead, row.analysis) !== "frio_confirmado"
+  );
+}
+
+/**
+ * Ordem da fila de reativação: quem mais deixou na agenda primeiro (total em
+ * R$, depois número de locações); empate, quem está parado há mais tempo.
+ */
+function ordemReativar(a: LeadInboxRow, b: LeadInboxRow): number {
+  const valor = (b.rentals?.total_brl ?? 0) - (a.rentals?.total_brl ?? 0);
+  if (valor !== 0) return valor;
+  const vezes = (b.rentals?.total ?? 0) - (a.rentals?.total ?? 0);
+  if (vezes !== 0) return vezes;
+  return (a.rentals?.ultima ?? "").localeCompare(b.rentals?.ultima ?? "");
+}
+
 /** Desde quando ele espera resposta, para ordenar a fila. */
 function desdeMs(row: LeadInboxRow): number {
   const desde = estadoContato(row.lead).desde;
@@ -428,6 +455,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (filtro === "sem_whatsapp" && !semWhatsApp(row)) return false;
       if (filtro === "resposta_automatica" && !respostaAutomatica(row)) return false;
       if (filtro === "nunca_respondeu" && !nuncaRespondeu(row)) return false;
+      if (filtro === "reativar" && !reativar(row)) return false;
       // O filtro de temperatura usa a EFETIVA: se o dono marcou à mão, é essa
       // que vale — senão o lead sumiria do chip que ele mesmo escolheu.
       if (
@@ -467,6 +495,10 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
         .sort((a, b) => desdeMs(a) - desdeMs(b));
     }
 
+    // "Reativar ex-cliente" também é fila, mas por valor: o melhor cliente
+    // parado vale mais que a conversa mais antiga.
+    if (filtro === "reativar") return filtrados.slice().sort(ordemReativar);
+
     // Com algum chip ligado, as conversas mais antigas vêm primeiro — filtrar
     // é ir atrás de quem ficou para trás. Sem filtro ("Todos" e "Todas"), as
     // mais novas primeiro, para ver o que acabou de chegar. A busca não conta
@@ -503,6 +535,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       aguardando_ele: 0,
       resposta_automatica: 0,
       nunca_respondeu: 0,
+      reativar: 0,
       sem_whatsapp: 0,
     };
     for (const row of rows) {
@@ -525,6 +558,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
       if (semWhatsApp(row)) c.sem_whatsapp += 1;
       if (respostaAutomatica(row)) c.resposta_automatica += 1;
       if (nuncaRespondeu(row)) c.nunca_respondeu += 1;
+      if (reativar(row)) c.reativar += 1;
     }
     return c;
   }, [rows]);
@@ -689,7 +723,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 }
 
 function LeadRow({ row }: { row: LeadInboxRow }) {
-  const { lead, analysis, lastMessage } = row;
+  const { lead, analysis, lastMessage, rentals } = row;
   const temperatura = temperaturaEfetiva(lead, analysis);
   const contato = estadoContato(lead);
 
@@ -769,6 +803,16 @@ function LeadRow({ row }: { row: LeadInboxRow }) {
           {temWhatsApp(lead) === false ? (
             <Badge variant="neutral" className="whitespace-nowrap">
               sem WhatsApp
+            </Badge>
+          ) : null}
+          {/* Histórico da agenda no card: é o que diz se um ex-cliente vale a
+              ligação, sem abrir a ficha. */}
+          {rentals?.ultima ? (
+            <Badge variant="neutral" className="whitespace-nowrap">
+              alugou {rentals.total}×
+              {(daysSince(rentals.ultima) ?? 0) < 0
+                ? " · tem locação marcada"
+                : ` · última ${relativeDays(rentals.ultima)}`}
             </Badge>
           ) : null}
           {/* Mesmo selo da ficha: o @ salvo depois vence a marca. */}
