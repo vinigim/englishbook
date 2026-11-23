@@ -65,6 +65,16 @@ export type Lead = {
    */
   whatsapp_existe?: boolean | null;
   whatsapp_verificado_em?: string | null;
+  /**
+   * Chaves de telefone que o lead já usou (0031). "Trocar telefone" e a
+   * coluna "Telefone anterior" da planilha põem o número velho aqui.
+   * Opcionais para não quebrar antes da migração rodar.
+   */
+  telefones_anteriores?: string[] | null;
+  /** Onde o médico foi achado: catálogo, Doctoralia, site (0031). */
+  perfil_url?: string | null;
+  crm?: string | null;
+  rqe?: string | null;
   lead_kind: LeadKind;
   source: LeadSource;
   /** Marcado pelo dono. Prevalece sobre a derivação da agenda. Nulo = derivar. */

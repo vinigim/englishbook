@@ -9,6 +9,8 @@ import { analyzeLead } from "@/lib/ai/lead-analysis";
 import { loadAnalysisInput, loadEquipment } from "@/lib/ai/load-input";
 import { isDraftModel } from "@/lib/ai/models";
 import { toInstagramHandle } from "@/lib/leads/instagram";
+import { toLeadPhone } from "@/lib/leads/phone";
+import { trocarTelefone } from "@/lib/leads/troca-telefone";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import {
   EFFECTIVE_TEMPERATURES,
@@ -481,6 +483,67 @@ export async function updateLeadDetails(
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
+
+  revalidateLead(id);
+  return { ok: true };
+}
+
+/**
+ * "Trocar telefone" na ficha: o mesmo lead passa a usar outro número, e o
+ * velho fica em `telefones_anteriores` (0031). Ver `trocarTelefone()`.
+ *
+ * Número que já é de outro lead é recusado com o nome e o id dele, para a
+ * tela oferecer o link — juntar dois leads é decisão do dono.
+ */
+export type TrocaTelefoneResult = ActionResult & {
+  outro?: { id: string; nome: string };
+};
+
+export async function trocarTelefoneLead(
+  id: string,
+  numero: string,
+): Promise<TrocaTelefoneResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const novo = toLeadPhone(z.string().trim().max(40).catch("").parse(numero));
+  if (!novo) {
+    return { ok: false, error: "Número inválido. Use DDD + número, ex: (18) 99999-8888." };
+  }
+
+  const { data: lead, error: erroLead } = await supabase
+    .from("wa_leads")
+    .select("id, phone_key, telefones_anteriores")
+    .eq("id", id)
+    .maybeSingle();
+  if (erroLead) {
+    return {
+      ok: false,
+      error: /telefones_anteriores/.test(erroLead.message)
+        ? "Falta rodar a migração 0031 no Supabase."
+        : erroLead.message,
+    };
+  }
+  if (!lead) return { ok: false, error: "Lead não encontrado." };
+
+  const r = await trocarTelefone(supabase, lead, novo);
+  if (!r.ok) {
+    if (r.motivo === "mesmo_numero") {
+      return { ok: false, error: "Esse já é o número do lead." };
+    }
+    if (r.motivo === "numero_de_outro_lead") {
+      return {
+        ok: false,
+        error: `Esse número já é de outro lead: ${r.outro.nome}.`,
+        outro: r.outro,
+      };
+    }
+    return { ok: false, error: r.mensagem };
+  }
 
   revalidateLead(id);
   return { ok: true };
