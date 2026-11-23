@@ -30,6 +30,8 @@ import {
 } from "../../leads-shared";
 import type { LeadInboxRow } from "../../leads-types";
 import { BuscaInstagramLote } from "./BuscaInstagramLote";
+import { FilaDoDia } from "./FilaDoDia";
+import type { FilaDoDia as FilaDoDiaTipo } from "../../fila-do-dia";
 import { guardarFiltrosDoRadar, marcarLeadAbertoDoRadar } from "./filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
@@ -343,7 +345,13 @@ function ultimaMensagemMs(row: LeadInboxRow): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
+export function InboxClient({
+  rows,
+  fila,
+}: {
+  rows: LeadInboxRow[];
+  fila: FilaDoDiaTipo | null;
+}) {
   // Os filtros moram na URL. Antes moravam só no estado do componente, e abrir
   // um lead e voltar zerava tudo — o dono refazia a mesma filtragem a cada
   // lead que conferia. Na URL, o "Voltar" do navegador já traz de volta, e o
@@ -622,6 +630,7 @@ export function InboxClient({ rows }: { rows: LeadInboxRow[] }) {
 
   return (
     <div>
+      <FilaDoDia fila={fila} rows={rows} />
       <div ref={barra} className="mb-4 space-y-2">
         {/*
           No celular os chips rolam na horizontal em vez de quebrar em três

@@ -579,6 +579,42 @@ de sempre — a IA já escolhe `reativacao_inativo` para quem foi cliente.
 Todo card de quem já alugou mostra `alugou N× · última há X` (ou
 `tem locação marcada`), da view `wa_lead_rentals`.
 
+## Fila do dia
+
+Bloco no topo do Radar com o trabalho de hoje, na ordem combinada com o dono.
+Montado às **6h** (São Paulo) por um cron da Vercel e guardado em
+`fila_do_dia` (`0032`), para a lista ficar parada o dia inteiro e mostrar o
+progresso ("12 de 70 feitos"). Regras puras em `src/app/derma-lux/fila-do-dia.ts`.
+
+| Seção | Quem entra |
+|---|---|
+| Responder | "Devo responder", o mais recente primeiro |
+| Quentes | Quente ou quente confirmado, fora de "Responder" |
+| Retomar contato | A última palavra foi nossa há 4+ dias. Etapa pela cadência da IA: 2ª mensagem (4 dias), 3ª (10), despedida (20) |
+| Primeiro contato pelo WhatsApp | Nunca abordado com WhatsApp confirmado, os 15 de maior prioridade |
+| Primeiro contato pelo Instagram | Nunca abordado sem WhatsApp, com @ e sem direct enviado, até 10 |
+| Reativar ex-cliente | A regra de `paraReativar()` |
+
+Ficam fora de tudo: descartado, frio confirmado, arquivado e grupo. Cada lead
+entra numa seção só. "Feito" é fato, como em "De quem é a bola": mensagem nossa
+(WhatsApp sincronizado ou "Já enviei pelo Instagram") depois da montagem, o
+lead tirado do jogo, ou — em "Responder" — a bola ter deixado de ser nossa.
+
+**O cron** (`/api/cron/fila-do-dia`, `vercel.json` `0 9 * * *` UTC) também
+analisa os leads da fila que estão pendentes, até ~35 s, para os rascunhos
+estarem prontos. Mesma regra do botão "Analisar pendentes" (triagem sempre,
+redação só para quente/morno), então o custo é o de sempre e fica gravado em
+`fila_do_dia.custo_usd`.
+
+**Configuração na Vercel:**
+- `CRON_SECRET` (obrigatória): sem ela a rota responde 401 e a fila não é
+  montada. A Vercel manda o segredo sozinha no cabeçalho do cron.
+- `FILA_AVISO_WHATSAPP` (opcional): um número; o resumo das 6h vai por
+  WhatsApp pelo provedor. Uma mensagem por dia para um número seu.
+
+Sem a fila de hoje (cron não rodou), o bloco mostra **"Montar agora"**, que só
+monta se ainda não existir — remontar no meio do dia zeraria o progresso.
+
 ## Janelas da rota
 
 `/derma-lux/leads/janelas` (link "Janelas da rota" no topo do Radar). O laser
@@ -761,11 +797,9 @@ O teste de RLS que mais importa: entre com uma conta que **não** esteja em
 ## O que ficou para depois
 
 - Enviar pelo painel (`wa_outbound.channel = 'api'` + `provider.sendText`).
-- Follow-up automático: o campo `snoozed_until` e um cron já estão previstos,
-  mas **`vercel.json` não existe neste repo**, então hoje nenhum cron roda em
-  produção. O arquivo foi apagado quando os crons do EnglishBook bloqueavam o
-  deploy no plano Hobby; com aquele app removido, os 2 slots do Hobby estão
-  livres.
+- Follow-up automático: o campo `snoozed_until` existe, mas o envio continua
+  manual. O `vercel.json` voltou com o cron da Fila do dia; sobra um slot do
+  Hobby.
 - ~~Conciliar automaticamente `rentals.wa_lead_id`~~ — feito na 0014: a
   conciliação virou a função `conciliar_rentals()`, chamada ao fim de cada
   backfill.

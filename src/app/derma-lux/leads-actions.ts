@@ -11,6 +11,8 @@ import { isDraftModel } from "@/lib/ai/models";
 import { toInstagramHandle } from "@/lib/leads/instagram";
 import { toLeadPhone } from "@/lib/leads/phone";
 import { trocarTelefone } from "@/lib/leads/troca-telefone";
+import { gerarFilaDoDia } from "@/lib/leads/fila-servidor";
+import { hojeSP } from "./fila-do-dia";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import {
   EFFECTIVE_TEMPERATURES,
@@ -729,4 +731,55 @@ export async function verificarWhatsApp(
     console.error("[verificar-whatsapp]", err);
     return { ok: false, error: erroDeVerificacao(err) };
   }
+}
+
+// ============================================================================
+//  Fila do dia
+// ============================================================================
+
+/**
+ * "Montar agora": para quando o cron das 6h não rodou (deploy novo, segredo
+ * ausente) ou o dono abriu o Radar antes. Só monta se ainda não existe a fila
+ * de hoje — remontar no meio do dia zeraria o progresso.
+ */
+export async function montarFilaDoDiaAgora(): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+  // A service role ignora o RLS; quem não é da equipe não chega a ela.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: staff } = await supabase
+    .from("lux_staff")
+    .select("user_id")
+    .eq("user_id", user?.id ?? "")
+    .maybeSingle();
+  if (!staff) return { ok: false, error: "Sem permissão." };
+
+  const { data: existe, error: erroLer } = await supabase
+    .from("fila_do_dia")
+    .select("dia")
+    .eq("dia", hojeSP())
+    .maybeSingle();
+  if (erroLer) {
+    return {
+      ok: false,
+      error: /fila_do_dia/.test(erroLer.message)
+        ? "Falta rodar a migração 0032 no Supabase."
+        : erroLer.message,
+    };
+  }
+  if (existe) {
+    revalidatePath("/derma-lux/leads");
+    return { ok: true };
+  }
+
+  try {
+    await gerarFilaDoDia(createAdminClient(), "manual");
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Falha ao montar a fila." };
+  }
+  revalidatePath("/derma-lux/leads");
+  return { ok: true };
 }

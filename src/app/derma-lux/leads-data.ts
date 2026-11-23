@@ -1,5 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { priorityScore } from "./leads-shared";
+import { hojeSP, type FilaDoDia } from "./fila-do-dia";
 import type {
   Lead,
   LeadAnalysis,
@@ -351,10 +353,12 @@ export async function getAnalysisSpend(): Promise<{
  * e o resumo da agenda, para a planilha de exportação. Sem o teto da caixa de
  * entrada: pagina até acabar.
  */
-export async function getLeadsParaExportar(): Promise<
-  Pick<LeadInboxRow, "lead" | "analysis" | "rentals">[]
-> {
-  const supabase = await createClient();
+export async function getLeadsParaExportar(
+  // A Fila do dia (cron das 6h) roda sem sessão e passa a service role; a
+  // exportação usa o cliente do usuário, com o RLS dele.
+  db?: SupabaseClient,
+): Promise<Pick<LeadInboxRow, "lead" | "analysis" | "rentals">[]> {
+  const supabase = db ?? (await createClient());
 
   const leads: Lead[] = [];
   for (let de = 0; ; de += PAGINA) {
@@ -387,4 +391,19 @@ export async function getLeadsParaExportar(): Promise<
     analysis: analisePorLead.get(lead.id) ?? null,
     rentals: agendaPorLead.get(lead.id) ?? null,
   }));
+}
+
+/**
+ * A Fila do dia de hoje (0032), ou null se ainda não foi montada — ou se a
+ * migração não rodou: a tela mostra o botão de montar, nunca quebra.
+ */
+export async function getFilaDoDia(): Promise<FilaDoDia | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("fila_do_dia")
+    .select("dia, gerada_em, secoes, locacoes_7d")
+    .eq("dia", hojeSP())
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as FilaDoDia;
 }

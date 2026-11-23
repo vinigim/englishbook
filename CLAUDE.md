@@ -22,7 +22,7 @@ lasers to doctors and aesthetic clinics. It has two areas, both behind the same 
 | Path | What |
 |---|---|
 | `/derma-lux` | Rental agenda: equipment, rentals, availability, schedule blocks |
-| `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI |
+| `/derma-lux/leads` | Radar de Leads — WhatsApp conversations analyzed by AI. "Fila do dia" on top (`fila-do-dia.ts`, cron 6h, `fila_do_dia` table `0032`) |
 | `/derma-lux/parametros` | AI recommender for SmartXide Punto (CO2 laser) settings |
 | `/derma-lux/manuseio` | Field checklists (install / uninstall the laser). Static steps in `procedimentos.ts`, progress in `localStorage` only; a finished checklist is sent through the owner's WhatsApp (`whatsapp://send?text=`, no number), optionally tagged with a rental from yesterday–tomorrow |
 | `oculos-g2/` | Even G2 glasses app showing a rental's saved settings (own `package.json`) |
@@ -200,8 +200,8 @@ before `create policy`, realtime registration inside a
 
 ### Known gaps
 
-- **No `vercel.json`, so no cron runs in production.** It was deleted when the
-  EnglishBook crons blocked a Hobby-plan deploy. Creating it is a prerequisite for
-  automatic follow-up; Hobby allows 2 crons at daily granularity.
+- **One cron in `vercel.json`**: `/api/cron/fila-do-dia` at 09:00 UTC (6h in São
+  Paulo; Hobby fires anytime within that hour). It needs `CRON_SECRET` set in Vercel
+  or it answers 401. Hobby allows 2 crons at daily granularity, so one slot is left.
 - No password-reset page — recovery is triggered from the Supabase dashboard
 - No way to send a WhatsApp message from the panel (deliberate, see above)
