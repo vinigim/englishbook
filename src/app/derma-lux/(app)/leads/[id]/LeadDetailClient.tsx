@@ -71,6 +71,8 @@ import {
 import { pareceRespostaAutomatica } from "@/lib/leads/resposta-automatica";
 import { BuscarInstagram } from "./BuscarInstagram";
 import { InstagramNaoEncontrado } from "./InstagramNaoEncontrado";
+import { TrocarTelefone } from "./TrocarTelefone";
+import { linkDoPerfil, origemDoPerfil } from "@/lib/leads/troca-telefone";
 import { urlDoRadar } from "../filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
@@ -535,6 +537,9 @@ export function LeadDetailClient({
 
   // Mesma regra da rota de busca: só nome com letra (o display_name às vezes é
   // o próprio LID do WhatsApp).
+  // Vem de planilha: só vira link se for http(s), nunca `javascript:`.
+  const perfil = linkDoPerfil(lead.perfil_url);
+
   const nomesParaInstagram = [
     ...new Set(
       [lead.sheet_name, lead.display_name]
@@ -550,7 +555,31 @@ export function LeadDetailClient({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="text-sm text-ink space-y-0.5">
             <p className="font-medium">{formatPhoneBR(lead.phone_e164)}</p>
+            <TrocarTelefone
+              leadId={lead.id}
+              anteriores={lead.telefones_anteriores ?? []}
+            />
             {lead.clinic_name ? <p>{lead.clinic_name}</p> : null}
+            {/* De onde veio a prospecção (0031): o link leva ao perfil, que é
+                onde se confere o endereço e o telefone antes de abordar. */}
+            {perfil || lead.crm || lead.rqe ? (
+              <p className="text-muted">
+                {perfil ? (
+                  <a
+                    href={perfil}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {origemDoPerfil(perfil) ?? "Perfil"}
+                  </a>
+                ) : null}
+                {perfil && (lead.crm || lead.rqe) ? " · " : null}
+                {[lead.crm, lead.rqe ? `RQE ${lead.rqe}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
             {instagram ? (
               <p>
                 <a

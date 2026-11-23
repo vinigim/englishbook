@@ -15,6 +15,12 @@ export type ColumnRole =
   | "specialty"
   | "city"
   | "instagram"
+  /** Número que o lead usava antes; a linha troca o telefone dele (0031). */
+  | "previous_phone"
+  /** Link do perfil onde o médico foi achado (catálogo, Doctoralia, site). */
+  | "profile_url"
+  | "crm"
+  | "rqe"
   | "custom";
 
 /** Uma linha da planilha: cabeçalho -> valor, tudo como texto já aparado. */
@@ -41,5 +47,9 @@ export type ColumnMapping = Record<string, ColumnRole>;
 export type ImportReport = {
   criados: number;
   atualizados: number;
+  /** Leads que trocaram de telefone pela coluna "Telefone anterior". */
+  telefonesTrocados: number;
+  /** Trocas que não deu para fazer, com o motivo; a linha seguiu como lead novo/atualizado. */
+  avisos: { linha: number; motivo: string }[];
   invalidos: { linha: number; telefone: string; motivo: string }[];
 };

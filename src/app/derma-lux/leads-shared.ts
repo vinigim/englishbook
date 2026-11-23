@@ -408,6 +408,19 @@ export function formatPhoneBR(phoneE164: string): string {
   return phoneE164;
 }
 
+/**
+ * Mostra uma chave de telefone (`phone_key`, sem o 9º dígito do celular) como
+ * número discável: chave de celular brasileiro (12 dígitos, número começando
+ * por 6–9) ganha o 9 de volta. Para `telefones_anteriores`, que só guarda chave.
+ */
+export function formatPhoneKeyBR(phoneKey: string): string {
+  const d = String(phoneKey ?? "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("55") && /[6-9]/.test(d[4])) {
+    return formatPhoneBR(`${d.slice(0, 4)}9${d.slice(4)}`);
+  }
+  return formatPhoneBR(d);
+}
+
 const MEDIA_LABEL: Record<MessageType, string> = {
   text: "",
   image: "🖼️ imagem",

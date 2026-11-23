@@ -14,6 +14,15 @@ type Role = Exclude<ColumnRole, "custom">;
 // Aliases que casam por SUBSTRING — inequívocos o bastante para aparecer dentro
 // de cabeçalhos compostos (ex: "telefone comercial", "nome completo").
 const SUBSTRING_ALIASES: Record<Role, string[]> = {
+  previous_phone: [
+    "telefones anteriores",
+    "telefone anterior",
+    "telefone antigo",
+    "fone anterior",
+    "celular anterior",
+    "numero anterior",
+    "numero antigo",
+  ],
   phone: [
     "telefone",
     "celular",
@@ -39,12 +48,17 @@ const SUBSTRING_ALIASES: Record<Role, string[]> = {
   specialty: ["especialidade", "especialidades", "area de atuacao", "atuacao"],
   city: ["cidade", "municipio", "localidade"],
   instagram: ["instagram", "insta", "perfil do instagram"],
+  // Depois de instagram na ordem, então "Perfil do Instagram" não cai aqui.
+  profile_url: ["link do perfil", "url do perfil", "perfil"],
+  crm: ["crm"],
+  rqe: ["rqe"],
 };
 
 // Aliases ambíguos/curtos — só casam se o cabeçalho for EXATAMENTE isso.
 // Evita que "Status do Contato" ou "Data do Contato" virem "nome" só por
 // conterem a palavra "contato".
 const EXACT_ALIASES: Record<Role, string[]> = {
+  previous_phone: [],
   phone: ["numero", "num", "tel", "phone"],
   name: ["cliente", "contato", "responsavel", "lead", "medico", "doutor", "dra"],
   email: ["mail"],
@@ -52,6 +66,9 @@ const EXACT_ALIASES: Record<Role, string[]> = {
   specialty: ["area"],
   city: ["uf", "estado"],
   instagram: ["ig", "arroba", "rede social", "redes sociais"],
+  profile_url: ["link", "url"],
+  crm: [],
+  rqe: [],
 };
 
 // Ordem importa: papéis mais específicos primeiro, "name" por último, porque
@@ -60,9 +77,16 @@ const EXACT_ALIASES: Record<Role, string[]> = {
 // `phone` vem antes de `instagram` de propósito: num cabeçalho misto como
 // "WhatsApp / Instagram" o telefone tem que ganhar, porque é ele que
 // identifica o lead — sem telefone a linha inteira é descartada.
+//
+// `previous_phone` vem antes de tudo: "Telefone anterior" contém "telefone" e
+// viraria o telefone do lead, trocando o número novo pelo velho.
 const ROLE_ORDER: Role[] = [
+  "previous_phone",
   "phone",
   "instagram",
+  "profile_url",
+  "crm",
+  "rqe",
   "email",
   "specialty",
   "city",

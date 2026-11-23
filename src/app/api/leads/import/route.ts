@@ -6,6 +6,7 @@ import { parseSpreadsheet } from "@/lib/leads/spreadsheet";
 import { looksLikeCompanyName } from "@/lib/leads/columns";
 import { toInstagramHandle } from "@/lib/leads/instagram";
 import { toLeadPhone } from "@/lib/leads/phone";
+import { linkDoPerfil, trocarTelefone } from "@/lib/leads/troca-telefone";
 import type {
   ColumnMapping,
   ColumnRole,
@@ -98,6 +99,10 @@ const ROLES: [ColumnRole, ...ColumnRole[]] = [
   "specialty",
   "city",
   "instagram",
+  "previous_phone",
+  "profile_url",
+  "crm",
+  "rqe",
   "custom",
 ];
 
@@ -123,6 +128,10 @@ type ExistingLead = {
   // reenviados iguais. Ver o aviso sobre lote misto na montagem do payload.
   phone_e164: string;
   first_seen_at: string | null;
+  // Só lidos quando a planilha traz perfil, CRM ou RQE (0031).
+  perfil_url?: string | null;
+  crm?: string | null;
+  rqe?: string | null;
 };
 
 async function handleCommit(request: NextRequest) {
@@ -163,7 +172,13 @@ async function handleCommit(request: NextRequest) {
     );
   }
 
-  const report: ImportReport = { criados: 0, atualizados: 0, invalidos: [] };
+  const report: ImportReport = {
+    criados: 0,
+    atualizados: 0,
+    telefonesTrocados: 0,
+    avisos: [],
+    invalidos: [],
+  };
 
   // 1) Normaliza e valida todas as linhas antes de tocar no banco.
   type Candidate = {
@@ -175,6 +190,12 @@ async function handleCommit(request: NextRequest) {
     city: string | null;
     email: string | null;
     instagram: string | null;
+    /** Chave do número que o lead usava antes (coluna "Telefone anterior"). */
+    prevKey: string | null;
+    perfil: string | null;
+    crm: string | null;
+    rqe: string | null;
+    linha: number;
     extra: Record<string, string>;
   };
 
@@ -233,6 +254,27 @@ async function handleCommit(request: NextRequest) {
       }
     }
 
+    // "Telefone anterior": a linha é o MESMO lead com número novo. Número
+    // velho ilegível não impede a linha — só fica guardado como extra.
+    let prevKey: string | null = null;
+    for (const header of byRole.get("previous_phone") ?? []) {
+      const bruto = row[header]?.trim();
+      if (!bruto) continue;
+      const anterior = toLeadPhone(bruto);
+      if (anterior && !prevKey) prevKey = anterior.phoneKey;
+      else if (!anterior) extra[header] = bruto;
+    }
+
+    // Link do perfil só se for http(s); o resto (um "não achei") vai para extra.
+    let perfil: string | null = null;
+    for (const header of byRole.get("profile_url") ?? []) {
+      const bruto = row[header]?.trim();
+      if (!bruto) continue;
+      const link = linkDoPerfil(bruto);
+      if (link && !perfil) perfil = link;
+      else if (!link) extra[header] = bruto;
+    }
+
     const candidate: Candidate = {
       phoneKey: phone.phoneKey,
       phoneE164: phone.phoneE164,
@@ -242,6 +284,11 @@ async function handleCommit(request: NextRequest) {
       city: firstValue(row, byRole.get("city") ?? []),
       email: firstValue(row, byRole.get("email") ?? []),
       instagram,
+      prevKey: prevKey && prevKey !== phone.phoneKey ? prevKey : null,
+      perfil,
+      crm: firstValue(row, byRole.get("crm") ?? []),
+      rqe: firstValue(row, byRole.get("rqe") ?? []),
+      linha: i + 2,
       extra,
     };
 
@@ -264,10 +311,62 @@ async function handleCommit(request: NextRequest) {
   const admin = adminResult.admin;
   const keys = [...candidates.keys()];
 
+  // 2a) Trocas de telefone ANTES de ler o que existe: o lead que estava no
+  // número velho passa a estar no novo, e o merge abaixo o encontra lá —
+  // conversa, análises e locações seguem com ele. Rodar a mesma planilha de
+  // novo não faz nada: o número velho já não é de ninguém como atual.
+  const trocas = [...candidates.values()].filter((c) => c.prevKey);
+  if (trocas.length > 0) {
+    const { data: antigos, error } = await admin
+      .from("wa_leads")
+      .select("id, phone_key, telefones_anteriores")
+      .in("phone_key", trocas.map((c) => c.prevKey as string));
+    if (error) {
+      console.error("[leads-import] select anteriores:", error);
+      return NextResponse.json(
+        {
+          error: "import_failed",
+          message: /telefones_anteriores/.test(error.message)
+            ? "Falta rodar a migração 0031 no Supabase."
+            : error.message,
+        },
+        { status: 500 },
+      );
+    }
+    const porChave = new Map(
+      ((antigos ?? []) as { id: string; phone_key: string; telefones_anteriores: string[] | null }[])
+        .map((l) => [l.phone_key, l]),
+    );
+    for (const c of trocas) {
+      const lead = porChave.get(c.prevKey as string);
+      if (!lead) continue;
+      const r = await trocarTelefone(admin, lead, {
+        phoneKey: c.phoneKey,
+        phoneE164: c.phoneE164,
+      });
+      if (r.ok) {
+        report.telefonesTrocados += 1;
+        porChave.delete(c.prevKey as string);
+      } else if (r.motivo === "numero_de_outro_lead") {
+        report.avisos.push({
+          linha: c.linha,
+          motivo: `o número novo já é do lead "${r.outro.nome}"; o lead do número anterior ficou como estava`,
+        });
+      } else if (r.motivo === "erro") {
+        report.avisos.push({ linha: c.linha, motivo: r.mensagem });
+      }
+    }
+  }
+
+  // Perfil, CRM e RQE entram no upsert só quando a planilha traz algum: as
+  // colunas são da 0031, e planilha comum não pode quebrar sem ela.
+  const comPerfil = [...candidates.values()].some((c) => c.perfil || c.crm || c.rqe);
+
   // 2) Busca o que já existe, para fazer o merge sem sobrescrever.
   const existing = new Map<string, ExistingLead>();
   const COLUNAS =
-    "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra, phone_e164, first_seen_at";
+    "id, phone_key, display_name, sheet_name, clinic_name, specialty, city, instagram, source, extra, phone_e164, first_seen_at" +
+    (comPerfil ? ", perfil_url, crm, rqe" : "");
   // Sem a migração 0019 a coluna não existe; a importação não pode parar por
   // isso — segue sem ela, com a regra antiga (a planilha manda no @).
   let comEscolha = true;
@@ -284,7 +383,15 @@ async function handleCommit(request: NextRequest) {
 
     if (error) {
       console.error("[leads-import] select error:", error);
-      return NextResponse.json({ error: "import_failed" }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: "import_failed",
+          message: /perfil_url|crm|rqe/.test(error.message)
+            ? "Falta rodar a migração 0031 no Supabase."
+            : undefined,
+        },
+        { status: 500 },
+      );
     }
     for (const row of (data ?? []) as unknown as ExistingLead[]) {
       existing.set(row.phone_key, row);
@@ -356,6 +463,15 @@ async function handleCommit(request: NextRequest) {
       // `prev ? prev.x : agora` e não `??`: lead antigo cuja data é nula
       // continua nula, em vez de ganhar a de hoje e parecer recém-conhecido.
       first_seen_at: prev ? prev.first_seen_at : new Date().toISOString(),
+      // Mesma regra de chaves iguais em todas as linhas (ver o aviso acima):
+      // ou todas trazem as três, ou nenhuma. O da planilha vence, vazio preserva.
+      ...(comPerfil
+        ? {
+            perfil_url: c.perfil ?? prev?.perfil_url ?? null,
+            crm: c.crm ?? prev?.crm ?? null,
+            rqe: c.rqe ?? prev?.rqe ?? null,
+          }
+        : {}),
     };
   });
 

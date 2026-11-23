@@ -51,6 +51,20 @@ const vazio: IngestResult = {
   telefoneInvalido: 0,
 };
 
+/** As mensagens de um número, e o que elas dizem sobre o lead. */
+type GrupoDeMensagens = {
+  phoneKey: string;
+  phoneE164: string;
+  chatId: string;
+  pushName: string | null;
+  primeira: string | null;
+  ultima: string | null;
+  ultimaEntrada: string | null;
+  ultimaSaida: string | null;
+  temEntrada: boolean;
+  mensagens: NormalizedMessage[];
+};
+
 /** Maior de duas datas ISO, tolerando nulos. */
 function maisRecente(a: string | null, b: string | null): string | null {
   if (!a) return b;
@@ -87,20 +101,7 @@ export async function ingestMessages(
   if (relevantes.length === 0) return resultado;
 
   // ---------------------------------------------------------------- agrupar
-  type Grupo = {
-    phoneKey: string;
-    phoneE164: string;
-    chatId: string;
-    pushName: string | null;
-    primeira: string | null;
-    ultima: string | null;
-    ultimaEntrada: string | null;
-    ultimaSaida: string | null;
-    temEntrada: boolean;
-    mensagens: NormalizedMessage[];
-  };
-
-  const grupos = new Map<string, Grupo>();
+  const grupos = new Map<string, GrupoDeMensagens>();
 
   for (const msg of relevantes) {
     // Rede de segurança, com o mesmo libphonenumber da importação de planilha.
@@ -165,6 +166,8 @@ export async function ingestMessages(
     // planilha tinha com, queremos guardar a forma discável.
     if (phoneE164.length > g.phoneE164.length) g.phoneE164 = phoneE164;
   }
+
+  await juntarNumerosAnteriores(admin, grupos);
 
   const chaves = [...grupos.keys()];
 
@@ -281,6 +284,67 @@ export async function ingestMessages(
   await registrarRespostasDeJanela(admin, grupos.values(), idPorChave);
 
   return resultado;
+}
+
+/**
+ * Número que um lead já usou (`telefones_anteriores`, 0031) continua sendo
+ * dele: o grupo daquele número passa para a chave atual do lead, em vez de
+ * virar um lead novo. É o que permite trocar o fixo pelo celular sem que a
+ * próxima mensagem do fixo recrie o lead antigo.
+ *
+ * O telefone e o JID gravados continuam os do lead (o número novo) — a
+ * mensagem do número velho não desfaz a troca.
+ *
+ * Sem a migração a coluna não existe; aí nada é juntado, como antes.
+ */
+async function juntarNumerosAnteriores(
+  admin: SupabaseClient,
+  grupos: Map<string, GrupoDeMensagens>,
+) {
+  const chaves = [...grupos.keys()];
+  if (chaves.length === 0) return;
+
+  const { data, error } = await admin
+    .from("wa_leads")
+    .select("phone_key, phone_e164, wa_jid, telefones_anteriores")
+    .overlaps("telefones_anteriores", chaves);
+  if (error) {
+    if (!/telefones_anteriores/.test(error.message)) {
+      console.error("[wa-ingest] números anteriores:", error.message);
+    }
+    return;
+  }
+
+  for (const lead of (data ?? []) as {
+    phone_key: string;
+    phone_e164: string;
+    wa_jid: string | null;
+    telefones_anteriores: string[];
+  }[]) {
+    for (const antiga of lead.telefones_anteriores) {
+      const velho = grupos.get(antiga);
+      if (!velho) continue;
+      grupos.delete(antiga);
+
+      const atual = grupos.get(lead.phone_key);
+      if (!atual) {
+        grupos.set(lead.phone_key, {
+          ...velho,
+          phoneKey: lead.phone_key,
+          phoneE164: lead.phone_e164,
+          chatId: lead.wa_jid ?? velho.chatId,
+        });
+        continue;
+      }
+      atual.mensagens.push(...velho.mensagens);
+      atual.primeira = maisAntiga(atual.primeira, velho.primeira);
+      atual.ultima = maisRecente(atual.ultima, velho.ultima);
+      atual.ultimaEntrada = maisRecente(atual.ultimaEntrada, velho.ultimaEntrada);
+      atual.ultimaSaida = maisRecente(atual.ultimaSaida, velho.ultimaSaida);
+      atual.temEntrada ||= velho.temEntrada;
+      atual.pushName ??= velho.pushName;
+    }
+  }
 }
 
 /**

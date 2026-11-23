@@ -216,6 +216,45 @@ viraria dois leads com a conversa dividida ao meio.
 `waPhoneKey()` em `src/lib/leads/phone.ts` normaliza isso, e o `unique` do
 banco é nessa chave.
 
+## Trocar o telefone do lead
+
+O lead é identificado pelo telefone (`phone_key`). Quando a prospecção acha o
+celular de quem estava com o fixo, o **mesmo lead** muda de número — conversa,
+análises, locações e marcações seguem com ele. Migração `0031`.
+
+- **Na ficha:** "Trocar telefone", abaixo do número. O número velho aparece em
+  "Antes:".
+- **Na importação:** coluna **"Telefone anterior"** (também "telefone antigo",
+  "número anterior"). A linha com Telefone = celular novo e Telefone anterior
+  = fixo troca o número do lead do fixo antes do merge, e o relatório conta
+  "com telefone trocado". Sem lead no número anterior, a linha segue como
+  sempre. Acabou a aba "Arquivar no Radar".
+- **Recusa:** número novo que já é de outro lead (atual ou antigo) não é
+  trocado. A ficha mostra o link desse lead; a importação lista em "trocas não
+  feitas". Juntar dois leads é decisão do dono.
+- **O que é zerado:** `wa_jid` e a verificação do WhatsApp, que eram do número
+  velho. A ficha verifica o novo ao abrir.
+- **Sincronização:** mensagem de um número em `telefones_anteriores` cai no
+  lead atual (`juntarNumerosAnteriores()` em `ingest.ts`), sem recriar o
+  antigo e sem trocar o número de volta.
+- **Locações:** o gatilho da 0030 também roda na troca, e liga as locações
+  soltas do número novo.
+- **Exportação:** "Telefone anterior" traz o último número antigo, com o nome
+  que a importação reconhece — reimportar não desfaz nada.
+
+Lógica em `src/lib/leads/troca-telefone.ts` (`trocarTelefone()`), usada pela
+Server Action `trocarTelefoneLead` e pela rota de importação.
+
+### Perfil, CRM e RQE
+
+Também na `0031`: `perfil_url`, `crm` e `rqe`, preenchidos pelas colunas
+"Perfil" / "Link do perfil", "CRM" e "RQE" da planilha. A ficha mostra a
+origem pelo domínio do link (Catálogo Médico, Doctoralia ou o site). Link que
+não é http(s) com domínio vai para `extra`, nunca para um `href`. O valor da
+planilha vence; vazio preserva o que já estava. A importação só escreve essas
+colunas quando a planilha traz alguma delas, para planilha comum não depender
+da migração.
+
 ## Instagram
 
 A planilha de prospecção traz o Instagram escrito de todo jeito: `@fulana`,

@@ -20,6 +20,10 @@ const ROLE_OPTIONS: { value: ColumnRole; label: string }[] = [
   { value: "city", label: "Cidade" },
   { value: "email", label: "E-mail" },
   { value: "instagram", label: "Instagram" },
+  { value: "previous_phone", label: "Telefone anterior (troca o número do lead)" },
+  { value: "profile_url", label: "Link do perfil" },
+  { value: "crm", label: "CRM" },
+  { value: "rqe", label: "RQE" },
   { value: "custom", label: "Guardar como extra" },
 ];
 
@@ -131,10 +135,27 @@ export function ImportClient() {
             {" · "}
             {report.atualizados}{" "}
             {report.atualizados === 1 ? "atualizado" : "atualizados"}
+            {report.telefonesTrocados > 0
+              ? ` · ${report.telefonesTrocados} com telefone trocado`
+              : ""}
             {report.invalidos.length > 0
               ? ` · ${report.invalidos.length} linha(s) ignorada(s)`
               : ""}
           </p>
+          {report.avisos?.length ? (
+            <details className="mt-2" open>
+              <summary className="cursor-pointer">
+                {report.avisos.length} troca(s) de telefone não feita(s)
+              </summary>
+              <ul className="mt-1 space-y-0.5">
+                {report.avisos.slice(0, 50).map((a, i) => (
+                  <li key={i}>
+                    Linha {a.linha}: {a.motivo}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           {report.invalidos.length > 0 ? (
             <details className="mt-2">
               <summary className="cursor-pointer">

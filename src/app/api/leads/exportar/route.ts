@@ -5,6 +5,7 @@ import { getLeadsParaExportar } from "@/app/derma-lux/leads-data";
 import {
   estadoContato,
   formatPhoneBR,
+  formatPhoneKeyBR,
   instagramDoLead,
   situacaoEfetiva,
   temWhatsApp,
@@ -113,6 +114,15 @@ export async function GET() {
         const h = instagramDoLead(lead);
         return h ? `@${h}` : "";
       })(),
+      // Só o último número antigo, com o mesmo nome da coluna que a importação
+      // reconhece: reimportar a planilha exportada não troca nada de volta.
+      "Telefone anterior": (() => {
+        const k = lead.telefones_anteriores?.at(-1);
+        return k ? formatPhoneKeyBR(k) : "";
+      })(),
+      Perfil: lead.perfil_url ?? "",
+      CRM: lead.crm ?? "",
+      RQE: lead.rqe ?? "",
       "Apelido no contato": lead.display_name ?? "",
       Tipo: TIPO_LABEL[lead.lead_kind] ?? "",
       Origem: ORIGEM_LABEL[lead.source] ?? "",
