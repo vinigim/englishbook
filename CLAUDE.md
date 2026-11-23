@@ -26,6 +26,7 @@ lasers to doctors and aesthetic clinics. It has two areas, both behind the same 
 | `/derma-lux/parametros` | AI recommender for SmartXide Punto (CO2 laser) settings |
 | `/derma-lux/manuseio` | Field checklists (install / uninstall the laser). Static steps in `procedimentos.ts`, progress in `localStorage` only; a finished checklist is sent through the owner's WhatsApp (`whatsapp://send?text=`, no number), optionally tagged with a rental from yesterday–tomorrow |
 | `oculos-g2/` | Even G2 glasses app showing a rental's saved settings (own `package.json`) |
+| `ferramentas/varredura/` | Python lead sweep (catalogo.med.br + Doctoralia) run by a scheduled session on the 1st and 15th; reads the Radar base from `/api/varredura/base` (`VARREDURA_TOKEN`). See its README |
 
 `/` redirects to `/derma-lux` (`next.config.mjs`). UI language is pt-BR throughout.
 
