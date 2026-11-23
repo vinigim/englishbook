@@ -22,3 +22,7 @@ next-env.d.ts
 
 # vercel
 .vercel
+
+# varredura de leads (cache e saídas com dado de lead)
+/.varredura/
+__pycache__/

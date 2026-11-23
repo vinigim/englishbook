@@ -1,0 +1,70 @@
+# Ordem das rodadas da varredura: 8 cidades por rodada, de cima para baixo, e
+# depois recomeça (médico novo aparece nos sites com o tempo). As primeiras
+# ainda não passaram pelo catálogo; as últimas já passaram em 21/11/2026.
+# Fora de SP: "Nome/UF". Leads novos só até 200 km de Penápolis; cidade mais
+# longe ainda serve para achar celular de quem já está no Radar.
+Penápolis
+Araçatuba
+Birigui
+São José do Rio Preto
+Bauru
+Marília
+Catanduva
+Votuporanga
+Araraquara
+São Carlos
+Jaú
+Botucatu
+Franca
+Uberaba/MG
+Ourinhos
+Assis
+Andradina
+Jales
+Tupã
+Adamantina
+Dracena
+Lençóis Paulista
+Mirassol
+Olímpia
+Matão
+Ibitinga
+Jaboticabal
+Taquaritinga
+Novo Horizonte
+José Bonifácio
+Promissão
+Garça
+Cornélio Procópio/PR
+Bandeirantes/PR
+Rolândia/PR
+Cambé/PR
+Ibiporã/PR
+Jacarezinho/PR
+Andirá/PR
+Bela Vista do Paraíso/PR
+Três Lagoas/MS
+Ilha Solteira
+Pereira Barreto
+Mirandópolis
+Osvaldo Cruz
+Presidente Venceslau
+Santa Cruz do Rio Pardo
+Monte Alto
+Monte Aprazível
+Pederneiras
+Barra Bonita
+São Manuel
+Orlândia
+Guaíra
+Agudos
+Avaré
+Ribeirão Preto
+Londrina/PR
+Presidente Prudente
+Barretos
+Fernandópolis
+Sertãozinho
+Bebedouro
+Lins
+Bariri

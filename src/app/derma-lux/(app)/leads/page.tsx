@@ -4,6 +4,7 @@ import {
   countLeads,
   countPendingAnalysis,
   getAnalysisSpend,
+  getFilaDoDia,
   getLeadsInbox,
   INBOX_LIMIT,
 } from "../../leads-data";
@@ -65,11 +66,12 @@ function paraALista(rows: LeadInboxRow[]): LeadInboxRow[] {
 }
 
 export default async function LeadsPage() {
-  const [rows, total, pending, spend] = await Promise.all([
+  const [rows, total, pending, spend, fila] = await Promise.all([
     getLeadsInbox(),
     countLeads(),
     countPendingAnalysis(),
     getAnalysisSpend(),
+    getFilaDoDia(),
   ]);
 
   // Os filtros e a busca rodam sobre `rows`, então um lead não carregado é um
@@ -159,7 +161,7 @@ export default async function LeadsPage() {
               para o banco — me avise.
             </Alert>
           ) : null}
-          <InboxClient rows={paraALista(rows)} />
+          <InboxClient rows={paraALista(rows)} fila={fila} />
         </>
       )}
     </div>
