@@ -551,6 +551,100 @@ export async function trocarTelefoneLead(
   return { ok: true };
 }
 
+// ============================================================================
+//  Juntar dois leads que são a mesma pessoa (0033)
+// ============================================================================
+
+export type LeadParaJuntar = {
+  id: string;
+  nome: string;
+  telefone: string;
+  mensagens: number;
+  locacoes: number;
+};
+
+/**
+ * Acha, pelo telefone, o lead com quem juntar este. Só consulta: a tela mostra
+ * quem é antes de o dono confirmar.
+ */
+export async function acharLeadParaJuntar(
+  id: string,
+  numero: string,
+): Promise<ActionResult & { lead?: LeadParaJuntar }> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+  if (!idSchema.safeParse(id).success) return { ok: false, error: "ID inválido." };
+
+  const tel = toLeadPhone(z.string().trim().max(40).catch("").parse(numero));
+  if (!tel) {
+    return { ok: false, error: "Número inválido. Use DDD + número, ex: (18) 99999-8888." };
+  }
+
+  const { data, error } = await supabase
+    .from("wa_leads")
+    .select("id, phone_e164, display_name, sheet_name, clinic_name, is_group")
+    .or(`phone_key.eq.${tel.phoneKey},telefones_anteriores.cs.{${tel.phoneKey}}`)
+    .limit(1);
+  if (error) return { ok: false, error: error.message };
+  const outro = data?.[0];
+  if (!outro) return { ok: false, error: "Nenhum lead com esse número." };
+  if (outro.id === id) return { ok: false, error: "Esse número é deste lead." };
+  if (outro.is_group) return { ok: false, error: "Esse número é de um grupo." };
+
+  const [msgs, locs] = await Promise.all([
+    supabase.from("wa_messages").select("id", { count: "exact", head: true }).eq("lead_id", outro.id),
+    supabase.from("rentals").select("id", { count: "exact", head: true }).eq("wa_lead_id", outro.id),
+  ]);
+
+  return {
+    ok: true,
+    lead: {
+      id: outro.id,
+      nome:
+        outro.display_name || outro.sheet_name || outro.clinic_name || outro.phone_e164,
+      telefone: outro.phone_e164,
+      mensagens: msgs.count ?? 0,
+      locacoes: locs.count ?? 0,
+    },
+  };
+}
+
+/**
+ * Passa este lead (origem) para dentro de outro (destino) e apaga a origem.
+ * O trabalho todo é a função `juntar_leads` do banco, numa transação só.
+ */
+export async function juntarLeads(
+  origemId: string,
+  destinoId: string,
+): Promise<ActionResult> {
+  const supabase = await requireSupabase();
+  if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
+  if (!idSchema.safeParse(origemId).success || !idSchema.safeParse(destinoId).success) {
+    return { ok: false, error: "ID inválido." };
+  }
+
+  const { error } = await supabase.rpc("juntar_leads", {
+    p_origem: origemId,
+    p_destino: destinoId,
+  });
+  if (error) {
+    const msg = error.message;
+    if (/juntar_leads/.test(msg) && /function|schema cache/i.test(msg)) {
+      return { ok: false, error: "Falta rodar a migração 0033 no Supabase." };
+    }
+    if (msg.includes("sem_permissao")) return { ok: false, error: "Sem permissão." };
+    if (msg.includes("lead_nao_encontrado")) return { ok: false, error: "Lead não encontrado." };
+    if (msg.includes("mesmo_lead")) return { ok: false, error: "É o mesmo lead." };
+    if (msg.includes("grupo")) return { ok: false, error: "Grupo não pode ser juntado." };
+    console.error("[juntar-leads]", msg);
+    return { ok: false, error: msg };
+  }
+
+  revalidatePath("/derma-lux/leads");
+  revalidatePath(`/derma-lux/leads/${destinoId}`);
+  return { ok: true };
+}
+
 export async function archiveLead(id: string): Promise<ActionResult> {
   const supabase = await requireSupabase();
   if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };

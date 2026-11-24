@@ -26,7 +26,13 @@ export default async function DermaLuxAppLayout({
     <div className="min-h-screen">
       <DermaLuxNav email={user.email ?? ""} />
       <RealtimeRefresher />
-      <main className="py-8 md:py-10">
+      {/*
+        overflow-x-clip: rede de segurança. Qualquer coisa mais larga que a
+        tela (um link comprido, uma tabela) deixava a página mais larga, e o
+        celular encolhia o site inteiro para caber. Assim o excesso é cortado
+        e o resto da página fica no tamanho certo.
+      */}
+      <main className="py-8 md:py-10 overflow-x-clip">
         <Container size="xl">{children}</Container>
       </main>
     </div>
