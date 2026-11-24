@@ -18,6 +18,10 @@ import { RADAR_PATH, urlDoRadar, veioDoRadar } from "./filtros-radar";
  */
 export function VoltarAoRadar() {
   const [href, setHref] = useState(RADAR_PATH);
+  // A lista pode levar uns segundos para voltar. Sem sinal nenhum, o toque
+  // parecia não ter funcionado, e o segundo toque ia parar numa navegação nova
+  // por cima do "Voltar" que já estava a caminho.
+  const [voltando, setVoltando] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -29,6 +33,11 @@ export function VoltarAoRadar() {
     <Link
       href={href}
       onClick={(e) => {
+        if (voltando) {
+          e.preventDefault();
+          return;
+        }
+        setVoltando(true);
         const leadId = pathname.split("/").pop() ?? "";
         if (window.history.length > 1 && veioDoRadar(leadId)) {
           e.preventDefault();
@@ -37,7 +46,7 @@ export function VoltarAoRadar() {
       }}
       className="text-sm text-muted hover:text-ink transition-colors"
     >
-      ← Voltar ao radar
+      {voltando ? "Voltando ao radar…" : "← Voltar ao radar"}
     </Link>
   );
 }

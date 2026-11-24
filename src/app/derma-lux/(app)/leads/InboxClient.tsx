@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
@@ -32,7 +32,11 @@ import type { LeadInboxRow } from "../../leads-types";
 import { BuscaInstagramLote } from "./BuscaInstagramLote";
 import { FilaDoDia } from "./FilaDoDia";
 import type { FilaDoDia as FilaDoDiaTipo } from "../../fila-do-dia";
-import { guardarFiltrosDoRadar, marcarLeadAbertoDoRadar } from "./filtros-radar";
+import {
+  guardarFiltrosDoRadar,
+  marcarLeadAbertoDoRadar,
+  rolagemGuardadaDoRadar,
+} from "./filtros-radar";
 
 const TEMPERATURE_VARIANT: Record<
   EffectiveTemperature,
@@ -387,6 +391,19 @@ export function InboxClient({
     );
     guardarFiltrosDoRadar(query);
   }, [filtro, situacao, instagram, whatsapp, busca]);
+
+  // De volta de um lead: a lista volta para onde estava (ver
+  // rolagemGuardadaDoRadar). useLayoutEffect para o salto acontecer antes da
+  // pintura, sem a lista aparecer no topo e depois pular.
+  useLayoutEffect(() => {
+    const y = rolagemGuardadaDoRadar();
+    if (y === null) return;
+    window.scrollTo(0, y);
+    // O navegador e o Next também tentam restaurar a rolagem no "Voltar";
+    // se um deles chegar depois, este segundo quadro corrige.
+    const quadro = requestAnimationFrame(() => window.scrollTo(0, y));
+    return () => cancelAnimationFrame(quadro);
+  }, []);
 
   // Cada linha de chips rola na horizontal no celular, e um chip ligado lá no
   // fim ficava fora da tela: a lista vinha vazia sem nada aparentemente
