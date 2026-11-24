@@ -700,7 +700,7 @@ export function LeadDetailClient({
               {extras.map(([chave, valor]) => (
                 <div key={chave} className="sm:contents">
                   <dt className="text-muted sm:text-right">{chave}</dt>
-                  <dd className="text-ink m-0 break-words">{valor}</dd>
+                  <dd className="text-ink m-0 min-w-0 [overflow-wrap:anywhere]">{valor}</dd>
                 </div>
               ))}
             </dl>
@@ -728,7 +728,7 @@ export function LeadDetailClient({
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* -------------------------------------------------------- conversa */}
-        <Card variant="bordered" className="order-2 lg:order-1">
+        <Card variant="bordered" className="order-2 lg:order-1 min-w-0">
           <CardTitle className="text-xl mb-3">Conversa</CardTitle>
           {/*
             A altura da conversa é relativa à tela no celular: um bloco fixo de
@@ -749,7 +749,7 @@ export function LeadDetailClient({
         </Card>
 
         {/* -------------------------------------------- análise e sugestão */}
-        <div className="order-1 lg:order-2 space-y-4">
+        <div className="order-1 lg:order-2 space-y-4 min-w-0">
           <Card variant="bordered">
             <div className="flex items-start justify-between gap-3 mb-3">
               <CardTitle className="text-xl">Leitura da IA</CardTitle>
@@ -1279,7 +1279,7 @@ function MessageBubble({ msg }: { msg: WaMessage }) {
     <li className={cn("flex", daEmpresa ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] px-3 py-2 text-sm",
+          "max-w-[85%] min-w-0 px-3 py-2 text-sm",
           daEmpresa
             ? "bg-brand text-paper"
             : "bg-line/50 text-ink border border-line",
@@ -1304,7 +1304,12 @@ function MessageBubble({ msg }: { msg: WaMessage }) {
           </p>
         ) : null}
 
-        {texto ? <p className="whitespace-pre-wrap">{texto}</p> : null}
+        {/*
+          `anywhere`, e não só `break-words`: um link comprido numa mensagem
+          alargava a coluna inteira, a página ficava mais larga que a tela e o
+          celular reduzia tudo (o cabeçalho ocupava só metade da largura).
+        */}
+        {texto ? <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{texto}</p> : null}
 
         <p
           className={cn(
