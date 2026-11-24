@@ -217,8 +217,10 @@ export function itemFeito(
 ): boolean {
   if (!linha) return true; // arquivado ou apagado desde a montagem
   if (fora(linha)) return true;
+  // Como datas, e não como texto: o banco devolve "+00:00" e a fila guarda
+  // "Z"; comparar as strings só funcionava por coincidência de formato.
   const saida = ultimaSaida(linha.lead);
-  if (saida && saida > geradaEm) return true;
+  if (saida && new Date(saida).getTime() > new Date(geradaEm).getTime()) return true;
   if (secao === "responder") {
     return estadoContato(linha.lead).estado !== "devo_responder";
   }
