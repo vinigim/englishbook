@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import {
@@ -395,6 +395,8 @@ export function InboxClient({
   // De volta de um lead: a lista volta para onde estava (ver
   // rolagemGuardadaDoRadar). useLayoutEffect para o salto acontecer antes da
   // pintura, sem a lista aparecer no topo e depois pular.
+  const router = useRouter();
+  const ultimaAtualizacao = useRef(0);
   useLayoutEffect(() => {
     const y = rolagemGuardadaDoRadar();
     if (y === null) return;
@@ -402,8 +404,39 @@ export function InboxClient({
     // O navegador e o Next também tentam restaurar a rolagem no "Voltar";
     // se um deles chegar depois, este segundo quadro corrige.
     const quadro = requestAnimationFrame(() => window.scrollTo(0, y));
+    // A lista que voltou pode ser a cópia de antes de abrir o lead. A mensagem
+    // enviada pelo WhatsApp só chega pela sincronização, então busca os dados
+    // de novo em segundo plano: a tela continua usável, e o ✓ da Fila do dia
+    // aparece quando a resposta chega.
+    ultimaAtualizacao.current = Date.now();
+    router.refresh();
     return () => cancelAnimationFrame(quadro);
-  }, []);
+  }, [router]);
+
+  // Voltar do app do WhatsApp para o navegador também atualiza: é o caminho
+  // de quem manda a mensagem pelo celular. A sincronização leva alguns
+  // segundos, então repete uma vez depois de 15 s. No máximo uma busca a cada
+  // 10 s, porque cada uma remonta a lista inteira no servidor.
+  useEffect(() => {
+    let depois: ReturnType<typeof setTimeout> | undefined;
+    const atualizar = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaAtualizacao.current < 10_000) return;
+      ultimaAtualizacao.current = Date.now();
+      router.refresh();
+    };
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      atualizar();
+      clearTimeout(depois);
+      depois = setTimeout(atualizar, 15_000);
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      clearTimeout(depois);
+    };
+  }, [router]);
 
   // Cada linha de chips rola na horizontal no celular, e um chip ligado lá no
   // fim ficava fora da tela: a lista vinha vazia sem nada aparentemente
