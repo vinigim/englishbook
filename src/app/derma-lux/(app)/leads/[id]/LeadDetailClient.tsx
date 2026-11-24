@@ -119,7 +119,23 @@ export function LeadDetailClient({
   /** Média de tokens de uma análise com rascunho. Nulo = sem histórico ainda. */
   tokenProfile: TokenUsage | null;
 }) {
-  const { lead, messages, analysis, rentals } = detail;
+  const { messages, analysis, rentals } = detail;
+  // Resposta da consulta automática do WhatsApp, mostrada sem recarregar a
+  // página (ver `verificar`). Vale só para o número consultado: se o telefone
+  // for trocado, a ficha volta a ler o que vem do servidor.
+  const [whatsappAgora, setWhatsappAgora] = useState<{
+    numero: string;
+    existe: boolean;
+    em: string;
+  } | null>(null);
+  const lead =
+    whatsappAgora && whatsappAgora.numero === detail.lead.phone_e164
+      ? {
+          ...detail.lead,
+          whatsapp_existe: whatsappAgora.existe,
+          whatsapp_verificado_em: whatsappAgora.em,
+        }
+      : detail.lead;
   // A escolha vale por clique e não é gravada em lugar nenhum: assim não
   // existe jeito de ela ficar esquecida ligada no modelo caro.
   const [modelo, setModelo] = useState<DraftModel>(MODELO_PADRAO);
@@ -329,13 +345,23 @@ export function LeadDetailClient({
   const [erroWhatsApp, setErroWhatsApp] = useState<string | null>(null);
   const autoVerificado = useRef(false);
 
-  async function verificar() {
+  /**
+   * `automatica`: a consulta que a ficha faz sozinha ao abrir. Ela não
+   * recarrega nada — nem esta página, nem o radar —, porque qualquer recarga
+   * aqui fazia o Next descartar a lista do radar guardada na memória, e o
+   * "← Voltar ao radar" ficava lento e pulava de lugar. A resposta entra na
+   * tela pelo estado local.
+   */
+  async function verificar(automatica = false) {
     setVerificando(true);
     setErroWhatsApp(null);
     try {
-      const r = await verificarWhatsApp({ id: lead.id });
+      const numero = lead.phone_e164;
+      const r = await verificarWhatsApp({ id: lead.id, silenciosa: automatica });
       if (!r.ok) setErroWhatsApp(r.error ?? "Não consegui verificar.");
-      else router.refresh();
+      else if (automatica && numero && typeof r.existe === "boolean") {
+        setWhatsappAgora({ numero, existe: r.existe, em: new Date().toISOString() });
+      } else router.refresh();
     } catch {
       setErroWhatsApp("A resposta não chegou. Tente de novo.");
     } finally {
@@ -346,7 +372,7 @@ export function LeadDetailClient({
   useEffect(() => {
     if (!lead.phone_e164 || whatsapp !== null || autoVerificado.current) return;
     autoVerificado.current = true;
-    void verificar();
+    void verificar(true);
     // Só na montagem: a nova resposta chega por props, e o ref impede uma
     // segunda consulta automática se ela falhar.
   }, [lead.phone_e164, whatsapp]);

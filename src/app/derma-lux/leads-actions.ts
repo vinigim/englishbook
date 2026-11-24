@@ -622,7 +622,18 @@ export type VerificacaoResult = ActionResult & {
   existe?: boolean;
 };
 
-const verificacaoSchema = z.object({ id: z.string().uuid("ID inválido").optional() });
+const verificacaoSchema = z.object({
+  id: z.string().uuid("ID inválido").optional(),
+  /**
+   * A consulta automática da ficha não invalida o radar. Uma revalidação numa
+   * Server Action faz o Next jogar fora a lista que estava guardada na
+   * memória, e o "← Voltar ao radar" deixava de ser instantâneo: remontava os
+   * ~1000 leads no servidor, com a página pulando de lugar no meio do caminho.
+   * A ficha mostra a resposta sozinha (`existe`), e o radar a lê na próxima
+   * carga.
+   */
+  silenciosa: z.boolean().optional(),
+});
 
 function erroDeVerificacao(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -646,7 +657,7 @@ function erroDeVerificacao(err: unknown): string {
  * falta de resposta esconderia o botão do WhatsApp de quem tem.
  */
 export async function verificarWhatsApp(
-  input: { id?: string } = {},
+  input: { id?: string; silenciosa?: boolean } = {},
 ): Promise<VerificacaoResult> {
   const supabase = await requireSupabase();
   if (!supabase) return { ok: false, error: "Sessão expirada. Entre novamente." };
@@ -655,7 +666,7 @@ export async function verificarWhatsApp(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message };
   }
-  const { id } = parsed.data;
+  const { id, silenciosa } = parsed.data;
 
   const provider = getWhatsAppProvider();
   if (!provider.checkNumbers) {
@@ -716,7 +727,9 @@ export async function verificarWhatsApp(
       restantes = count ?? 0;
     }
 
-    if (id) revalidateLead(id);
+    if (id && silenciosa) {
+      // sem revalidação: ver o esquema
+    } else if (id) revalidateLead(id);
     else revalidatePath("/derma-lux/leads");
 
     return {
