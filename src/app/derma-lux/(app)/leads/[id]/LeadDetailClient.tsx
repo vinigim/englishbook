@@ -72,6 +72,7 @@ import { pareceRespostaAutomatica } from "@/lib/leads/resposta-automatica";
 import { BuscarInstagram } from "./BuscarInstagram";
 import { InstagramNaoEncontrado } from "./InstagramNaoEncontrado";
 import { TrocarTelefone } from "./TrocarTelefone";
+import { JuntarLead } from "./JuntarLead";
 import { linkDoPerfil, origemDoPerfil } from "@/lib/leads/troca-telefone";
 import { urlDoRadar } from "../filtros-radar";
 
@@ -585,6 +586,7 @@ export function LeadDetailClient({
               leadId={lead.id}
               anteriores={lead.telefones_anteriores ?? []}
             />
+            <JuntarLead leadId={lead.id} nomeAtual={leadDisplayName(lead)} />
             {lead.clinic_name ? <p>{lead.clinic_name}</p> : null}
             {/* De onde veio a prospecção (0031): o link leva ao perfil, que é
                 onde se confere o endereço e o telefone antes de abordar. */}

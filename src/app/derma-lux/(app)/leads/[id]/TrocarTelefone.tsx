@@ -94,6 +94,11 @@ export function TrocarTelefone({
                   Abrir esse lead
                 </Link>
               ) : null}
+              {outro ? (
+                <span className="block font-normal text-muted mt-1">
+                  Se é a mesma pessoa, use &quot;Juntar com outro lead&quot;.
+                </span>
+              ) : null}
             </p>
           ) : null}
         </form>
